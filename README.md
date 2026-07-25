@@ -16,7 +16,7 @@ Works in **Claude Code**, **Claude Cowork**, and (as a manual prompt pack) **Cod
 **Claude Code:**
 
 ```
-/plugin marketplace add <your-github-user>/compute-squad
+/plugin marketplace add NickyStaffs29/compute-squad
 /plugin install compute-squad@compute-squad
 ```
 
