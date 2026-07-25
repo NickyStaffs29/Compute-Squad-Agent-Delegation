@@ -20,7 +20,7 @@ Works in **Claude Code**, **Claude Cowork**, and (as a manual prompt pack) **Cod
 /plugin install compute-squad@compute-squad
 ```
 
-**Claude Cowork:** download `compute-squad.plugin` from [Releases](../../releases), drop it into a chat, and accept the install.
+**Claude Cowork:** download [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/compute-squad/raw/main/dist/compute-squad.plugin), drop it into a chat, and accept the install.
 
 **Codex:** no install. Use the prompt pack in [`codex/`](codex/) — the same pipeline as a manually-run sequence of sessions. See [`codex/README.md`](codex/README.md).
 
@@ -76,7 +76,8 @@ compute-squad/
 │   ├── squad-executor.md     # Sonnet · implementation (Opus override on COMPLEX)
 │   └── squad-mech.md         # Haiku · the intern
 ├── codex/                    # the pipeline as manual Codex session prompts
-└── docs/example-log.md       # a complete worked run
+├── docs/example-log.md       # a complete worked run
+└── dist/compute-squad.plugin # drag-and-drop install package for Claude Cowork
 ```
 
 ## FAQ
