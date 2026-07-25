@@ -47,7 +47,7 @@ Or from inside a Claude Code session:
 **Claude Cowork.** Download the package and drop it into any chat, then accept the install:
 
 ```bash
-curl -L -o compute-squad.plugin https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin
+curl -L -o compute-squad.plugin https://raw.githubusercontent.com/NickyStaffs29/Compute-Squad-Agent-Delegation/main/dist/compute-squad.plugin
 ```
 
 Or grab [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin) directly.
