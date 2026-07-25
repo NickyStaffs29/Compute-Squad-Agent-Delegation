@@ -3,11 +3,11 @@ name: compute-squad
 description: >
   This skill should be used when the user asks to "run the squad", "run compute squad",
   "compute squad this", "squad run", or wants a code change executed through the
-  Compute Squad delegation pipeline (Strategy → Recon → Plan → Execute → Accept) with
-  COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
+  Compute Squad delegation pipeline (Strategy → Archive → Recon → Plan → Execute → Accept)
+  with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
 metadata:
-  version: "3.2.0"
+  version: "3.3.0"
   author: "Nick Stafford"
 ---
 
@@ -17,7 +17,8 @@ Run the goal through the pipeline with the v3 role hierarchy:
 
 - **Main session (top-tier model recommended): strategy.** Interrogates the goal, identifies gaps, clarifies them with the user, locks acceptance criteria, renders final judgment. Runs directly in the main session because only the main session can ask the user questions.
 - **Opus: PM.** Plans the work and accepts the deliverable (`squad-pm`, PLAN and ACCEPT modes).
-- **Sonnet: execution.** Codebase mapping (`squad-recon`) and implementation (`squad-executor`).
+- **Sonnet: execution.** Codebase mapping (`squad-recon`), implementation (`squad-executor`), and delegated execution-tier subtasks (`squad-helper`).
+- **Opus: execution on COMPLEX.** The same executor protocol on the stronger model (`squad-executor-opus`).
 - **Haiku: intern.** Zero-judgment busywork (`squad-mech`).
 
 Coordinate exclusively through `COMPUTE_SQUAD_LOG.md` in the repo root. Full routing rules in `references/routing-rules.md`.
@@ -31,9 +32,11 @@ Do this directly in the main session; never delegate it:
 3. Clarify gaps WITH THE USER via AskUserQuestion before the pipeline starts. Batch the questions; do not drip them. If the session is clearly unattended, make the most reasonable call per gap, state each assumption explicitly, and proceed.
 4. Lock the goal (one sentence) and acceptance criteria (concrete, verifiable). Once locked, no agent may redefine them; changes come back to Stage 0.
 
+If `COMPUTE_SQUAD_LOG.md` already contains entries for this same goal, offer the user a resume from the last logged entry instead of a fresh run, and archive only if they choose the fresh run.
+
 ## Stage 1 — Archive (squad-mech, Haiku)
 
-Spawn `squad-mech` to archive any non-empty `COMPUTE_SQUAD_LOG.md` to a timestamped file (in `codex-prompts/compute-squad-archive/` if it exists, else `compute-squad-archive/`) and start with an empty active log. Never discard a prior or failed run.
+Spawn `squad-mech` to archive any non-empty `COMPUTE_SQUAD_LOG.md` to a timestamped file in `compute-squad-archive/` in the repo root, and start with an empty active log. Never discard a prior or failed run.
 
 ## Stage 2 — Recon (squad-recon, Sonnet)
 
@@ -49,24 +52,25 @@ If the PM logs a named blocker requiring a human decision, return to Stage 0: su
 
 Route by the PM's classification:
 
-- **MECHANICAL / STANDARD** → spawn `squad-executor` as defined (Sonnet).
-- **COMPLEX** → spawn `squad-executor` with an Opus model override.
+- **MECHANICAL / STANDARD** → spawn `squad-executor` (Sonnet).
+- **COMPLEX** → spawn `squad-executor-opus` (Opus), the same protocol on the stronger model.
 
 When unsure, route up: a wrong answer that forces a re-run costs more than the tier difference.
 
 ## Stage 5 — Accept (squad-pm in ACCEPT mode, Opus)
 
-Spawn `squad-pm` with mode ACCEPT. Being Opus, it is never weaker than the Sonnet execution it reviews; if the Executor ran on an Opus override, acceptance stays at least at Opus.
+Spawn `squad-pm` with mode ACCEPT. Being Opus, it is never weaker than the Sonnet execution it reviews; if execution ran on `squad-executor-opus`, acceptance stays at Opus.
 
-- **PASS:** the PM clears the log as its final step. If it flagged the change high-stakes (auth, payments, migrations, privacy, production config), do a final review directly in the main session before declaring the run complete. Then report outcome and evidence to the user.
+- **PASS:** the PM appends its PASS entry, archives the full log to `compute-squad-archive/` and verifies the copy, then clears the active log only if the change is not high-stakes. If it flagged the change high-stakes (auth, payments, migrations, privacy, production config), the PM leaves the active log intact: do the final review directly in the main session, then clear the log yourself before declaring the run complete. Report outcome and evidence to the user either way.
 - **FAIL:** the PM names exactly one stage to re-run (Recon, Plan, or Executor). Re-run that stage and all stages after it with the log intact.
+- **PM — Accept (pending):** the PM needed delegated work before it could decide. Run the `DELEGATE:` block, append the results, and re-spawn the PM in ACCEPT mode for the verdict.
 
 ## Intra-stage delegation (the DELEGATE protocol)
 
 The role hierarchy is fractal: every level pushes its own busywork down a tier. Subagents cannot spawn subagents, so the Squad Manager acts as the switchboard:
 
 1. Any stage may end its log entry with a `DELEGATE:` block listing subtasks below its tier, each with an exact procedure and a target tier (`intern` for zero-judgment work, `execution` for tightly-specced Sonnet work).
-2. On seeing a `DELEGATE:` block, spawn the requested helpers (`squad-mech` for intern tasks; a Sonnet general-purpose agent for execution tasks), append their results to the log under `## Delegated — <stage>`, then continue the pipeline. If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage to complete its entry with the results in the log.
+2. On seeing a `DELEGATE:` block, spawn the requested helpers (`squad-mech` for intern tasks; `squad-helper` for execution tasks). Helpers return their results in their final message; you append those results to the log under `## Delegated — <stage>`, then continue the pipeline. If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. A re-spawned stage appends a `## <Stage> (cont.)` entry covering only the remainder of its work; the "exactly one entry" rule is per spawn, not per run.
 3. Delegation only flows downward. A stage that wants a higher tier is asking for escalation, not delegation; that goes through the escalation rules.
 4. Cap helper fan-out at 5 per stage per run; past that, the stage's scoping is the problem, and it should say so in its entry instead.
 
@@ -74,17 +78,19 @@ Typical uses: Recon delegates bulk file inventories or dependency listings to th
 
 ## Escalation rules
 
-- Same stage fails twice → escalate that stage one model tier on the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass) instead of retrying at the same tier.
+- Same stage fails twice → escalate that stage one model tier on the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass) instead of retrying at the same tier. For execution, that means `squad-executor` → `squad-executor-opus`.
 - Three total FAILs on one run → stop, summarize the log history, and hand back to the user.
 - Anything that would change the locked goal or acceptance criteria → back to Stage 0 with the user. Always.
 
+Blockers work the same way from any stage, not just the PM. A logged blocker that names an upstream stage re-runs that stage and every stage after it, and it counts toward the three-FAIL stop. A logged blocker that requires a human decision returns to Stage 0: surface it, resolve it with the user, re-lock, continue. Never guess past a blocker.
+
 ## Audit-grade runs
 
-When the user asks for an audit, adversarial review, or says "be thorough": after execution, fan out parallel Sonnet finder agents across dimensions (runtime integrity, security/privacy, dead code/slop, UI/accessibility, docs drift), then have Opus skeptic passes attempt to refute each finding. Only skeptic-confirmed findings count as FAIL evidence. See `references/routing-rules.md`.
+When the user asks for an audit, adversarial review, or says "be thorough": after execution, fan out parallel Sonnet finder agents across dimensions (runtime integrity, security/privacy, dead code/slop, UI/accessibility, docs drift), then have Opus skeptic passes attempt to refute each finding. Only skeptic-confirmed findings count as FAIL evidence. Use the ready-made briefs in `references/audit-prompts.md` for the five finders and the skeptic; routing and cost posture are in `references/routing-rules.md`.
 
 ## Hard rules
 
-- Coordination happens only through `COMPUTE_SQUAD_LOG.md`; every stage appends, no stage rewrites history, only a PASSing PM clears it.
+- Coordination happens only through `COMPUTE_SQUAD_LOG.md`; every stage appends, no stage rewrites history, and it is cleared only after a PASS: by the PM itself, or by the main session once a high-stakes review is done.
 - No stage skips: even a one-line change gets Recon and Plan entries (they can be short).
 - The Executor never accepts its own work; the PM never writes product code; the intern never makes judgment calls.
 - Anti-slop discipline everywhere: YAGNI, stdlib/native first, no speculative abstractions, no scaffolding.

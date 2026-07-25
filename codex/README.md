@@ -18,15 +18,15 @@ Then run the sessions in order, pasting each prompt file and filling in the `<GO
 
 **On FAIL:** the acceptance session names exactly one stage to re-run. Re-run that stage's session (and every stage after it) with the log intact. Same stage fails twice: use a stronger model for the third attempt. Three total FAILs: stop and rethink the goal.
 
-**On PASS:** the acceptance session clears the log as its final step. Done.
+**On PASS:** the acceptance session appends its PASS entry, archives the full log, and clears the active log. If it flagged the change high-stakes, it leaves the log intact for your own review, and you clear it once that review is done.
 
 ## The DELEGATE protocol in Codex
 
-Stages may end their log entry with a `DELEGATE:` block listing zero-judgment subtasks. In Codex, you are the switchboard: run each delegated subtask in a cheap-model session (paste the exact procedure from the block), append results to the log under `## Delegated — <stage>`, then re-run the requesting stage if it marked the request `BLOCKING`.
+Stages may end their log entry with a `DELEGATE:` block listing zero-judgment subtasks. In Codex, you are the switchboard: run each delegated subtask in a cheap-model session (paste the exact procedure from the block), append results to the log under `## Delegated — <stage>`, then re-run the requesting stage if it marked the request `BLOCKING`. A re-run stage appends a `## <Stage> (cont.)` entry covering only the remainder. Delegation flows downward only and is capped at 5 helper sessions per stage per run; past that, the stage's scoping is the problem, and it should say so in its entry instead.
 
 ## Rules that keep it honest
 
-- Every stage appends to `COMPUTE_SQUAD_LOG.md`; no stage rewrites history; only a PASSing acceptance session clears it.
-- Archive a non-empty log before every new run (`codex-prompts/compute-squad-archive/` if your repo has it, else `compute-squad-archive/`). Never discard a prior or failed run.
+- Every stage appends to `COMPUTE_SQUAD_LOG.md`; no stage rewrites history; the log is cleared only after a PASS, by the acceptance session or by you on a high-stakes change.
+- Archive a non-empty log to `compute-squad-archive/` in the repo root before every new run, and again on PASS. Never discard a prior or failed run.
 - No stage skips, even for one-line changes. The entries can be short; the discipline can't.
 - The executor never accepts its own work. You, not any session, own the goal and acceptance criteria.

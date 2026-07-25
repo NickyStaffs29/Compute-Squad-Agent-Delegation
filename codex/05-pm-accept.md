@@ -15,6 +15,8 @@ Process:
 Verdict protocol:
 
 - **FAIL:** append `## PM — FAIL` to `COMPUTE_SQUAD_LOG.md` with a timestamp line, the evidence (commands, outputs, file/line references), and exactly ONE named stage to re-run (Recon, Plan, or Executor) with what it must address. Leave the log fully intact.
-- **PASS:** append `## PM — PASS` with a timestamp line and the evidence summary (test counts, commands run, refutations attempted and survived), then clear `COMPUTE_SQUAD_LOG.md` to empty as your very final action. Never clear on FAIL.
+- **PASS:** run this sequence in order, and do not reorder it. (1) Append `## PM — PASS` with a timestamp line, the evidence summary (test counts, commands run, refutations attempted and survived), and an explicit high-stakes determination. (2) Copy the full log, including that entry, to `compute-squad-archive/COMPUTE_SQUAD_LOG_<YYYY-MM-DD_HHMMSS>.md` in the repo root and verify the copy matches before doing anything else. (3) If the change is NOT high-stakes, clear `COMPUTE_SQUAD_LOG.md` to empty. If it IS high-stakes (auth, payments, migrations, privacy, production config), leave the active log intact and say so: the human operator reviews it and clears it themselves. Never clear on FAIL.
 
-Flag explicitly if the change is high-stakes (auth, payments, migrations, privacy, production config) so the human operator gives it their own final review after your PASS. Never rewrite prior log entries.
+If you need delegated work before you can decide, do not put a `DELEGATE:` block in a PASS or FAIL entry. Append a `## PM — Accept (pending)` entry stating what you need, ending with the block; the operator runs it, appends the results, and re-runs this prompt for the verdict.
+
+End with a summary stating the verdict, the evidence, the archive path, and whether you cleared the log. Never rewrite prior log entries.

@@ -1,28 +1,19 @@
 ---
-name: squad-executor
+name: squad-executor-opus
 description: |
-  Use this agent as the execution stage of the Compute Squad pipeline. It reads the PM's plan in COMPUTE_SQUAD_LOG.md and implements exactly what was specified, production-quality with no scaffolding, then logs its entry. Spawn it only after squad-pm has logged a PLAN entry. It runs on Sonnet and covers work the PM classified MECHANICAL or STANDARD; COMPLEX work goes to squad-executor-opus instead.
+  Use this agent as the COMPLEX and escalation variant of the Compute Squad execution stage. It is squad-executor on Opus: identical protocol and discipline, stronger model. Spawn it when the PM classifies the execution work COMPLEX, or when execution escalates after two FAILs on the Executor stage. For MECHANICAL and STANDARD work, spawn squad-executor instead.
 
   <example>
-  Context: The PM has logged a STANDARD plan during a squad run.
-  user: "Plan is logged, keep going"
-  assistant: "Spawning the squad-executor agent to implement the PM's task list exactly as written."
-  <commentary>
-  Execution follows the PM plan and implements only what it says, nothing more.
-  </commentary>
-  </example>
-
-  <example>
-  Context: The PM classified a single-file config change MECHANICAL.
+  Context: The PM classified the work COMPLEX (concurrent writes across the outbox and dispatcher).
   user: "Continue the pipeline"
-  assistant: "The plan is MECHANICAL, so I'm spawning squad-executor to transcribe it."
+  assistant: "The PM marked this COMPLEX, so I'm spawning squad-executor-opus for the implementation."
   <commentary>
-  Sonnet execution covers MECHANICAL and STANDARD plans; only a COMPLEX classification routes to squad-executor-opus.
+  Sonnet is the execution default; the Squad Manager routes to the Opus variant only when the PM flags complexity a tight spec cannot fully de-risk.
   </commentary>
   </example>
 
-model: sonnet
-color: magenta
+model: opus
+color: red
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 ---
 

@@ -93,10 +93,13 @@ limiter untouched. Refutations attempted: (1) two concurrent first requests — 
 create tokens (pre-existing behavior, out of locked scope, noted for the user);
 (2) clock skew — comparison uses DB UTC consistently; (3) account-enumeration
 timing — the cooldown path still performs the token query, timing delta negligible.
-Diff review: no scope creep, no dead code. Not high-stakes (no auth-boundary,
-schema, or production-config change). Verdict: PASS. Clearing the log as final action.
+Diff review: no scope creep, no dead code. HIGH-STAKES: yes — the change sits on the
+password-reset auth path and the no-account-existence-leak invariant. Verdict: PASS.
+Archived this log to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md
+and verified the copy. Leaving the active log intact for the main session's
+high-stakes review; the Squad Manager clears it afterwards.
 ```
 
 ---
 
-After the PASS entry, the PM clears `COMPUTE_SQUAD_LOG.md` to empty, and the Squad Manager reports the outcome (including the concurrent-request note the PM surfaced) back to the user. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact.
+The PM archives the full log (PASS entry included) and stops there, because the change touches an auth path. The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and clears `COMPUTE_SQUAD_LOG.md` itself as the last step of the run. On an ordinary, non-high-stakes change the PM would clear the log itself right after the verified archive. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive.
