@@ -76,8 +76,14 @@ if not plugin_version:
 if codex_plugin_json.get("version") != plugin_version:
     fail(1, f"{codex_plugin_path}: version {codex_plugin_json.get('version')!r} != {plugin_path} version {plugin_version!r}")
 
-if codex_plugin_json.get("skills") != "./codex/":
-    fail(1, f"{codex_plugin_path}: skills must be './codex/'")
+if codex_plugin_json.get("skills") != "./skills/":
+    fail(1, f"{codex_plugin_path}: skills must be './skills/'")
+
+if "hooks" in codex_plugin_json:
+    fail(1, f"{codex_plugin_path}: hooks is not accepted by the Codex plugin contract")
+
+if not codex_plugin_json.get("interface", {}).get("defaultPrompt"):
+    fail(1, f"{codex_plugin_path}: interface.defaultPrompt is required")
 
 ok(1, "Claude and Codex plugin/marketplace manifests parse as JSON")
 
@@ -359,8 +365,8 @@ if subprocess.run([sys.executable, "codex/build-agents.py", "--check"], stdout=s
 
 with open(".codex-plugin/plugin.json", encoding="utf-8") as handle:
     manifest = json.load(handle)
-if manifest.get("skills") != "./codex/":
-    fail(".codex-plugin/plugin.json does not point at ./codex/")
+if manifest.get("skills") != "./skills/":
+    fail(".codex-plugin/plugin.json does not point at ./skills/")
 
 print("PASS: check 6: Codex skill, agents, profiles, routing, and generator sync are valid")
 PYEOF

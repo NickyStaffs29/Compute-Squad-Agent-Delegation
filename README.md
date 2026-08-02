@@ -217,7 +217,7 @@ Compute-Squad-Agent-Delegation/
 ├── commands/
 │   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
 ├── codex/
-│   ├── SKILL.md              # native Codex orchestration entry point
+│   ├── SKILL.md              # Codex-specific routing reference
 │   ├── agents/*.toml         # generated Codex agent definitions
 │   ├── profiles.toml         # Sol/Terra/Luna profile reference
 │   └── 01-05*.md             # manual-session fallback prompts

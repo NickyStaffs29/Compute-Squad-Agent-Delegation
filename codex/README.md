@@ -1,6 +1,6 @@
 # Compute Squad for Codex
 
-The repository ships a native Codex plugin plus five prompt files for older Codex versions. The native path gives Codex the orchestration skill and the same seven named agents used by the Claude package; both implementations coordinate through `COMPUTE_SQUAD_LOG.md`.
+The repository ships a native Codex plugin plus five prompt files for older Codex versions. The native path loads the shared `skills/compute-squad/SKILL.md` orchestration skill and uses the same seven named agents as the Claude package; both implementations coordinate through `COMPUTE_SQUAD_LOG.md`.
 
 ## Native Codex install
 

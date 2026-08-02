@@ -4,7 +4,7 @@
 
 Native Codex plugin packaging brings the Compute Squad workflow to Codex without dropping the existing Claude package.
 
-- **Codex plugin.** Added a native `.codex-plugin` manifest, Codex marketplace registration, a Codex-native skill entry point, generated Codex agent definitions, and model profiles.
+- **Codex plugin.** Added a native `.codex-plugin` manifest, Codex marketplace registration, shared-skill Codex routing, generated Codex agent definitions, and model profiles.
 - **Codex routing.** Maps the PM and COMPLEX execution to `gpt-5.6-sol`, standard execution to `gpt-5.6-terra`, and mechanical work to `gpt-5.6-luna`, with max reasoning pinned for worker profiles.
 - **Sync and verification.** Added generation and validation gates so Codex agents stay aligned with the existing protocol and the Claude distribution remains independently packaged.
 

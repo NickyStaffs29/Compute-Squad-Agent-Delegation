@@ -16,8 +16,7 @@
     "code-quality",
     "codex"
   ],
-  "skills": "./codex/",
-  "hooks": {},
+  "skills": "./skills/",
   "interface": {
     "displayName": "Compute Squad",
     "shortDescription": "Plan, execute, and adversarially accept code changes",
@@ -28,6 +27,11 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Run Compute Squad on this goal",
+      "Map, plan, execute, and accept this code change",
+      "Start a staged Compute Squad run"
     ],
     "websiteURL": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation"
   }

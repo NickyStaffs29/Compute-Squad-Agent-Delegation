@@ -24,6 +24,19 @@ Run the goal through the pipeline with the v3 role hierarchy:
 
 Coordinate exclusively through `COMPUTE_SQUAD_LOG.md` in the repo root. Full routing rules in `references/routing-rules.md`.
 
+## Codex model routing
+
+When this shared skill is loaded by Codex, use the generated definitions in
+`codex/agents/` after copying them to `~/.codex/agents/`. Their fixed routing is:
+
+- Main session: `gpt-5.6-sol` at high reasoning.
+- PM and COMPLEX execution: `gpt-5.6-sol` at max reasoning.
+- Recon, STANDARD execution, and delegated execution: `gpt-5.6-terra` at max reasoning.
+- MECHANICAL execution and intern work: `gpt-5.6-luna` at max reasoning.
+
+The Claude agent aliases below remain the source of truth for the Claude package;
+the Codex TOML `model` fields are the source of truth for Codex.
+
 ## Stage 0 — Strategy (main session, before anything spawns)
 
 Do this directly in the main session; never delegate it:
