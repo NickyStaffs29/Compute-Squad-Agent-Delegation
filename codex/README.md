@@ -17,9 +17,9 @@ git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME
 bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, and writes the four current Codex V2 profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN` and `GIT_BIN` to absolute paths; `CODEX_HOME` can override the default `~/.codex` directory.
+The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, and writes the four current Codex V2 profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME` to absolute paths; use an absolute path to the updater script as well.
 
-`codex/profiles.toml` is the repository reference for those V2 profile files. The main profile controls the top-level session; each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
+`codex/profiles.toml` is the repository reference for those V2 profile files. The `compute-squad` profile is the one selected by the quick-start command and controls the top-level session. Native named agents use the `model` and `model_reasoning_effort` fields in their own TOMLs; the other three profiles are for manual or fallback launches. Each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
 
 After installing or updating the plugin, start a new Codex session before running:
 
@@ -31,14 +31,14 @@ The routing is Sol (`gpt-5.6-sol`) for strategy, PM, and COMPLEX execution; Terr
 
 ## Updating an installed setup
 
-Current Codex has no `codex plugin update` command. Run the checked-in updater instead:
+Current Codex has no `codex plugin update` command. The top-level `codex update` updates the CLI itself, not this plugin. Run the checked-in updater instead:
 
 ```bash
 CODEX_BIN="$(command -v codex)" GIT_BIN="$(command -v git)" \
   bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The updater uses `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, pulls the agent definitions and profile values, and refreshes the local clone with `git pull --ff-only`. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute `CODEX_BIN` and `GIT_BIN` values and redirect stdout/stderr to a log; schedulers do not reliably inherit an interactive shell's `PATH`. The updater does not create a schedule itself.
+The updater uses `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, pulls the agent definitions and profile values, and refreshes the local clone with `git pull --ff-only`. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute paths to the updater, `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME`; schedulers do not reliably inherit an interactive shell's `PATH`. On macOS, use a per-user LaunchAgent and do not place `$HOME` in launchd's `ProgramArguments`. Use the scheduler's native stdout/stderr log settings. The updater does not create a schedule itself.
 
 ## Manual fallback
 
