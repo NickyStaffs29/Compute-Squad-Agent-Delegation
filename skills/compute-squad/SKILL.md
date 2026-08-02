@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
 metadata:
-  version: "3.4.1"
+  version: "3.5.0"
   author: "Nick Stafford"
 ---
 
@@ -17,6 +17,7 @@ Run the goal through the pipeline with the v3 role hierarchy:
 
 - **Main session (top-tier model recommended): strategy.** Interrogates the goal, identifies gaps, clarifies them with the user, locks acceptance criteria, renders final judgment. Runs directly in the main session because only the main session can ask the user questions.
 - **Opus: PM.** Plans the work and accepts the deliverable (`squad-pm`, PLAN and ACCEPT modes).
+- **Haiku: execution on MECHANICAL.** The same executor protocol on the cheapest model (`squad-executor-haiku`).
 - **Sonnet: execution.** Codebase mapping (`squad-recon`), implementation (`squad-executor`), and delegated execution-tier subtasks (`squad-helper`).
 - **Opus: execution on COMPLEX.** The same executor protocol on the stronger model (`squad-executor-opus`).
 - **Haiku: intern.** Zero-judgment busywork (`squad-mech`).
@@ -63,7 +64,8 @@ If the PM logs a named blocker requiring a human decision, return to Stage 0: su
 
 Route by the PM's classification:
 
-- **MECHANICAL / STANDARD** → spawn `squad-executor` (Sonnet).
+- **MECHANICAL** → spawn `squad-executor-haiku` (Haiku).
+- **STANDARD** → spawn `squad-executor` (Sonnet).
 - **COMPLEX** → spawn `squad-executor-opus` (Opus), the same protocol on the stronger model.
 
 When unsure, route up: a wrong answer that forces a re-run costs more than the tier difference.
@@ -89,7 +91,7 @@ Typical uses: Recon delegates bulk file inventories or dependency listings to th
 
 ## Escalation rules
 
-- Same stage fails twice → escalate that stage one model tier on the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass) instead of retrying at the same tier. For execution, that means `squad-executor` → `squad-executor-opus`.
+- Same stage fails twice → escalate that stage one model tier on the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass) instead of retrying at the same tier. For execution, the escalation ladder is `squad-executor-haiku` → `squad-executor` → `squad-executor-opus` (haiku → sonnet → opus); two FAILs at a tier moves execution up one tier.
 - Three total FAILs on one run → stop, summarize the log history, and hand back to the user.
 - Anything that would change the locked goal or acceptance criteria → back to Stage 0 with the user. Always.
 

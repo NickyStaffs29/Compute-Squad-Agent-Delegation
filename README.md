@@ -4,12 +4,13 @@ Most multi-agent setups have an org chart problem. The strongest model does the 
 
 What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. That routing is also the math that makes the pipeline affordable: on list prices, it puts a run roughly 30 to 40% below an all-Opus worker pool running the same stages — the comparison is to a pool of Opus agents, not a single session.
 
-One skill. Six agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
+One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
 | Role | Model | Agent | Owns |
 |---|---|---|---|
 | Strategy | Your main session (top tier recommended) | none. This is you and your session model | Goal, gaps, acceptance criteria, final judgment |
 | PM | Opus | `squad-pm` | The plan and the acceptance decision |
+| Execution on MECHANICAL | Haiku | `squad-executor-haiku` | The same executor protocol, cheapest model |
 | Execution | Sonnet | `squad-recon`, `squad-executor`, `squad-helper` | Mapping the codebase, implementing the plan, delegated subtasks |
 | Execution on COMPLEX | Opus | `squad-executor-opus` | The same executor protocol, stronger model |
 | Intern | Haiku | `squad-mech` | Busywork. Nothing that requires judgment |
@@ -128,13 +129,13 @@ Its standard: the PM should never have to guess. Ambiguity Recon cannot resolve 
 
 The project manager. Plans work, accepts deliverables, never writes product code. One agent, two invocations per run.
 
-**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. COMPLEX routes execution to `squad-executor-opus` instead of `squad-executor`.
+**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-haiku`, COMPLEX routes it to `squad-executor-opus`, and STANDARD stays on `squad-executor`.
 
 **ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, so the Executor's framing cannot anchor it. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
 
 Decisions the PM is not allowed to make: anything product-level, irreversible, or cost-bearing, and anything that would change the locked goal. Those get logged as named blockers and go back to the human. Guessing past a blocker is a protocol violation, not initiative.
 
-### squad-executor (Sonnet) and squad-executor-opus (Opus)
+### squad-executor (Sonnet), squad-executor-haiku (Haiku), and squad-executor-opus (Opus)
 
 The builder. Reads the full log, then works the PM's task list in order. Exactly what the plan says. No more, no less.
 
@@ -142,7 +143,7 @@ If the plan is wrong or impossible, it stops and logs a blocker naming Plan as t
 
 It runs the project's own test and verify commands as it goes and will not log completion with failing tests.
 
-`squad-executor-opus` is the same agent definition on Opus. It runs when the PM classifies the work COMPLEX, or when execution escalates after two FAILs. Two definitions instead of one flag, because an agent's model is fixed in its frontmatter.
+`squad-executor-haiku` and `squad-executor-opus` are the same agent definition on Haiku and Opus respectively. `squad-executor-haiku` runs when the PM classifies the work MECHANICAL — transcription-grade by the PM's own classification, so it carries one extra discipline line: any task that turns out to need more than transcribing an explicitly specified change is a blocker naming Plan, not something to push through. `squad-executor-opus` runs when the PM classifies the work COMPLEX, or when execution escalates after two FAILs. Three definitions instead of one flag, because an agent's model is fixed in its frontmatter.
 
 ### squad-helper (Sonnet, the delegated worker)
 
@@ -159,7 +160,7 @@ Its one skill beyond following procedure is knowing what it is not: handed anyth
 Four rules generate the whole system.
 
 **1. Route by decision density, not task difficulty.**
-Planning and acceptance are where errors cascade, so they run Opus. Mapping and implementation are volume work against a spec, so they run Sonnet. Zero-judgment steps run Haiku. Your top-tier session does the one thing only it can do: talk to you, and judge. Opus costs about 1.67x Sonnet per token. A wrong answer that forces an upstream re-run costs more than the tier difference every time, which makes routing up on uncertainty the cheap option.
+Planning and acceptance are where errors cascade, so they run Opus. Mapping and implementation are volume work against a spec, so they run Sonnet by default — or Haiku, when the PM's own classification says the work is transcription-grade (MECHANICAL). Zero-judgment steps run Haiku. Your top-tier session does the one thing only it can do: talk to you, and judge. Opus costs about 1.67x Sonnet per token. A wrong answer that forces an upstream re-run costs more than the tier difference every time, which makes routing up on uncertainty the cheap option.
 
 **2. The reviewer is never below the work, and a tier above by default.**
 The Opus PM accepts Sonnet execution. When execution escalates to Opus, acceptance holds at Opus, and high-stakes changes add a top-tier review in your session. The executor never accepts its own output. Nobody has to remember this rule. The structure enforces it.
@@ -188,6 +189,7 @@ Compute-Squad-Agent-Delegation/
 │   ├── squad-recon.md        # Sonnet · read-only mapping
 │   ├── squad-pm.md           # Opus · PLAN + ACCEPT modes
 │   ├── squad-executor.md     # Sonnet · implementation
+│   ├── squad-executor-haiku.md # Haiku · implementation on MECHANICAL
 │   ├── squad-executor-opus.md # Opus · implementation on COMPLEX
 │   ├── squad-helper.md       # Sonnet · delegated execution-tier subtasks
 │   └── squad-mech.md         # Haiku · the intern

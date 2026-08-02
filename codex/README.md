@@ -13,8 +13,10 @@ Then run the sessions in order:
 | 1 | `01-archive.md` | Archive the prior log | cheapest available |
 | 2 | `02-recon.md` | Read-only codebase mapping | mid tier |
 | 3 | `03-pm-plan.md` | Spec + task breakdown, no code | strongest available |
-| 4 | `04-execute.md` | Implementation, exactly per plan | mid tier (strongest if the plan said COMPLEX) |
+| 4 | `04-execute.md` | Implementation, exactly per plan | mid tier (cheapest available if the plan said MECHANICAL; strongest if the plan said COMPLEX) |
 | 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | strongest available |
+
+Codex has one execute prompt file, not three; you pick the model per run instead. That single file plays the same role as three separate agents in the Claude Code plugin — `squad-executor-haiku` (MECHANICAL), `squad-executor` (STANDARD), `squad-executor-opus` (COMPLEX) — because Claude Code locks an agent's model in its frontmatter and Codex doesn't have that constraint.
 
 After session 1 (`01-archive.md`) reports the fresh log is ready, append the `## Goal — Locked` entry yourself as its first entry, before pasting `02-recon.md`:
 

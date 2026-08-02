@@ -1,7 +1,7 @@
 ---
 name: squad-executor
 description: |
-  Use this agent as the execution stage of the Compute Squad pipeline. It reads the PM's plan in COMPUTE_SQUAD_LOG.md and implements exactly what was specified, production-quality with no scaffolding, then logs its entry. Spawn it only after squad-pm has logged a PLAN entry. It runs on Sonnet and covers work the PM classified MECHANICAL or STANDARD; COMPLEX work goes to squad-executor-opus instead.
+  Use this agent as the execution stage of the Compute Squad pipeline. It reads the PM's plan in COMPUTE_SQUAD_LOG.md and implements exactly what was specified, production-quality with no scaffolding, then logs its entry. Spawn it only after squad-pm has logged a PLAN entry. It runs on Sonnet and covers work the PM classified STANDARD; MECHANICAL work goes to squad-executor-haiku instead, COMPLEX work goes to squad-executor-opus instead.
 
   <example>
   Context: The PM has logged a STANDARD plan during a squad run.
@@ -15,9 +15,9 @@ description: |
   <example>
   Context: The PM classified a single-file config change MECHANICAL.
   user: "Continue the pipeline"
-  assistant: "The plan is MECHANICAL, so I'm spawning squad-executor to transcribe it."
+  assistant: "The plan is MECHANICAL, so I'm spawning squad-executor-haiku instead of squad-executor."
   <commentary>
-  Sonnet execution covers MECHANICAL and STANDARD plans; only a COMPLEX classification routes to squad-executor-opus.
+  Sonnet execution is the STANDARD default; MECHANICAL work routes to the cheaper squad-executor-haiku, and COMPLEX work routes to squad-executor-opus.
   </commentary>
   </example>
 
