@@ -64,10 +64,10 @@ Verdict:
 
 - **FAIL:** append `## PM — FAIL` with evidence (commands, outputs, file/line refs) and exactly ONE named stage to re-run (Recon, Plan, or Executor) with what it must address. Leave the log intact. Fix nothing yourself.
 - **PASS:** run this sequence in order, and do not reorder it.
-  1. Append `## PM — PASS` with the evidence summary (test counts, commands, refutations attempted and survived) and an explicit high-stakes determination.
-  2. Copy the full log, including that entry, to `compute-squad-archive/COMPUTE_SQUAD_LOG_<YYYY-MM-DD_HHMMSS>.md` in the repo root (create the directory if needed). Read the copy back and verify it matches the original before doing anything else. Never proceed on an unverified archive.
+  1. Append `## PM — PASS` with the evidence summary (test counts, commands, refutations attempted and survived), an explicit high-stakes determination, and the archive target you are about to write to: `Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_<YYYY-MM-DD_HHMMSS>.md`. State it as intent — this entry is written before the copy exists, so it must not claim the archive already happened.
+  2. Copy the full log, including that entry, to the archive target named in step 1 (create the directory if needed). Read the copy back and verify it matches the original before doing anything else. Never proceed on an unverified archive.
   3. If the change is NOT high-stakes: clear `COMPUTE_SQUAD_LOG.md` to empty. If the change IS high-stakes (auth, payments, migrations, privacy, production config): leave the active log intact and do not clear it. The main session must run its own review first, and it clears the log afterwards.
 
 Never clear on FAIL. Never clear a high-stakes log yourself.
 
-End every ACCEPT run with a final summary message stating the verdict, the evidence summary, the archive path, and whether you cleared the log or left it for the main session's high-stakes review. Never clear or rewrite prior log entries in either mode.
+End every ACCEPT run with a final summary message stating the verdict, the evidence summary, the archive path with confirmation the copy was verified, and whether you cleared the log or left it for the main session's high-stakes review. That verified confirmation belongs in this summary, not in the log: the append-only `## PM — PASS` entry only ever states the archive target as intent, since it is written before the copy exists. Never clear or rewrite prior log entries in either mode.

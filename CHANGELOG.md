@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.4.1 — 2026-08-02
+
+Copy hardening: no oversold claims, no past-tense claims about actions that haven't happened yet.
+
+- **"Always a tier above" softened.** The README intro, README rule 2, and `references/routing-rules.md` now say the reviewer is "never below the work, and a tier above by default" — accurate once COMPLEX escalates execution to Opus and acceptance holds at the same tier instead of climbing further. The adjacent caveat about that COMPLEX case is unchanged.
+- **README intro reframed.** Leads with what the pipeline actually sells — verification and auditability that don't depend on operator discipline, plus capacity from runs not occupying your session — then the decision-density routing, then the 30-40% cost arithmetic, now explicit that the comparison baseline is an all-Opus worker pool running the same stages, not a single session.
+- **Repo-layout tree fixed.** Removed the duplicate `scripts/build-plugin.sh` line.
+- **PASS entries no longer claim the future.** The PM's `## PM — PASS` entry (in `agents/squad-pm.md`, `codex/05-pm-accept.md`, and `docs/example-log.md`) now states the archive target as intent (`Archive target: compute-squad-archive/<name>`) instead of claiming the copy is already made and verified — that entry is written before the copy exists. The verified-archive confirmation moved to the PM's final summary message, which sits outside the append-only log.
+- **plugin.json metadata.** Added `homepage`, `repository`, and `license: MIT`.
+
 ## 3.4.0 — 2026-08-02
 
 Protocol hardening: the goal is now part of the record, and blockers have a grammar.

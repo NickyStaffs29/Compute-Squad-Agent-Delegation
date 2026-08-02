@@ -14,7 +14,7 @@ Updated 2026-08-02. v3 restructures roles around a clean four-tier hierarchy: ma
 
 ## Why the hierarchy works
 
-- **Verification asymmetry holds by construction.** The Opus PM accepts Sonnet execution, so the reviewer is always a tier above the work. When execution escalates to Opus (COMPLEX), acceptance stays at Opus and high-stakes changes add a top-tier main-session review on top.
+- **Verification asymmetry holds by construction.** The Opus PM accepts Sonnet execution, so the reviewer is never below the work, and a tier above by default. When execution escalates to Opus (COMPLEX), acceptance stays at Opus and high-stakes changes add a top-tier main-session review on top.
 - **The tight-spec dependency.** Sonnet-as-execution is only as good as the PM's plan. That is by design: the PLAN mode requirement (a task list a junior engineer could follow without judgment calls) is what makes cheap execution safe. A vague plan is a plan defect, and the Executor is instructed to log it as a blocker rather than improvise.
 - **Gaps surface before tokens are spent.** Stage 0 strategy runs before any agent spawns, so ambiguity gets resolved with the user once, up front, instead of being discovered by a FAIL three stages deep.
 

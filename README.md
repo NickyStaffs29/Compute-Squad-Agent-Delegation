@@ -2,7 +2,7 @@
 
 Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
 
-Compute Squad routes by decision density instead. Stages that decide get strong models. Stages that execute against a tight spec get cheap ones. On list prices, that arithmetic puts a run roughly 30 to 40% below an all-Opus worker pool, and the review layer is always a tier above the work it checks, so mistakes get caught by something stronger than what made them.
+What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. That routing is also the math that makes the pipeline affordable: on list prices, it puts a run roughly 30 to 40% below an all-Opus worker pool running the same stages — the comparison is to a pool of Opus agents, not a single session.
 
 One skill. Six agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
@@ -161,7 +161,7 @@ Four rules generate the whole system.
 **1. Route by decision density, not task difficulty.**
 Planning and acceptance are where errors cascade, so they run Opus. Mapping and implementation are volume work against a spec, so they run Sonnet. Zero-judgment steps run Haiku. Your top-tier session does the one thing only it can do: talk to you, and judge. Opus costs about 1.67x Sonnet per token. A wrong answer that forces an upstream re-run costs more than the tier difference every time, which makes routing up on uncertainty the cheap option.
 
-**2. The reviewer is always a tier above the work.**
+**2. The reviewer is never below the work, and a tier above by default.**
 The Opus PM accepts Sonnet execution. When execution escalates to Opus, acceptance holds at Opus, and high-stakes changes add a top-tier review in your session. The executor never accepts its own output. Nobody has to remember this rule. The structure enforces it.
 
 **3. The hierarchy is fractal. Every level pushes busywork down.**
@@ -192,9 +192,8 @@ Compute-Squad-Agent-Delegation/
 │   ├── squad-helper.md       # Sonnet · delegated execution-tier subtasks
 │   └── squad-mech.md         # Haiku · the intern
 ├── codex/                    # the pipeline as manual Codex session prompts
-├── scripts/build-plugin.sh   # rebuilds dist/ from source
 ├── docs/example-log.md       # a complete worked run
-├── scripts/build-plugin.sh   # rebuilds the dist package from source
+├── scripts/build-plugin.sh   # rebuilds dist/ from source
 ├── dist/compute-squad.plugin # drag-and-drop install for Claude Cowork
 ├── CONTRIBUTING.md           # the sync rule: skill, agents, codex, dist change together
 └── CHANGELOG.md              # version history

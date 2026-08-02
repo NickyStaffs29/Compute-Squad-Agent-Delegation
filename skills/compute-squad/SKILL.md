@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
 metadata:
-  version: "3.4.0"
+  version: "3.4.1"
   author: "Nick Stafford"
 ---
 
