@@ -1,6 +1,6 @@
 # Compute Squad v3 — Role Hierarchy and Routing Rules
 
-Updated 2026-07-25. v3 restructures roles around a clean four-tier hierarchy: main session = strategy, Opus = PM, Sonnet = execution, Haiku = intern.
+Updated 2026-08-02. v3 restructures roles around a clean four-tier hierarchy: main session = strategy, Opus = PM, Sonnet = execution, Haiku = intern.
 
 ## Roles and model routing
 
@@ -26,6 +26,7 @@ Updated 2026-07-25. v3 restructures roles around a clean four-tier hierarchy: ma
 4. **Strategy changes go to the user.** Anything that would alter the locked goal or acceptance criteria returns to Stage 0 and the user. No agent, including the PM, renegotiates strategy.
 5. **Adversarial verification** (audit-grade runs): fan out Sonnet finder agents across dimensions (runtime integrity, security/privacy, dead code/slop, UI/accessibility, docs drift); Opus skeptics attempt to refute each finding; only skeptic-confirmed findings count.
 6. **The hierarchy is fractal (DELEGATE protocol).** Every level pushes its own busywork down a tier. The runtime is flat (subagents cannot spawn subagents), so stages request delegation via a `DELEGATE:` block in their log entry and the Squad Manager executes it on their behalf: intern tasks go to `squad-mech`, tightly-specced execution tasks go to `squad-helper`. Helpers return results in their final message and the Squad Manager appends them under `## Delegated — <stage>`; `BLOCKING` requests re-spawn the requesting stage, which appends a `## <Stage> (cont.)` entry. Downward only; capped at 5 helpers per stage per run.
+7. **The blocker grammar.** Mirrors the DELEGATE block: a stage that hits a blocker mid-work ends its own log entry with a `BLOCKER:` block instead of freeform prose — `rerun: <Recon|Plan|Executor>` with a one-line `why:`, or `needs-human: <the decision required>` with a one-line `why:`. A `rerun:` blocker re-runs that stage and everything after it and counts toward the three-FAIL stop (rule 3). A `needs-human:` blocker returns to Stage 0 (rule 4). Freeform prose blockers are a protocol violation.
 
 ## Cost posture (July 2026, $/M input/output)
 
@@ -37,9 +38,10 @@ v3 concentrates Opus spend in the two decision-dense PM passes and pushes volume
 
 Agent definitions use the `sonnet` / `opus` / `haiku` aliases so the squad tracks each tier's current generation automatically. Agent frontmatter also accepts `inherit` and explicit model IDs; pin an explicit ID only if a workflow regression-tests better on an older snapshot. Strategy lives in the main session because subagents are headless and cannot ask the user anything, not because of a frontmatter limit.
 
-## Log discipline (unchanged)
+## Log discipline
 
-- All coordination through `COMPUTE_SQUAD_LOG.md` in the repo root; each stage appends one entry per spawn (`## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS` / `## PM — FAIL`), with `## <Stage> (cont.)` for a re-spawn.
+- Every fresh log opens with a `## Goal — Locked` entry: goal, acceptance criteria, out of scope, and assumptions, composed by Stage 0 and appended by Stage 1 right after the archive completes, before Recon spawns. Stage 0's resume check ("is this the same goal?") reads this entry, never the operator's memory of the original prompt.
+- All coordination through `COMPUTE_SQUAD_LOG.md` in the repo root; each stage appends one entry per spawn (`## Goal — Locked`, `## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS` / `## PM — FAIL`), with `## <Stage> (cont.)` for a re-spawn.
 - Archive any non-empty log to a timestamped file in `compute-squad-archive/` in the repo root before every new run, and again on PASS. Never discard a prior or failed run.
 - The active log is cleared only after a PASS, and only once the PASS entry is archived: by the PM on ordinary changes, by the main session on high-stakes changes after its own review.
 - Anti-slop discipline in the plan: YAGNI, stdlib/native first, no speculative abstractions.

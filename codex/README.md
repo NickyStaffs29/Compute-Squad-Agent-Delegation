@@ -4,9 +4,9 @@ Codex has no nested agent-spawning tool, so the pipeline can't run as one automa
 
 ## How to run it
 
-**Stage 0 — Strategy (you, before any session).** Interrogate your own goal: what does done look like, what's out of scope, what could this break. Write down the goal (one sentence) and concrete acceptance criteria. You own these; no session may redefine them.
+**Stage 0 — Strategy (you, before any session).** Interrogate your own goal: what does done look like, what's out of scope, what could this break. Write down the goal (one sentence), concrete acceptance criteria, what's out of scope, and any assumptions (only if you're running unattended; otherwise "none"). You own these; no session may redefine them.
 
-Then run the sessions in order, pasting each prompt file and filling in the `<GOAL>` and `<ACCEPTANCE CRITERIA>` placeholders:
+Then run the sessions in order:
 
 | Order | Prompt file | Stage | Suggested model |
 |---|---|---|---|
@@ -15,6 +15,20 @@ Then run the sessions in order, pasting each prompt file and filling in the `<GO
 | 3 | `03-pm-plan.md` | Spec + task breakdown, no code | strongest available |
 | 4 | `04-execute.md` | Implementation, exactly per plan | mid tier (strongest if the plan said COMPLEX) |
 | 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | strongest available |
+
+After session 1 (`01-archive.md`) reports the fresh log is ready, append the `## Goal — Locked` entry yourself as its first entry, before pasting `02-recon.md`:
+
+```markdown
+## Goal — Locked
+<timestamp line>
+Goal: <one sentence>
+Acceptance criteria:
+- <concrete, verifiable item>
+Out of scope: <items>
+Assumptions: <only for unattended runs; otherwise "none">
+```
+
+Sessions 2 through 5 read the goal and acceptance criteria from that entry — nothing to fill in on their end.
 
 **On FAIL:** the acceptance session names exactly one stage to re-run. Re-run that stage's session (and every stage after it) with the log intact. Same stage fails twice: use a stronger model for the third attempt. Three total FAILs: stop and rethink the goal.
 
@@ -29,4 +43,5 @@ Stages may end their log entry with a `DELEGATE:` block listing zero-judgment su
 - Every stage appends to `COMPUTE_SQUAD_LOG.md`; no stage rewrites history; the log is cleared only after a PASS, by the acceptance session or by you on a high-stakes change.
 - Archive a non-empty log to `compute-squad-archive/` in the repo root before every new run, and again on PASS. Never discard a prior or failed run.
 - No stage skips, even for one-line changes. The entries can be short; the discipline can't.
+- A blocker is a `BLOCKER:` block at the end of a stage's own entry (`rerun: <Recon|Plan|Executor>` or `needs-human: <the decision required>`, plus `why:`) — never freeform prose. `rerun:` re-runs that stage and everything after it and counts toward the three-FAIL stop; `needs-human:` comes back to you at Stage 0.
 - The executor never accepts its own work. You, not any session, own the goal and acceptance criteria.

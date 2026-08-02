@@ -82,9 +82,9 @@ In Claude Cowork, run it from a session with your project folder connected, so t
 Six things happen, in order. Nothing skips.
 
 **Stage 0: Strategy. Your session, before any agent spawns.**
-The goal gets interrogated. What does done look like. What is out of scope. What could this break. Gaps get surfaced and clarified with you in one batched pass, not dripped across the run. Then the goal and acceptance criteria get locked. From this point no agent can redefine them. Any change routes back to you. If the session is unattended and nobody answers, Stage 0 makes the most reasonable call on each gap, states every assumption in writing, and proceeds rather than stalling.
+The goal gets interrogated. What does done look like. What is out of scope. What could this break. Gaps get surfaced and clarified with you in one batched pass, not dripped across the run. Then the goal and acceptance criteria get locked and composed into a `## Goal — Locked` entry. From this point no agent can redefine them, and every downstream stage reads this entry instead of trusting its spawn prompt. Any change routes back to you. If the session is unattended and nobody answers, Stage 0 makes the most reasonable call on each gap, states every assumption in writing, and proceeds rather than stalling.
 
-**Stage 1: Archive.** `squad-mech` moves any prior log to a timestamped archive file. Failed runs are never discarded. They are evidence.
+**Stage 1: Archive.** `squad-mech` moves any prior log to a timestamped archive file, then appends the `## Goal — Locked` entry from Stage 0 as the first entry of the fresh log, before Recon spawns. Failed runs are never discarded. They are evidence.
 
 **Stage 2: Recon.** `squad-recon` maps the codebase read-only: exact files, functions, line ranges, every call site, every invariant the change must not break.
 
@@ -168,9 +168,9 @@ The Opus PM accepts Sonnet execution. When execution escalates to Opus, acceptan
 The PM does not spend Opus tokens assembling changelogs. Recon does not burn its context window on file inventories. Any stage can end its log entry with a `DELEGATE:` block: subtasks, exact procedures, target tier. Subagents cannot spawn subagents, so the orchestrating session acts as the switchboard, runs the helpers (`squad-mech` for intern work, `squad-helper` for execution work), writes their returned results into the log, and re-spawns the requesting stage if it marked the request BLOCKING. Delegation flows downward only, capped at 5 helpers per stage per run. A stage that needs more than 5 helpers has a scoping problem, and the protocol makes it say so.
 
 **4. Escalation runs on evidence, never on vibes.**
-Same stage fails acceptance twice: it gets one model tier up on the third attempt. Three total FAILs: the run stops and comes back to you with the full log history. Anything that would change the locked goal returns to Stage 0 and the human. Always.
+Same stage fails acceptance twice: it gets one model tier up on the third attempt. Three total FAILs: the run stops and comes back to you with the full log history. Anything that would change the locked goal returns to Stage 0 and the human. Always. A blocker is never freeform prose: it's a `BLOCKER:` block at the end of a stage's own entry, either `rerun: <stage>` (re-runs that stage and everything after it, counting toward the three-FAIL stop) or `needs-human: <decision>` (returns to Stage 0).
 
-Underneath all four sits the log. `COMPUTE_SQUAD_LOG.md` is the only coordination channel. Every stage appends. No stage rewrites history. It is cleared only after a PASS and only after that PASS is archived, and failed runs archive rather than vanish. Durable, auditable state is what lets a FAIL re-run one stage instead of the whole pipeline, and it is why the same protocol runs in Codex with no agent-spawning at all.
+Underneath all four sits the log. `COMPUTE_SQUAD_LOG.md` is the only coordination channel. Every stage appends. No stage rewrites history. Every fresh log opens with a locked `## Goal — Locked` entry, so no stage ever has to trust a prompt over the record. It is cleared only after a PASS and only after that PASS is archived, and failed runs archive rather than vanish. Durable, auditable state is what lets a FAIL re-run one stage instead of the whole pipeline, and it is why the same protocol runs in Codex with no agent-spawning at all.
 
 ## Repo layout
 

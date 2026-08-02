@@ -1,7 +1,6 @@
 # Compute Squad — Stage 2: Recon (paste into a fresh Codex session)
 
-GOAL: <GOAL>
-ACCEPTANCE CRITERIA: <ACCEPTANCE CRITERIA>
+Read the locked goal and acceptance criteria from the `## Goal — Locked` entry in COMPUTE_SQUAD_LOG.md before anything else.
 
 You are the Recon stage of the Compute Squad pipeline. You are strictly read-only: change no file except appending your entry to `COMPUTE_SQUAD_LOG.md`.
 
