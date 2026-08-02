@@ -1,25 +1,12 @@
 # Compute Squad
 
-Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
+A four-tier agent delegation pipeline for Claude Code (and Codex): your main session runs strategy, an Opus PM plans and accepts the work, Sonnet executes, and Haiku handles the busywork — coordinated through a shared, auditable log.
 
-What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. That routing is also the math that makes the pipeline affordable: on list prices, it puts a run roughly 30 to 40% below an all-Opus worker pool running the same stages — the comparison is to a pool of Opus agents, not a single session.
+Three steps to a working setup: **install**, **run**, **auto-update**. Everything else on this page is reference.
 
-One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
+## 1. Install
 
-| Role | Claude model | Codex model | Agent | Owns |
-|---|---|---|---|---|
-| Strategy | Main session | `gpt-5.6-sol` high | none. This is you and your session model | Goal, gaps, acceptance criteria, final judgment |
-| PM | Opus | `gpt-5.6-sol` max | `squad-pm` | The plan and the acceptance decision |
-| Execution on MECHANICAL | Haiku | `gpt-5.6-luna` max | `squad-executor-haiku` | The same executor protocol, cheapest model |
-| Execution | Sonnet | `gpt-5.6-terra` max | `squad-recon`, `squad-executor`, `squad-helper` | Mapping the codebase, implementing the plan, delegated subtasks |
-| Execution on COMPLEX | Opus | `gpt-5.6-sol` max | `squad-executor-opus` | The same executor protocol, stronger model |
-| Intern | Haiku | `gpt-5.6-luna` max | `squad-mech` | Busywork. Nothing that requires judgment |
-
-Works in Claude Code, Claude Cowork, and Codex (as a native plugin with a manual prompt fallback).
-
-## Install
-
-**Claude Code, from your terminal.** Paste these two lines:
+Paste these two lines in your terminal:
 
 ```bash
 claude plugin marketplace add NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -32,6 +19,42 @@ Or from inside a Claude Code session:
 /plugin marketplace add NickyStaffs29/Compute-Squad-Agent-Delegation
 /plugin install compute-squad@compute-squad
 ```
+
+That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
+
+## 2. Run it
+
+```
+/squad add rate limiting to the password-reset endpoint
+```
+
+Or say any of: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `full pipeline on this`. Run it from your project root, in a session that can read and write the repo.
+
+## 3. Get updates automatically
+
+Paste this prompt into Claude Code once. Claude sets up the recurring job on your device itself — nothing for you to configure:
+
+```
+Set up a weekly recurring task on this device that keeps the Compute Squad
+plugin up to date. Once a week it should run, in order:
+  claude plugin marketplace update compute-squad
+  claude plugin update compute-squad
+Use your native scheduled-tasks feature if this app has one; otherwise use
+the OS scheduler (launchd on macOS, cron on Linux, Task Scheduler on
+Windows). When you're done, tell me the schedule you created.
+```
+
+Prefer manual updates? Run these from inside a session whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):
+
+```
+/plugin marketplace update compute-squad
+/plugin update compute-squad
+```
+
+To remove: `/plugin uninstall compute-squad@compute-squad`. Uninstalling removes the agents and the skill but leaves `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` in your project untouched.
+
+<details>
+<summary><strong>Other install targets: teams, Claude Cowork, Codex</strong></summary>
 
 **Team rollout.** Add this to your project's `.claude/settings.json` and the plugin auto-installs for everyone who trusts the repo:
 
@@ -46,13 +69,7 @@ Or from inside a Claude Code session:
 }
 ```
 
-**Claude Cowork.** Download the package and drop it into any chat, then accept the install:
-
-```bash
-curl -L -o compute-squad.plugin https://raw.githubusercontent.com/NickyStaffs29/Compute-Squad-Agent-Delegation/main/dist/compute-squad.plugin
-```
-
-Or grab [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin) directly.
+**Claude Cowork.** Download [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin), drop it into any chat, and accept the install. In Cowork, run the squad from a session with your project folder connected so the agents can read and write the repo and the log.
 
 **Codex.** Codex reads the native plugin manifest in this repository:
 
@@ -71,31 +88,34 @@ cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
 
 Copy the profile values from `codex/profiles.toml` into the current Codex V2 profile files under `~/.codex/`, then start the orchestrator with `codex --profile compute-squad`. Older Codex versions can use the five manually sequenced prompts in [`codex/`](codex/); the setup and routing table are in [`codex/README.md`](codex/README.md).
 
-The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
-
-Once installed, `/squad <goal>` runs the pipeline directly — same Stage 0 start as any of the trigger phrases below.
-
-**Update or remove.** From inside a Claude Code session:
-
-```
-/plugin marketplace update compute-squad
-/plugin update compute-squad
-/plugin uninstall compute-squad@compute-squad
-```
-
-Run the marketplace update first: it refreshes the source, then the plugin update pulls the new version. Uninstalling removes the agents and the skill. It leaves `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` in your project untouched.
+</details>
 
 Version history is in [CHANGELOG.md](CHANGELOG.md).
 
+---
+
+# Reference
+
+Everything below is background on how the pipeline works. You don't need any of it to install or run the squad.
+
+## Why it exists
+
+Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
+
+What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. That routing is also the math that makes the pipeline affordable: on list prices, it puts a run roughly 30 to 40% below an all-Opus worker pool running the same stages — the comparison is to a pool of Opus agents, not a single session.
+
+One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
+
+| Role | Claude model | Codex model | Agent | Owns |
+|---|---|---|---|---|
+| Strategy | Main session | `gpt-5.6-sol` high | none. This is you and your session model | Goal, gaps, acceptance criteria, final judgment |
+| PM | Opus | `gpt-5.6-sol` max | `squad-pm` | The plan and the acceptance decision |
+| Execution on MECHANICAL | Haiku | `gpt-5.6-luna` max | `squad-executor-haiku` | The same executor protocol, cheapest model |
+| Execution | Sonnet | `gpt-5.6-terra` max | `squad-recon`, `squad-executor`, `squad-helper` | Mapping the codebase, implementing the plan, delegated subtasks |
+| Execution on COMPLEX | Opus | `gpt-5.6-sol` max | `squad-executor-opus` | The same executor protocol, stronger model |
+| Intern | Haiku | `gpt-5.6-luna` max | `squad-mech` | Busywork. Nothing that requires judgment |
+
 ## How a run works
-
-```
-run the squad: add rate limiting to the password-reset endpoint
-```
-
-Any of these start a run: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `squad run`, `full pipeline on this`, or the slash command `/squad <goal>`.
-
-In Claude Cowork, run it from a session with your project folder connected, so the agents can read and write the repo and the log.
 
 Six things happen, in order. Nothing skips.
 
@@ -118,9 +138,7 @@ A complete worked run with every log entry format is in [`docs/example-log.md`](
 
 ## What a run needs and leaves behind
 
-Run it from your project root, in a session that can read and write the repo.
-
-A run creates two things in that root:
+A run creates two things in your project root:
 
 - `COMPUTE_SQUAD_LOG.md`, the active log every stage appends to.
 - `compute-squad-archive/`, timestamped copies of past runs. The log is archived before a new run starts and again on PASS, so a failed run is never lost.
