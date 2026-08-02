@@ -2,6 +2,8 @@
 
 The repository ships a native Codex plugin plus five prompt files for older Codex versions. The native path loads the shared `skills/compute-squad/SKILL.md` orchestration skill and uses the same seven named agents as the Claude package; both implementations coordinate through `COMPUTE_SQUAD_LOG.md`.
 
+The native path requires Codex CLI with V2 profile support (the repository documents 0.134+), Git, and Bash. It supports macOS/Linux and WSL/Git Bash on Windows; the updater is not a native PowerShell script.
+
 ## Native Codex install
 
 ```bash
@@ -19,12 +21,20 @@ bash "$HOME/src/compute-squad/codex/update.sh"
 
 The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, and writes the four current Codex V2 profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN` and `GIT_BIN` to absolute paths; `CODEX_HOME` can override the default `~/.codex` directory.
 
-`codex/profiles.toml` is the repository reference for those V2 profile files. The main profile controls the top-level session; each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
+The plugin install and the agent/profile installation are separate steps: `codex plugin add` installs the plugin skill, while the updater copies `codex/agents/*.toml` and converts the repository profile manifest into native profile files.
+
+`codex/profiles.toml` is the repository source manifest for those V2 profile files; Codex consumes the four generated `$CODEX_HOME/<profile>.config.toml` files. The main profile controls the top-level session; each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
 
 After installing or updating the plugin, start a new Codex session before running:
 
 ```bash
 codex --profile compute-squad "Run the squad: <goal>"
+```
+
+This starts an interactive Codex session with the prompt supplied. For a non-interactive run, use:
+
+```bash
+codex exec --profile compute-squad "Run the squad: <goal>"
 ```
 
 The routing is Sol (`gpt-5.6-sol`) for strategy, PM, and COMPLEX execution; Terra (`gpt-5.6-terra`) for Recon and standard execution; and Luna (`gpt-5.6-luna`) for MECHANICAL and intern work. Worker profiles use `max` reasoning.
@@ -38,7 +48,19 @@ CODEX_BIN="$(command -v codex)" GIT_BIN="$(command -v git)" \
   bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The updater uses `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, pulls the agent definitions and profile values, and refreshes the local clone with `git pull --ff-only`. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute `CODEX_BIN` and `GIT_BIN` values and redirect stdout/stderr to a log; schedulers do not reliably inherit an interactive shell's `PATH`. The updater does not create a schedule itself.
+The updater uses `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, pulls the agent definitions and profile values, and refreshes the local clone with `git pull --ff-only`. For an interactive update, the command above is sufficient.
+
+For a scheduler, use one continued command with absolute paths and an explicit log path:
+
+```bash
+CODEX_HOME="/absolute/path/to/.codex" \
+CODEX_BIN="/absolute/path/to/codex" \
+GIT_BIN="/absolute/path/to/git" \
+/bin/bash "/absolute/path/to/compute-squad/codex/update.sh" \
+  >> "/absolute/path/to/compute-squad-update.log" 2>&1
+```
+
+Do not rely on an interactive shell's `$HOME` or `PATH`. The Bash updater supports macOS/Linux and WSL/Git Bash on Windows; native Windows PowerShell is not supported. OS jobs need network access and write access to the clone and `CODEX_HOME`. Codex CLI cannot create or manage native Codex Scheduled tasks; those are created from the ChatGPT desktop/web Scheduled tasks interface. The updater does not create an OS schedule itself.
 
 ## Manual fallback
 
