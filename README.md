@@ -2,11 +2,11 @@
 
 A four-tier agent delegation pipeline for Claude Code (and Codex): your main session runs strategy, an Opus PM plans and accepts the work, Sonnet executes, and Haiku handles the busywork — coordinated through a shared, auditable log.
 
-Three steps to a working setup: **install**, **run**, **auto-update**. Everything else on this page is reference.
+Three steps to a working setup: **install**, **run**, **auto-update**. Each step shows Claude Code first, Codex right after — use whichever matches your setup. Everything else on this page is reference.
 
 ## 1. Install
 
-Paste these two lines in your terminal:
+**Claude Code.** Paste these two lines in your terminal:
 
 ```bash
 claude plugin marketplace add NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -22,17 +22,41 @@ Or from inside a Claude Code session:
 
 That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
+**Codex.** Add the plugin, then install the seven named agents once so the skill can route each stage:
+
+```bash
+codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
+codex plugin add compute-squad@compute-squad
+git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation ~/src/compute-squad
+mkdir -p ~/.codex/agents
+cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
+```
+
+Then copy the profile values from [`codex/profiles.toml`](codex/profiles.toml) into your Codex V2 profile files under `~/.codex/`. Full Codex setup, routing table, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
+
 ## 2. Run it
+
+**Claude Code:**
 
 ```
 /squad add rate limiting to the password-reset endpoint
 ```
 
-Or say any of: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `full pipeline on this`. Run it from your project root, in a session that can read and write the repo.
+Or say any of: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `full pipeline on this`.
+
+**Codex:**
+
+```bash
+codex --profile compute-squad "Run the squad: add rate limiting to the password-reset endpoint"
+```
+
+Either way, run it from your project root, in a session that can read and write the repo.
 
 ## 3. Get updates automatically
 
-Paste this prompt into Claude Code once. Claude sets up the recurring job on your device itself — nothing for you to configure:
+Paste the prompt for your setup once. The assistant sets up the recurring job on your device itself — nothing for you to configure.
+
+**Claude Code** — paste into any Claude Code session:
 
 ```
 Set up a weekly recurring task on this device that keeps the Compute Squad
@@ -44,17 +68,34 @@ the OS scheduler (launchd on macOS, cron on Linux, Task Scheduler on
 Windows). When you're done, tell me the schedule you created.
 ```
 
-Prefer manual updates? Run these from inside a session whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):
+**Codex** — paste into a Codex session:
+
+```
+Set up a weekly recurring task on this device that keeps the Compute Squad
+plugin up to date. Once a week it should:
+  1. Refresh the plugin from
+     https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
+     (use the codex plugin update command if this version has one,
+     otherwise re-run marketplace add + plugin add).
+  2. Run: git -C ~/src/compute-squad pull
+  3. Run: cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
+Use the OS scheduler (launchd on macOS, cron on Linux, Task Scheduler on
+Windows). When you're done, tell me the schedule you created.
+```
+
+Prefer manual updates? In Claude Code, run these whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):
 
 ```
 /plugin marketplace update compute-squad
 /plugin update compute-squad
 ```
 
-To remove: `/plugin uninstall compute-squad@compute-squad`. Uninstalling removes the agents and the skill but leaves `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` in your project untouched.
+In Codex, re-run steps 1–3 from the Codex prompt above.
+
+To remove from Claude Code: `/plugin uninstall compute-squad@compute-squad`. Uninstalling removes the agents and the skill but leaves `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` in your project untouched.
 
 <details>
-<summary><strong>Other install targets: teams, Claude Cowork, Codex</strong></summary>
+<summary><strong>Other install targets: teams, Claude Cowork</strong></summary>
 
 **Team rollout.** Add this to your project's `.claude/settings.json` and the plugin auto-installs for everyone who trusts the repo:
 
@@ -70,23 +111,6 @@ To remove: `/plugin uninstall compute-squad@compute-squad`. Uninstalling removes
 ```
 
 **Claude Cowork.** Download [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin), drop it into any chat, and accept the install. In Cowork, run the squad from a session with your project folder connected so the agents can read and write the repo and the log.
-
-**Codex.** Codex reads the native plugin manifest in this repository:
-
-```bash
-codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
-codex plugin add compute-squad@compute-squad
-```
-
-Install the seven named Codex agents once so the skill can route each stage:
-
-```bash
-git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation ~/src/compute-squad
-mkdir -p ~/.codex/agents
-cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
-```
-
-Copy the profile values from `codex/profiles.toml` into the current Codex V2 profile files under `~/.codex/`, then start the orchestrator with `codex --profile compute-squad`. Older Codex versions can use the five manually sequenced prompts in [`codex/`](codex/); the setup and routing table are in [`codex/README.md`](codex/README.md).
 
 </details>
 
