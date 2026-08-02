@@ -2,14 +2,15 @@
 
 Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
 
-Compute Squad routes by decision density instead. Stages that decide get strong models. Stages that execute against a tight spec get cheap ones. On list prices, that arithmetic puts a run roughly 30 to 40% below an all-Opus worker pool, and the review layer is always a tier above the work it checks, so mistakes get caught by something stronger than what made them.
+What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. That routing is also the math that makes the pipeline affordable: on list prices, it puts a run roughly 30 to 40% below an all-Opus worker pool running the same stages — the comparison is to a pool of Opus agents, not a single session.
 
-One skill. Six agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
+One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
 | Role | Model | Agent | Owns |
 |---|---|---|---|
 | Strategy | Your main session (top tier recommended) | none. This is you and your session model | Goal, gaps, acceptance criteria, final judgment |
 | PM | Opus | `squad-pm` | The plan and the acceptance decision |
+| Execution on MECHANICAL | Haiku | `squad-executor-haiku` | The same executor protocol, cheapest model |
 | Execution | Sonnet | `squad-recon`, `squad-executor`, `squad-helper` | Mapping the codebase, implementing the plan, delegated subtasks |
 | Execution on COMPLEX | Opus | `squad-executor-opus` | The same executor protocol, stronger model |
 | Intern | Haiku | `squad-mech` | Busywork. Nothing that requires judgment |
@@ -57,6 +58,8 @@ Or grab [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-S
 
 The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
+Once installed, `/squad <goal>` runs the pipeline directly — same Stage 0 start as any of the trigger phrases below.
+
 **Update or remove.** From inside a Claude Code session:
 
 ```
@@ -75,16 +78,16 @@ Version history is in [CHANGELOG.md](CHANGELOG.md).
 run the squad: add rate limiting to the password-reset endpoint
 ```
 
-Any of these start a run: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `squad run`, `full pipeline on this`.
+Any of these start a run: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `squad run`, `full pipeline on this`, or the slash command `/squad <goal>`.
 
 In Claude Cowork, run it from a session with your project folder connected, so the agents can read and write the repo and the log.
 
 Six things happen, in order. Nothing skips.
 
 **Stage 0: Strategy. Your session, before any agent spawns.**
-The goal gets interrogated. What does done look like. What is out of scope. What could this break. Gaps get surfaced and clarified with you in one batched pass, not dripped across the run. Then the goal and acceptance criteria get locked. From this point no agent can redefine them. Any change routes back to you. If the session is unattended and nobody answers, Stage 0 makes the most reasonable call on each gap, states every assumption in writing, and proceeds rather than stalling.
+The goal gets interrogated. What does done look like. What is out of scope. What could this break. Gaps get surfaced and clarified with you in one batched pass, not dripped across the run. Then the goal and acceptance criteria get locked and composed into a `## Goal — Locked` entry. From this point no agent can redefine them, and every downstream stage reads this entry instead of trusting its spawn prompt. Any change routes back to you. If the session is unattended and nobody answers, Stage 0 makes the most reasonable call on each gap, states every assumption in writing, and proceeds rather than stalling.
 
-**Stage 1: Archive.** `squad-mech` moves any prior log to a timestamped archive file. Failed runs are never discarded. They are evidence.
+**Stage 1: Archive.** `squad-mech` moves any prior log to a timestamped archive file, then appends the `## Goal — Locked` entry from Stage 0 as the first entry of the fresh log, before Recon spawns. Failed runs are never discarded. They are evidence.
 
 **Stage 2: Recon.** `squad-recon` maps the codebase read-only: exact files, functions, line ranges, every call site, every invariant the change must not break.
 
@@ -128,13 +131,13 @@ Its standard: the PM should never have to guess. Ambiguity Recon cannot resolve 
 
 The project manager. Plans work, accepts deliverables, never writes product code. One agent, two invocations per run.
 
-**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. COMPLEX routes execution to `squad-executor-opus` instead of `squad-executor`.
+**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-haiku`, COMPLEX routes it to `squad-executor-opus`, and STANDARD stays on `squad-executor`.
 
 **ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, so the Executor's framing cannot anchor it. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
 
 Decisions the PM is not allowed to make: anything product-level, irreversible, or cost-bearing, and anything that would change the locked goal. Those get logged as named blockers and go back to the human. Guessing past a blocker is a protocol violation, not initiative.
 
-### squad-executor (Sonnet) and squad-executor-opus (Opus)
+### squad-executor (Sonnet), squad-executor-haiku (Haiku), and squad-executor-opus (Opus)
 
 The builder. Reads the full log, then works the PM's task list in order. Exactly what the plan says. No more, no less.
 
@@ -142,7 +145,7 @@ If the plan is wrong or impossible, it stops and logs a blocker naming Plan as t
 
 It runs the project's own test and verify commands as it goes and will not log completion with failing tests.
 
-`squad-executor-opus` is the same agent definition on Opus. It runs when the PM classifies the work COMPLEX, or when execution escalates after two FAILs. Two definitions instead of one flag, because an agent's model is fixed in its frontmatter.
+`squad-executor-haiku` and `squad-executor-opus` are the same agent definition on Haiku and Opus respectively. `squad-executor-haiku` runs when the PM classifies the work MECHANICAL — transcription-grade by the PM's own classification, so it carries one extra discipline line: any task that turns out to need more than transcribing an explicitly specified change is a blocker naming Plan, not something to push through. `squad-executor-opus` runs when the PM classifies the work COMPLEX, or when execution escalates after two FAILs. Three definitions instead of one flag, because an agent's model is fixed in its frontmatter.
 
 ### squad-helper (Sonnet, the delegated worker)
 
@@ -159,18 +162,18 @@ Its one skill beyond following procedure is knowing what it is not: handed anyth
 Four rules generate the whole system.
 
 **1. Route by decision density, not task difficulty.**
-Planning and acceptance are where errors cascade, so they run Opus. Mapping and implementation are volume work against a spec, so they run Sonnet. Zero-judgment steps run Haiku. Your top-tier session does the one thing only it can do: talk to you, and judge. Opus costs about 1.67x Sonnet per token. A wrong answer that forces an upstream re-run costs more than the tier difference every time, which makes routing up on uncertainty the cheap option.
+Planning and acceptance are where errors cascade, so they run Opus. Mapping and implementation are volume work against a spec, so they run Sonnet by default — or Haiku, when the PM's own classification says the work is transcription-grade (MECHANICAL). Zero-judgment steps run Haiku. Your top-tier session does the one thing only it can do: talk to you, and judge. Opus costs about 1.67x Sonnet per token. A wrong answer that forces an upstream re-run costs more than the tier difference every time, which makes routing up on uncertainty the cheap option.
 
-**2. The reviewer is always a tier above the work.**
+**2. The reviewer is never below the work, and a tier above by default.**
 The Opus PM accepts Sonnet execution. When execution escalates to Opus, acceptance holds at Opus, and high-stakes changes add a top-tier review in your session. The executor never accepts its own output. Nobody has to remember this rule. The structure enforces it.
 
 **3. The hierarchy is fractal. Every level pushes busywork down.**
 The PM does not spend Opus tokens assembling changelogs. Recon does not burn its context window on file inventories. Any stage can end its log entry with a `DELEGATE:` block: subtasks, exact procedures, target tier. Subagents cannot spawn subagents, so the orchestrating session acts as the switchboard, runs the helpers (`squad-mech` for intern work, `squad-helper` for execution work), writes their returned results into the log, and re-spawns the requesting stage if it marked the request BLOCKING. Delegation flows downward only, capped at 5 helpers per stage per run. A stage that needs more than 5 helpers has a scoping problem, and the protocol makes it say so.
 
 **4. Escalation runs on evidence, never on vibes.**
-Same stage fails acceptance twice: it gets one model tier up on the third attempt. Three total FAILs: the run stops and comes back to you with the full log history. Anything that would change the locked goal returns to Stage 0 and the human. Always.
+Same stage fails acceptance twice: it gets one model tier up on the third attempt. Three total FAILs: the run stops and comes back to you with the full log history. Anything that would change the locked goal returns to Stage 0 and the human. Always. A blocker is never freeform prose: it's a `BLOCKER:` block at the end of a stage's own entry, either `rerun: <stage>` (re-runs that stage and everything after it, counting toward the three-FAIL stop) or `needs-human: <decision>` (returns to Stage 0).
 
-Underneath all four sits the log. `COMPUTE_SQUAD_LOG.md` is the only coordination channel. Every stage appends. No stage rewrites history. It is cleared only after a PASS and only after that PASS is archived, and failed runs archive rather than vanish. Durable, auditable state is what lets a FAIL re-run one stage instead of the whole pipeline, and it is why the same protocol runs in Codex with no agent-spawning at all.
+Underneath all four sits the log. `COMPUTE_SQUAD_LOG.md` is the only coordination channel. Every stage appends. No stage rewrites history. Every fresh log opens with a locked `## Goal — Locked` entry, so no stage ever has to trust a prompt over the record. It is cleared only after a PASS and only after that PASS is archived, and failed runs archive rather than vanish. Durable, auditable state is what lets a FAIL re-run one stage instead of the whole pipeline, and it is why the same protocol runs in Codex with no agent-spawning at all.
 
 ## Repo layout
 
@@ -188,19 +191,21 @@ Compute-Squad-Agent-Delegation/
 │   ├── squad-recon.md        # Sonnet · read-only mapping
 │   ├── squad-pm.md           # Opus · PLAN + ACCEPT modes
 │   ├── squad-executor.md     # Sonnet · implementation
+│   ├── squad-executor-haiku.md # Haiku · implementation on MECHANICAL
 │   ├── squad-executor-opus.md # Opus · implementation on COMPLEX
 │   ├── squad-helper.md       # Sonnet · delegated execution-tier subtasks
 │   └── squad-mech.md         # Haiku · the intern
+├── commands/
+│   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
 ├── codex/                    # the pipeline as manual Codex session prompts
-├── scripts/build-plugin.sh   # rebuilds dist/ from source
 ├── docs/example-log.md       # a complete worked run
-├── scripts/build-plugin.sh   # rebuilds the dist package from source
+├── scripts/build-plugin.sh   # rebuilds dist/ from source
 ├── dist/compute-squad.plugin # drag-and-drop install for Claude Cowork
 ├── CONTRIBUTING.md           # the sync rule: skill, agents, codex, dist change together
 └── CHANGELOG.md              # version history
 ```
 
-`dist/compute-squad.plugin` is committed on purpose: Claude Cowork installs from a single downloadable file, so the package has to exist at a stable URL. It is a zip of `.claude-plugin/plugin.json`, `skills/`, `agents/`, and `README.md`. It is generated, never hand-edited. After changing any of those sources, run `scripts/build-plugin.sh` from the repo root and commit the rebuilt package with your change.
+`dist/compute-squad.plugin` is committed on purpose: Claude Cowork installs from a single downloadable file, so the package has to exist at a stable URL. It is a zip of `.claude-plugin/plugin.json`, `skills/`, `agents/`, `commands/`, and `README.md`. It is generated, never hand-edited. After changing any of those sources, run `scripts/build-plugin.sh` from the repo root and commit the rebuilt package with your change.
 
 ## FAQ
 

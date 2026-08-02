@@ -1,6 +1,6 @@
 # Compute Squad v3 — Role Hierarchy and Routing Rules
 
-Updated 2026-07-25. v3 restructures roles around a clean four-tier hierarchy: main session = strategy, Opus = PM, Sonnet = execution, Haiku = intern.
+Updated 2026-08-02. v3 restructures roles around a clean four-tier hierarchy: main session = strategy, Opus = PM, Sonnet = execution, Haiku = intern.
 
 ## Roles and model routing
 
@@ -8,13 +8,14 @@ Updated 2026-07-25. v3 restructures roles around a clean four-tier hierarchy: ma
 |---|---|---|---|
 | Strategy | Main-session model (top tier recommended) | none — runs in the main session | Interrogates the goal, identifies gaps, clarifies them with the user, locks goal + acceptance criteria, final judgment and high-stakes review. Runs in the main session because only the main session can ask the user questions; subagents are headless. |
 | PM | Opus | `squad-pm` (PLAN / ACCEPT modes) | Plans the work (spec + ordered task breakdown, execution classification) and accepts the deliverable (adversarial verification, PASS/FAIL, archive and clear on PASS). Never writes product code. |
+| Execution (MECHANICAL) | Haiku | `squad-executor-haiku` | The same executor protocol on the cheapest model, used when the PM classifies the work MECHANICAL. |
 | Execution | Sonnet | `squad-recon`, `squad-executor`, `squad-helper` | Codebase mapping, implementation against the PM's plan, and delegated execution-tier subtasks. |
 | Execution (COMPLEX) | Opus | `squad-executor-opus` | The same executor protocol on Opus, used when the PM classifies the work COMPLEX or execution escalates after two FAILs. |
 | Intern | Haiku | `squad-mech` | Zero-judgment busywork: log archival, rotation, formatting normalization, boilerplate collection. Refuses anything requiring judgment. |
 
 ## Why the hierarchy works
 
-- **Verification asymmetry holds by construction.** The Opus PM accepts Sonnet execution, so the reviewer is always a tier above the work. When execution escalates to Opus (COMPLEX), acceptance stays at Opus and high-stakes changes add a top-tier main-session review on top.
+- **Verification asymmetry holds by construction.** The Opus PM accepts Sonnet execution, so the reviewer is never below the work, and a tier above by default. On MECHANICAL work the same Opus PM accepts Haiku execution instead, so the gap between executor and reviewer widens rather than narrows. When execution escalates to Opus (COMPLEX), acceptance stays at Opus and high-stakes changes add a top-tier main-session review on top.
 - **The tight-spec dependency.** Sonnet-as-execution is only as good as the PM's plan. That is by design: the PLAN mode requirement (a task list a junior engineer could follow without judgment calls) is what makes cheap execution safe. A vague plan is a plan defect, and the Executor is instructed to log it as a blocker rather than improvise.
 - **Gaps surface before tokens are spent.** Stage 0 strategy runs before any agent spawns, so ambiguity gets resolved with the user once, up front, instead of being discovered by a FAIL three stages deep.
 
@@ -22,10 +23,11 @@ Updated 2026-07-25. v3 restructures roles around a clean four-tier hierarchy: ma
 
 1. **Route by role, escalate by evidence.** Default routing follows the hierarchy. Escalate a stage's model only on the PM's COMPLEX classification or after repeated FAILs, never on vibes.
 2. **Retry economics.** Opus costs roughly 1.67x Sonnet ($5/$25 vs $3/$15 per M tokens, July 2026). If a stage's failure forces upstream re-runs, the stronger model is the cheaper one. When unsure, route up.
-3. **Escalate on repeated FAIL.** Same stage fails twice → one tier up for the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass). Three total FAILs on a run → stop and hand back to the user with the log history.
+3. **Escalate on repeated FAIL.** Same stage fails twice → one tier up for the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass). For execution, the escalation ladder is `squad-executor-haiku` → `squad-executor` → `squad-executor-opus` (haiku → sonnet → opus); two FAILs at a tier moves execution up one tier. Three total FAILs on a run → stop and hand back to the user with the log history.
 4. **Strategy changes go to the user.** Anything that would alter the locked goal or acceptance criteria returns to Stage 0 and the user. No agent, including the PM, renegotiates strategy.
 5. **Adversarial verification** (audit-grade runs): fan out Sonnet finder agents across dimensions (runtime integrity, security/privacy, dead code/slop, UI/accessibility, docs drift); Opus skeptics attempt to refute each finding; only skeptic-confirmed findings count.
 6. **The hierarchy is fractal (DELEGATE protocol).** Every level pushes its own busywork down a tier. The runtime is flat (subagents cannot spawn subagents), so stages request delegation via a `DELEGATE:` block in their log entry and the Squad Manager executes it on their behalf: intern tasks go to `squad-mech`, tightly-specced execution tasks go to `squad-helper`. Helpers return results in their final message and the Squad Manager appends them under `## Delegated — <stage>`; `BLOCKING` requests re-spawn the requesting stage, which appends a `## <Stage> (cont.)` entry. Downward only; capped at 5 helpers per stage per run.
+7. **The blocker grammar.** Mirrors the DELEGATE block: a stage that hits a blocker mid-work ends its own log entry with a `BLOCKER:` block instead of freeform prose — `rerun: <Recon|Plan|Executor>` with a one-line `why:`, or `needs-human: <the decision required>` with a one-line `why:`. A `rerun:` blocker re-runs that stage and everything after it and counts toward the three-FAIL stop (rule 3). A `needs-human:` blocker returns to Stage 0 (rule 4). Freeform prose blockers are a protocol violation.
 
 ## Cost posture (July 2026, $/M input/output)
 
@@ -37,9 +39,11 @@ v3 concentrates Opus spend in the two decision-dense PM passes and pushes volume
 
 Agent definitions use the `sonnet` / `opus` / `haiku` aliases so the squad tracks each tier's current generation automatically. Agent frontmatter also accepts `inherit` and explicit model IDs; pin an explicit ID only if a workflow regression-tests better on an older snapshot. Strategy lives in the main session because subagents are headless and cannot ask the user anything, not because of a frontmatter limit.
 
-## Log discipline (unchanged)
+## Log discipline
 
-- All coordination through `COMPUTE_SQUAD_LOG.md` in the repo root; each stage appends one entry per spawn (`## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS` / `## PM — FAIL`), with `## <Stage> (cont.)` for a re-spawn.
+- Every fresh log opens with a `## Goal — Locked` entry: goal, acceptance criteria, out of scope, and assumptions, composed by Stage 0 and appended by Stage 1 right after the archive completes, before Recon spawns. Stage 0's resume check ("is this the same goal?") reads this entry, never the operator's memory of the original prompt.
+- All coordination through `COMPUTE_SQUAD_LOG.md` in the repo root; each stage appends one entry per spawn (`## Goal — Locked`, `## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS` / `## PM — FAIL`), with `## <Stage> (cont.)` for a re-spawn.
+- Every append is a single Bash heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ... EOF`), never a Read-then-Write of the whole file — that race can silently drop entries another stage appended in between. Whole-file `Write` on the active log is legitimate in exactly two places: squad-mech's truncate-after-verified-archive, and the PM's clear-on-PASS.
 - Archive any non-empty log to a timestamped file in `compute-squad-archive/` in the repo root before every new run, and again on PASS. Never discard a prior or failed run.
 - The active log is cleared only after a PASS, and only once the PASS entry is archived: by the PM on ordinary changes, by the main session on high-stakes changes after its own review.
 - Anti-slop discipline in the plan: YAGNI, stdlib/native first, no speculative abstractions.

@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
 metadata:
-  version: "3.3.0"
+  version: "3.6.0"
   author: "Nick Stafford"
 ---
 
@@ -17,6 +17,7 @@ Run the goal through the pipeline with the v3 role hierarchy:
 
 - **Main session (top-tier model recommended): strategy.** Interrogates the goal, identifies gaps, clarifies them with the user, locks acceptance criteria, renders final judgment. Runs directly in the main session because only the main session can ask the user questions.
 - **Opus: PM.** Plans the work and accepts the deliverable (`squad-pm`, PLAN and ACCEPT modes).
+- **Haiku: execution on MECHANICAL.** The same executor protocol on the cheapest model (`squad-executor-haiku`).
 - **Sonnet: execution.** Codebase mapping (`squad-recon`), implementation (`squad-executor`), and delegated execution-tier subtasks (`squad-helper`).
 - **Opus: execution on COMPLEX.** The same executor protocol on the stronger model (`squad-executor-opus`).
 - **Haiku: intern.** Zero-judgment busywork (`squad-mech`).
@@ -31,12 +32,23 @@ Do this directly in the main session; never delegate it:
 2. Identify gaps: ambiguities, unstated constraints, decisions with irreversible or cost-bearing consequences, conflicts with known project invariants.
 3. Clarify gaps WITH THE USER via AskUserQuestion before the pipeline starts. Batch the questions; do not drip them. If the session is clearly unattended, make the most reasonable call per gap, state each assumption explicitly, and proceed.
 4. Lock the goal (one sentence) and acceptance criteria (concrete, verifiable). Once locked, no agent may redefine them; changes come back to Stage 0.
+5. Compose the `## Goal — Locked` entry below, the mandatory first entry of every fresh log. Stage 0 composes it but does not write it — the fresh log doesn't exist yet — so Stage 1 appends it once the archive is done.
 
-If `COMPUTE_SQUAD_LOG.md` already contains entries for this same goal, offer the user a resume from the last logged entry instead of a fresh run, and archive only if they choose the fresh run.
+```markdown
+## Goal — Locked
+<timestamp line>
+Goal: <one sentence>
+Acceptance criteria:
+- <concrete, verifiable item>
+Out of scope: <items>
+Assumptions: <only for unattended runs; otherwise "none">
+```
+
+If `COMPUTE_SQUAD_LOG.md` already contains entries for this same goal — read the goal from its `## Goal — Locked` entry, not from memory — offer the user a resume from the last logged entry instead of a fresh run, and archive only if they choose the fresh run.
 
 ## Stage 1 — Archive (squad-mech, Haiku)
 
-Spawn `squad-mech` to archive any non-empty `COMPUTE_SQUAD_LOG.md` to a timestamped file in `compute-squad-archive/` in the repo root, and start with an empty active log. Never discard a prior or failed run.
+Spawn `squad-mech` to archive any non-empty `COMPUTE_SQUAD_LOG.md` to a timestamped file in `compute-squad-archive/` in the repo root, and start with an empty active log. Never discard a prior or failed run. After squad-mech reports, append the `## Goal — Locked` entry composed in Stage 0 as the first entry of the fresh log, before spawning Recon.
 
 ## Stage 2 — Recon (squad-recon, Sonnet)
 
@@ -52,7 +64,8 @@ If the PM logs a named blocker requiring a human decision, return to Stage 0: su
 
 Route by the PM's classification:
 
-- **MECHANICAL / STANDARD** → spawn `squad-executor` (Sonnet).
+- **MECHANICAL** → spawn `squad-executor-haiku` (Haiku).
+- **STANDARD** → spawn `squad-executor` (Sonnet).
 - **COMPLEX** → spawn `squad-executor-opus` (Opus), the same protocol on the stronger model.
 
 When unsure, route up: a wrong answer that forces a re-run costs more than the tier difference.
@@ -78,11 +91,19 @@ Typical uses: Recon delegates bulk file inventories or dependency listings to th
 
 ## Escalation rules
 
-- Same stage fails twice → escalate that stage one model tier on the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass) instead of retrying at the same tier. For execution, that means `squad-executor` → `squad-executor-opus`.
+- Same stage fails twice → escalate that stage one model tier on the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass) instead of retrying at the same tier. For execution, the escalation ladder is `squad-executor-haiku` → `squad-executor` → `squad-executor-opus` (haiku → sonnet → opus); two FAILs at a tier moves execution up one tier.
 - Three total FAILs on one run → stop, summarize the log history, and hand back to the user.
 - Anything that would change the locked goal or acceptance criteria → back to Stage 0 with the user. Always.
 
-Blockers work the same way from any stage, not just the PM. A logged blocker that names an upstream stage re-runs that stage and every stage after it, and it counts toward the three-FAIL stop. A logged blocker that requires a human decision returns to Stage 0: surface it, resolve it with the user, re-lock, continue. Never guess past a blocker.
+Blockers work the same way from any stage, not just the PM, and all of them use one grammar — a block at the end of a stage's own entry:
+
+```
+BLOCKER:
+- rerun: <Recon|Plan|Executor>   (or)   needs-human: <the decision required>
+- why: <one sentence, with evidence refs>
+```
+
+A `rerun:` blocker re-runs that stage and every stage after it, and it counts toward the three-FAIL stop. A `needs-human:` blocker returns to Stage 0: surface it, resolve it with the user, re-lock, continue. Freeform prose blockers are a protocol violation — never guess past a blocker, and never log one outside this grammar.
 
 ## Audit-grade runs
 
@@ -91,6 +112,8 @@ When the user asks for an audit, adversarial review, or says "be thorough": afte
 ## Hard rules
 
 - Coordination happens only through `COMPUTE_SQUAD_LOG.md`; every stage appends, no stage rewrites history, and it is cleared only after a PASS: by the PM itself, or by the main session once a high-stakes review is done.
+- Every append is a single Bash heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ... EOF`), never a Read-then-Write of the whole file — that race can silently drop entries another stage appended in between. Whole-file `Write` on the active log is legitimate in exactly two places: squad-mech's truncate-after-verified-archive, and the PM's clear-on-PASS.
+- Every fresh log opens with a `## Goal — Locked` entry, appended by Stage 1 before Recon spawns. No stage acts on a goal it did not read from that entry.
 - No stage skips: even a one-line change gets Recon and Plan entries (they can be short).
 - The Executor never accepts its own work; the PM never writes product code; the intern never makes judgment calls.
 - Anti-slop discipline everywhere: YAGNI, stdlib/native first, no speculative abstractions, no scaffolding.

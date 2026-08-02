@@ -2,9 +2,22 @@
 
 A complete worked run so you can see every entry format. Goal: add a 60-second resend cooldown to a password-reset email endpoint.
 
-Stage 0 (strategy) happens in the main session before the log starts: the goal gets interrogated, one gap gets clarified with the user ("should the cooldown apply per-account or per-IP?" → per-account), and the goal + acceptance criteria get locked. Then `squad-mech` archives any prior log and the pipeline writes entries like these.
+Stage 0 (strategy) happens in the main session before the log starts: the goal gets interrogated, one gap gets clarified with the user ("should the cooldown apply per-account or per-IP?" → per-account), and the goal + acceptance criteria get locked into the `## Goal — Locked` entry below. Then `squad-mech` archives any prior log, appends that entry as the first line of the fresh log, and the pipeline writes the rest of these entries in order.
 
 ---
+
+```markdown
+## Goal — Locked
+2026-07-25 13:58 UTC
+
+Goal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.
+Acceptance criteria:
+- A second reset request for the same account within 60 seconds of the first sends no new email and creates no new token row.
+- A second reset request after the 60-second window creates a new token and sends the email as normal.
+- No response or log reveals whether an account exists (existing invariant preserved).
+Out of scope: per-IP throttling; admin-triggered resets (different service path).
+Assumptions: none.
+```
 
 ```markdown
 ## Recon
@@ -95,11 +108,11 @@ create tokens (pre-existing behavior, out of locked scope, noted for the user);
 timing — the cooldown path still performs the token query, timing delta negligible.
 Diff review: no scope creep, no dead code. HIGH-STAKES: yes — the change sits on the
 password-reset auth path and the no-account-existence-leak invariant. Verdict: PASS.
-Archived this log to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md
-and verified the copy. Leaving the active log intact for the main session's
-high-stakes review; the Squad Manager clears it afterwards.
+Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md.
+Leaving the active log intact for the main session's high-stakes review; the Squad
+Manager clears it afterwards.
 ```
 
 ---
 
-The PM archives the full log (PASS entry included) and stops there, because the change touches an auth path. The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and clears `COMPUTE_SQUAD_LOG.md` itself as the last step of the run. On an ordinary, non-high-stakes change the PM would clear the log itself right after the verified archive. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive.
+The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM then makes the copy, reads it back to verify it matches, and reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and clears `COMPUTE_SQUAD_LOG.md` itself as the last step of the run. On an ordinary, non-high-stakes change the PM would clear the log itself right after the verified archive. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.
