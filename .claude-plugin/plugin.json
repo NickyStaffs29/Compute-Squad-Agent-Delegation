@@ -1,12 +1,12 @@
 {
   "name": "compute-squad",
-  "version": "3.6.0",
-  "description": "A four-tier agent delegation pipeline: your main session runs strategy and gap clarification, an Opus PM plans and accepts the work, Sonnet executes, and Haiku handles intern-tier busywork, coordinated through COMPUTE_SQUAD_LOG.md.",
+  "version": "3.7.0",
+  "description": "A four-tier agent delegation pipeline for Claude Code and Codex: strategy, planning and acceptance, execution, and intern-tier busywork coordinated through COMPUTE_SQUAD_LOG.md.",
   "author": {
     "name": "Nick Stafford"
   },
   "homepage": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation",
   "repository": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation",
   "license": "MIT",
-  "keywords": ["agents", "delegation", "orchestration", "pipeline", "code-quality"]
+  "keywords": ["agents", "delegation", "orchestration", "pipeline", "code-quality", "codex"]
 }

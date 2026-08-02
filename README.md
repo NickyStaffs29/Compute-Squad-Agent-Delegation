@@ -6,16 +6,16 @@ What Compute Squad actually sells is verification and auditability that don't de
 
 One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
-| Role | Model | Agent | Owns |
-|---|---|---|---|
-| Strategy | Your main session (top tier recommended) | none. This is you and your session model | Goal, gaps, acceptance criteria, final judgment |
-| PM | Opus | `squad-pm` | The plan and the acceptance decision |
-| Execution on MECHANICAL | Haiku | `squad-executor-haiku` | The same executor protocol, cheapest model |
-| Execution | Sonnet | `squad-recon`, `squad-executor`, `squad-helper` | Mapping the codebase, implementing the plan, delegated subtasks |
-| Execution on COMPLEX | Opus | `squad-executor-opus` | The same executor protocol, stronger model |
-| Intern | Haiku | `squad-mech` | Busywork. Nothing that requires judgment |
+| Role | Claude model | Codex model | Agent | Owns |
+|---|---|---|---|---|
+| Strategy | Main session | `gpt-5.6-sol` high | none. This is you and your session model | Goal, gaps, acceptance criteria, final judgment |
+| PM | Opus | `gpt-5.6-sol` max | `squad-pm` | The plan and the acceptance decision |
+| Execution on MECHANICAL | Haiku | `gpt-5.6-luna` max | `squad-executor-haiku` | The same executor protocol, cheapest model |
+| Execution | Sonnet | `gpt-5.6-terra` max | `squad-recon`, `squad-executor`, `squad-helper` | Mapping the codebase, implementing the plan, delegated subtasks |
+| Execution on COMPLEX | Opus | `gpt-5.6-sol` max | `squad-executor-opus` | The same executor protocol, stronger model |
+| Intern | Haiku | `gpt-5.6-luna` max | `squad-mech` | Busywork. Nothing that requires judgment |
 
-Works in Claude Code, Claude Cowork, and Codex (as a manual prompt pack).
+Works in Claude Code, Claude Cowork, and Codex (as a native plugin with a manual prompt fallback).
 
 ## Install
 
@@ -54,7 +54,22 @@ curl -L -o compute-squad.plugin https://raw.githubusercontent.com/NickyStaffs29/
 
 Or grab [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin) directly.
 
-**Codex.** No install. The pipeline runs as a manually sequenced set of sessions using the prompts in [`codex/`](codex/). Start with [`codex/README.md`](codex/README.md).
+**Codex.** Codex reads the native plugin manifest in this repository:
+
+```bash
+codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
+codex plugin add compute-squad@compute-squad
+```
+
+Install the seven named Codex agents once so the skill can route each stage:
+
+```bash
+git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation ~/src/compute-squad
+mkdir -p ~/.codex/agents
+cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
+```
+
+Copy the profile values from `codex/profiles.toml` into the current Codex V2 profile files under `~/.codex/`, then start the orchestrator with `codex --profile compute-squad`. Older Codex versions can use the five manually sequenced prompts in [`codex/`](codex/); the setup and routing table are in [`codex/README.md`](codex/README.md).
 
 The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
@@ -182,6 +197,10 @@ Compute-Squad-Agent-Delegation/
 ├── .claude-plugin/
 │   ├── plugin.json           # plugin manifest
 │   └── marketplace.json      # makes this repo installable in Claude Code
+├── .codex-plugin/
+│   └── plugin.json           # native Codex plugin manifest
+├── .agents/plugins/
+│   └── marketplace.json      # makes this repo discoverable in Codex
 ├── skills/compute-squad/
 │   ├── SKILL.md              # the orchestration protocol
 │   └── references/
@@ -197,7 +216,11 @@ Compute-Squad-Agent-Delegation/
 │   └── squad-mech.md         # Haiku · the intern
 ├── commands/
 │   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
-├── codex/                    # the pipeline as manual Codex session prompts
+├── codex/
+│   ├── SKILL.md              # native Codex orchestration entry point
+│   ├── agents/*.toml         # generated Codex agent definitions
+│   ├── profiles.toml         # Sol/Terra/Luna profile reference
+│   └── 01-05*.md             # manual-session fallback prompts
 ├── docs/example-log.md       # a complete worked run
 ├── scripts/build-plugin.sh   # rebuilds dist/ from source
 ├── dist/compute-squad.plugin # drag-and-drop install for Claude Cowork
@@ -210,7 +233,7 @@ Compute-Squad-Agent-Delegation/
 ## FAQ
 
 **Why is strategy not an agent?**
-Subagents run headless. They cannot ask you anything, and clarifying gaps with the human is the entire point of Stage 0. So strategy lives in the skill and executes on whatever model runs your session, which is also where your top-tier model runs.
+Subagents run headless. They cannot ask you anything, and clarifying gaps with the human is the entire point of Stage 0. So strategy lives in the skill and executes in your top-tier main session.
 
 **Do the models auto-upgrade?**
 Yes. Agents use tier aliases, which resolve to the newest model in each class at runtime. New generation ships, the squad picks it up, zero changes required. Agent frontmatter also accepts `inherit` and explicit model IDs. Pin an explicit ID only if a workflow regression-tests better on an older snapshot.
@@ -219,7 +242,7 @@ Yes. Agents use tier aliases, which resolve to the newest model in each class at
 Three backstops. The plan is required to carry the intelligence. Acceptance always reviews from a tier up. And the PM's COMPLEX classification escalates execution to Opus when a tight spec cannot fully de-risk the work.
 
 **Why a shared log instead of passing context directly?**
-Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. And a file protocol is portable: the same pipeline runs in Codex, which cannot spawn agents at all.
+Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. The append-only file protocol is portable across the Claude and Codex plugin implementations.
 
 **Six stages for a one-line change?**
 The stages are mandatory. Their length is not. A one-line change gets a three-sentence Recon entry and a four-line plan. The discipline is the constant; the overhead scales with the work.

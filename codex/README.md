@@ -1,6 +1,33 @@
 # Compute Squad for Codex
 
-Codex has no nested agent-spawning tool, so the pipeline can't run as one automatic command. It runs instead as a **manually-run sequence of Codex sessions**, one per stage, coordinating through the same `COMPUTE_SQUAD_LOG.md` in your repo root. The discipline is identical; only the trigger is manual.
+The repository ships a native Codex plugin plus five prompt files for older Codex versions. The native path gives Codex the orchestration skill and the same seven named agents used by the Claude package; both implementations coordinate through `COMPUTE_SQUAD_LOG.md`.
+
+## Native Codex install
+
+```bash
+codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
+codex plugin add compute-squad@compute-squad
+```
+
+Install the generated agent definitions into the user agent directory:
+
+```bash
+git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation ~/src/compute-squad
+mkdir -p ~/.codex/agents
+cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
+```
+
+`codex/profiles.toml` is a reference for the current Codex V2 profile files. Copy each table's `model` and `model_reasoning_effort` keys into `~/.codex/<profile-name>.config.toml`, then launch the main session with:
+
+```bash
+codex --profile compute-squad "Run the squad: <goal>"
+```
+
+The routing is Sol (`gpt-5.6-sol`) for strategy, PM, and COMPLEX execution; Terra (`gpt-5.6-terra`) for Recon and standard execution; and Luna (`gpt-5.6-luna`) for MECHANICAL and intern work. Worker profiles use `max` reasoning.
+
+## Manual fallback
+
+If the Codex version does not support the native plugin manifest, run the manually sequenced sessions below. Each stage reads and appends to the same `COMPUTE_SQUAD_LOG.md` in the repo root.
 
 ## How to run it
 
@@ -10,13 +37,13 @@ Then run the sessions in order:
 
 | Order | Prompt file | Stage | Suggested model |
 |---|---|---|---|
-| 1 | `01-archive.md` | Archive the prior log | cheapest available |
-| 2 | `02-recon.md` | Read-only codebase mapping | mid tier |
-| 3 | `03-pm-plan.md` | Spec + task breakdown, no code | strongest available |
-| 4 | `04-execute.md` | Implementation, exactly per plan | mid tier (cheapest available if the plan said MECHANICAL; strongest if the plan said COMPLEX) |
-| 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | strongest available |
+| 1 | `01-archive.md` | Archive the prior log | `gpt-5.6-luna` max |
+| 2 | `02-recon.md` | Read-only codebase mapping | `gpt-5.6-terra` max |
+| 3 | `03-pm-plan.md` | Spec + task breakdown, no code | `gpt-5.6-sol` max |
+| 4 | `04-execute.md` | Implementation, exactly per plan | Terra max; Luna max for MECHANICAL, Sol max for COMPLEX |
+| 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | `gpt-5.6-sol` max |
 
-Codex has one execute prompt file, not three; you pick the model per run instead. That single file plays the same role as three separate agents in the Claude Code plugin — `squad-executor-haiku` (MECHANICAL), `squad-executor` (STANDARD), `squad-executor-opus` (COMPLEX) — because Claude Code locks an agent's model in its frontmatter and Codex doesn't have that constraint.
+The fallback has one execute prompt file, not three; you pick the model per run. The native plugin's generated TOMLs preserve the three routing variants (`squad-executor-haiku`, `squad-executor`, and `squad-executor-opus`) with fixed Codex model IDs.
 
 After session 1 (`01-archive.md`) reports the fresh log is ready, append the `## Goal — Locked` entry yourself as its first entry, before pasting `02-recon.md`:
 

@@ -1,0 +1,22 @@
+# Codex profile reference for Compute Squad.
+#
+# Codex CLI 0.134+ uses V2 profile files: copy the key/value pairs from one
+# table into ~/.codex/<profile-name>.config.toml, then launch with
+# `codex --profile <profile-name>`. Older CLI versions accepted the tables
+# appended to config.toml; do not append this whole file on current CLI.
+
+[profiles.compute-squad]
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+
+[profiles.compute-squad-pm]
+model = "gpt-5.6-sol"
+model_reasoning_effort = "max"
+
+[profiles.compute-squad-execution]
+model = "gpt-5.6-terra"
+model_reasoning_effort = "max"
+
+[profiles.compute-squad-mechanical]
+model = "gpt-5.6-luna"
+model_reasoning_effort = "max"
