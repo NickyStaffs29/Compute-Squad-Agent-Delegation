@@ -22,7 +22,7 @@ Or from inside a Claude Code session:
 
 That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
-**Codex.** Add the plugin, then install the seven named agents once so the skill can route each stage:
+**Codex.** Prerequisites: a working `git`, `/bin/bash`, and a logged-in Codex CLI. Add the plugin, then run the checked-in updater to install the seven named agent TOMLs and four Codex V2 profile files:
 
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -32,7 +32,7 @@ git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME
 bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The updater also writes the Codex V2 profile files from [`codex/profiles.toml`](codex/profiles.toml). Start a new Codex session after installation so the plugin skill is loaded. Full Codex setup, routing table, update command, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
+The updater also refreshes the configured marketplace and plugin. Start a new Codex session after installation so the plugin skill is loaded. Full Codex setup, routing table, update command, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
 
 ## 2. Run it
 
@@ -56,24 +56,33 @@ Either way, run it from your project root, in a session that can read and write 
 
 **Claude Code** — auto-update is built in; you just flip it on once. Run `/plugin`, open the **Marketplaces** tab, select **compute-squad**, and choose **Enable auto-update**. Claude Code then refreshes the marketplace and updates the plugin in the background — nothing else to set up.
 
-**Codex** — paste this into a Codex session once, and it sets up the recurring job on your device itself:
+**Codex** — paste this into a Codex session once. Codex CLI has no built-in recurring-task command, so this asks the session to create the OS scheduler entry with your approval:
 
 ```
 Set up a weekly recurring task on this device that keeps the Compute Squad
-plugin up to date. Once a week it should:
-  1. Run the repository updater:
-     CODEX_BIN=/absolute/path/to/codex GIT_BIN=/absolute/path/to/git
-     /bin/bash "$HOME/src/compute-squad/codex/update.sh"
-     It runs `git pull --ff-only`,
-     `codex plugin marketplace upgrade compute-squad`,
-     `codex plugin add compute-squad@compute-squad`, and refreshes the
-     agents and Codex V2 profile files. Current Codex has no
-     `codex plugin update` command.
-Use the OS scheduler (launchd on macOS, cron on Linux, Task Scheduler on
-Windows), with absolute executable paths and stdout/stderr redirected to a
-log. The updater does not create the schedule. When you're done, tell me the
-schedule you created, the command path, and the log path. Start a new Codex
-session after a plugin update.
+plugin up to date. Use the OS scheduler: a per-user LaunchAgent under
+`~/Library/LaunchAgents` on macOS, cron on Linux, or Task Scheduler on
+Windows. On Windows, use the Bash environment that owns the clone (for
+example WSL or Git Bash). Ask for approval before writing or loading the
+scheduler entry. If the job cannot be created, report that instead of
+claiming success.
+
+Once a week, run the repository updater with the variables applied to the same
+command. Resolve the updater path, `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME` to
+absolute paths; do not put `$HOME` in launchd `ProgramArguments`:
+  CODEX_BIN=/absolute/path/to/codex \
+  GIT_BIN=/absolute/path/to/git \
+  CODEX_HOME=/absolute/path/to/codex-home \
+    /bin/bash /absolute/path/to/compute-squad/codex/update.sh
+
+The updater runs `git pull --ff-only`, `codex plugin marketplace upgrade
+compute-squad`, and `codex plugin add compute-squad@compute-squad`; it then
+refreshes the agents and Codex V2 profile files. There is no `codex plugin
+update` command; the top-level `codex update` updates the CLI itself, not this
+plugin. Configure stdout/stderr logging (for launchd, use `StandardOutPath`
+and `StandardErrorPath`). When done, tell me the schedule, command path, log
+path, and whether the job was successfully loaded. Start a new Codex session
+after a plugin update.
 ```
 
 Prefer manual updates? In Claude Code, run these whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):
