@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
 metadata:
-  version: "3.6.0"
+  version: "3.7.0"
   author: "Nick Stafford"
 ---
 
@@ -24,13 +24,26 @@ Run the goal through the pipeline with the v3 role hierarchy:
 
 Coordinate exclusively through `COMPUTE_SQUAD_LOG.md` in the repo root. Full routing rules in `references/routing-rules.md`.
 
+## Codex model routing
+
+When this shared skill is loaded by Codex, use the generated definitions in
+`codex/agents/` after copying them to `~/.codex/agents/`. Their fixed routing is:
+
+- Main session: `gpt-5.6-sol` at high reasoning.
+- PM and COMPLEX execution: `gpt-5.6-sol` at max reasoning.
+- Recon, STANDARD execution, and delegated execution: `gpt-5.6-terra` at max reasoning.
+- MECHANICAL execution and intern work: `gpt-5.6-luna` at max reasoning.
+
+The Claude agent aliases below remain the source of truth for the Claude package;
+the Codex TOML `model` fields are the source of truth for Codex.
+
 ## Stage 0 — Strategy (main session, before anything spawns)
 
 Do this directly in the main session; never delegate it:
 
 1. Interrogate the goal: what outcome is actually wanted, what does done look like, what is out of scope, what could this break, is there a higher-leverage framing of the same problem.
 2. Identify gaps: ambiguities, unstated constraints, decisions with irreversible or cost-bearing consequences, conflicts with known project invariants.
-3. Clarify gaps WITH THE USER via AskUserQuestion before the pipeline starts. Batch the questions; do not drip them. If the session is clearly unattended, make the most reasonable call per gap, state each assumption explicitly, and proceed.
+3. Clarify gaps WITH THE USER via the host's question mechanism (AskUserQuestion in Claude; request_user_input in Codex) before the pipeline starts. Batch the questions; do not drip them. If the session is clearly unattended, make the most reasonable call per gap, state each assumption explicitly, and proceed.
 4. Lock the goal (one sentence) and acceptance criteria (concrete, verifiable). Once locked, no agent may redefine them; changes come back to Stage 0.
 5. Compose the `## Goal — Locked` entry below, the mandatory first entry of every fresh log. Stage 0 composes it but does not write it — the fresh log doesn't exist yet — so Stage 1 appends it once the archive is done.
 

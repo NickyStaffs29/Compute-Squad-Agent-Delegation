@@ -1,0 +1,38 @@
+{
+  "name": "compute-squad",
+  "version": "3.7.0",
+  "description": "A staged planning, execution, and adversarial acceptance pipeline for Codex.",
+  "author": {
+    "name": "Nick Stafford"
+  },
+  "homepage": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation",
+  "repository": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "delegation",
+    "orchestration",
+    "pipeline",
+    "code-quality",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Compute Squad",
+    "shortDescription": "Plan, execute, and adversarially accept code changes",
+    "longDescription": "Run a staged Compute Squad workflow in Codex: lock the goal, archive prior run state, map the codebase, produce a no-guesswork plan, execute it at the right model tier, and adversarially accept the result through an append-only log.",
+    "developerName": "Nick Stafford",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Run Compute Squad on this goal",
+      "Map, plan, execute, and accept this code change",
+      "Start a staged Compute Squad run"
+    ],
+    "websiteURL": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation"
+  }
+}

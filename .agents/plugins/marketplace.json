@@ -1,0 +1,21 @@
+{
+  "name": "compute-squad",
+  "interface": {
+    "displayName": "Compute Squad"
+  },
+  "plugins": [
+    {
+      "name": "compute-squad",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
