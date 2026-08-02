@@ -12,18 +12,33 @@ codex plugin add compute-squad@compute-squad
 Install the generated agent definitions into the user agent directory:
 
 ```bash
-git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation ~/src/compute-squad
-mkdir -p ~/.codex/agents
-cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
+mkdir -p "$HOME/src"
+git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME/src/compute-squad"
+bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-`codex/profiles.toml` is a reference for the current Codex V2 profile files. Copy each table's `model` and `model_reasoning_effort` keys into `~/.codex/<profile-name>.config.toml`, then launch the main session with:
+The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, and writes the four current Codex V2 profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN` and `GIT_BIN` to absolute paths; `CODEX_HOME` can override the default `~/.codex` directory.
+
+`codex/profiles.toml` is the repository reference for those V2 profile files. The main profile controls the top-level session; each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
+
+After installing or updating the plugin, start a new Codex session before running:
 
 ```bash
 codex --profile compute-squad "Run the squad: <goal>"
 ```
 
 The routing is Sol (`gpt-5.6-sol`) for strategy, PM, and COMPLEX execution; Terra (`gpt-5.6-terra`) for Recon and standard execution; and Luna (`gpt-5.6-luna`) for MECHANICAL and intern work. Worker profiles use `max` reasoning.
+
+## Updating an installed setup
+
+Current Codex has no `codex plugin update` command. Run the checked-in updater instead:
+
+```bash
+CODEX_BIN="$(command -v codex)" GIT_BIN="$(command -v git)" \
+  bash "$HOME/src/compute-squad/codex/update.sh"
+```
+
+The updater uses `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, pulls the agent definitions and profile values, and refreshes the local clone with `git pull --ff-only`. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute `CODEX_BIN` and `GIT_BIN` values and redirect stdout/stderr to a log; schedulers do not reliably inherit an interactive shell's `PATH`. The updater does not create a schedule itself.
 
 ## Manual fallback
 

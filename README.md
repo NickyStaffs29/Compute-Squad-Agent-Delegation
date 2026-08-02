@@ -27,12 +27,12 @@ That's everything: all seven squad agents, the orchestration skill, and the `/sq
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
 codex plugin add compute-squad@compute-squad
-git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation ~/src/compute-squad
-mkdir -p ~/.codex/agents
-cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
+mkdir -p "$HOME/src"
+git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME/src/compute-squad"
+bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-Then copy the profile values from [`codex/profiles.toml`](codex/profiles.toml) into your Codex V2 profile files under `~/.codex/`. Full Codex setup, routing table, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
+The updater also writes the Codex V2 profile files from [`codex/profiles.toml`](codex/profiles.toml). Start a new Codex session after installation so the plugin skill is loaded. Full Codex setup, routing table, update command, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
 
 ## 2. Run it
 
@@ -61,14 +61,19 @@ Either way, run it from your project root, in a session that can read and write 
 ```
 Set up a weekly recurring task on this device that keeps the Compute Squad
 plugin up to date. Once a week it should:
-  1. Refresh the plugin from
-     https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
-     (use the codex plugin update command if this version has one,
-     otherwise re-run marketplace add + plugin add).
-  2. Run: git -C ~/src/compute-squad pull
-  3. Run: cp ~/src/compute-squad/codex/agents/*.toml ~/.codex/agents/
+  1. Run the repository updater:
+     CODEX_BIN=/absolute/path/to/codex GIT_BIN=/absolute/path/to/git
+     /bin/bash "$HOME/src/compute-squad/codex/update.sh"
+     It runs `git pull --ff-only`,
+     `codex plugin marketplace upgrade compute-squad`,
+     `codex plugin add compute-squad@compute-squad`, and refreshes the
+     agents and Codex V2 profile files. Current Codex has no
+     `codex plugin update` command.
 Use the OS scheduler (launchd on macOS, cron on Linux, Task Scheduler on
-Windows). When you're done, tell me the schedule you created.
+Windows), with absolute executable paths and stdout/stderr redirected to a
+log. The updater does not create the schedule. When you're done, tell me the
+schedule you created, the command path, and the log path. Start a new Codex
+session after a plugin update.
 ```
 
 Prefer manual updates? In Claude Code, run these whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):

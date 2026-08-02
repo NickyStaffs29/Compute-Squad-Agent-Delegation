@@ -82,8 +82,7 @@ def build() -> dict[str, tuple[str, str, str]]:
         header = (
             f"RUN THIS AGENT ON `{model}` AT `{effort}` REASONING EFFORT. "
             f"Codex defaults to {MODEL_DEFAULTS[model]} reasoning for this model; "
-            "the matching profile in codex/profiles.toml is what pins the requested "
-            "effort. This header states the requirement; it does not enforce it.\n\n"
+            "the model_reasoning_effort field below pins the requested effort.\n\n"
         )
         instructions = header + body
         if '"""' in instructions:
@@ -94,6 +93,7 @@ def build() -> dict[str, tuple[str, str, str]]:
                     f"name = {toml_string(name)}",
                     f"description = {toml_string(description)}",
                     f"model = {toml_string(model)}",
+                    f"model_reasoning_effort = {toml_string(effort)}",
                     'developer_instructions = """',
                     instructions,
                     '"""',
