@@ -22,7 +22,7 @@ Or from inside a Claude Code session:
 
 That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
-**Codex.** Add the plugin, then install the seven named agents once so the skill can route each stage:
+**Codex.** Requires Codex CLI with V2 profile support (the repository documents 0.134+), Git, and Bash. The plugin installs the Compute Squad skill; the updater below separately installs the seven agent TOMLs and generates the native profile files. These shell commands are for macOS/Linux or WSL/Git Bash on Windows:
 
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -32,7 +32,7 @@ git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME
 bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The updater also writes the Codex V2 profile files from [`codex/profiles.toml`](codex/profiles.toml). Start a new Codex session after installation so the plugin skill is loaded. Full Codex setup, routing table, update command, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
+The updater also writes the Codex V2 profile files from [`codex/profiles.toml`](codex/profiles.toml). That file is the repository source manifest; Codex loads the generated `$CODEX_HOME/<profile>.config.toml` files. Start a new Codex session after installation so the plugin skill is loaded. Full Codex setup, routing table, update command, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
 
 ## 2. Run it
 
@@ -50,30 +50,45 @@ Or say any of: `run the squad: <goal>`, `run compute squad`, `compute squad this
 codex --profile compute-squad "Run the squad: add rate limiting to the password-reset endpoint"
 ```
 
+This starts an interactive Codex session with the prompt supplied. For a non-interactive run, use:
+
+```bash
+codex exec --profile compute-squad "Run the squad: add rate limiting to the password-reset endpoint"
+```
+
 Either way, run it from your project root, in a session that can read and write the repo.
 
 ## 3. Get updates automatically
 
 **Claude Code** — auto-update is built in; you just flip it on once. Run `/plugin`, open the **Marketplaces** tab, select **compute-squad**, and choose **Enable auto-update**. Claude Code then refreshes the marketplace and updates the plugin in the background — nothing else to set up.
 
-**Codex** — paste this into a Codex session once, and it sets up the recurring job on your device itself:
+**Codex** — the following creates an OS-level schedule, not a native Codex Scheduled task. Codex CLI cannot create or manage native Scheduled tasks; create those from the ChatGPT desktop/web Scheduled tasks interface instead. For an OS-level weekly updater, paste this into a Codex session once:
 
 ```
-Set up a weekly recurring task on this device that keeps the Compute Squad
-plugin up to date. Once a week it should:
-  1. Run the repository updater:
-     CODEX_BIN=/absolute/path/to/codex GIT_BIN=/absolute/path/to/git
-     /bin/bash "$HOME/src/compute-squad/codex/update.sh"
-     It runs `git pull --ff-only`,
-     `codex plugin marketplace upgrade compute-squad`,
-     `codex plugin add compute-squad@compute-squad`, and refreshes the
-     agents and Codex V2 profile files. Current Codex has no
-     `codex plugin update` command.
-Use the OS scheduler (launchd on macOS, cron on Linux, Task Scheduler on
-Windows), with absolute executable paths and stdout/stderr redirected to a
-log. The updater does not create the schedule. When you're done, tell me the
-schedule you created, the command path, and the log path. Start a new Codex
-session after a plugin update.
+Set up a user-level OS scheduler job on this device for a weekly run that keeps
+the Compute Squad plugin up to date. This updater is a Bash script. If this is
+native Windows, stop and explain that it must run under WSL or Git Bash; do not
+create a native PowerShell command.
+
+Choose and state a specific weekly day and time. On macOS use a LaunchAgent; on
+Linux use cron or a user systemd timer; under Windows use the chosen WSL/Git
+Bash environment. Use absolute paths and do not rely on $HOME or $PATH.
+
+The scheduled command must run exactly this one continued shell command, after
+replacing every placeholder with a real path:
+  CODEX_HOME="/absolute/path/to/.codex" \
+  CODEX_BIN="/absolute/path/to/codex" \
+  GIT_BIN="/absolute/path/to/git" \
+  /bin/bash "/absolute/path/to/compute-squad/codex/update.sh" \
+    >> "/absolute/path/to/compute-squad-update.log" 2>&1
+
+It runs `git pull --ff-only`, `codex plugin marketplace upgrade
+compute-squad`, `codex plugin add compute-squad@compute-squad`, and refreshes
+the agents and Codex V2 profile files. Current Codex has no `codex plugin
+update` command. The job needs network access and write access to the clone
+and CODEX_HOME. Create and enable the schedule, verify that it is active, and
+tell me the schedule, command path, and log path. Start a new Codex session
+after a plugin update.
 ```
 
 Prefer manual updates? In Claude Code, run these whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):
@@ -83,7 +98,7 @@ Prefer manual updates? In Claude Code, run these whenever you like (marketplace 
 /plugin update compute-squad
 ```
 
-In Codex, re-run steps 1–3 from the Codex prompt above.
+In Codex, rerun the updater command from the install section or [`codex/README.md`](codex/README.md); do not repeat the initial marketplace registration unless it has been removed.
 
 To remove from Claude Code: `/plugin uninstall compute-squad@compute-squad`. Uninstalling removes the agents and the skill but leaves `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` in your project untouched.
 
