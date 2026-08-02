@@ -54,21 +54,9 @@ Either way, run it from your project root, in a session that can read and write 
 
 ## 3. Get updates automatically
 
-Paste the prompt for your setup once. The assistant sets up the recurring job on your device itself — nothing for you to configure.
+**Claude Code** — auto-update is built in; you just flip it on once. Run `/plugin`, open the **Marketplaces** tab, select **compute-squad**, and choose **Enable auto-update**. Claude Code then refreshes the marketplace and updates the plugin in the background — nothing else to set up.
 
-**Claude Code** — paste into any Claude Code session:
-
-```
-Set up a weekly recurring task on this device that keeps the Compute Squad
-plugin up to date. Once a week it should run, in order:
-  claude plugin marketplace update compute-squad
-  claude plugin update compute-squad
-Use your native scheduled-tasks feature if this app has one; otherwise use
-the OS scheduler (launchd on macOS, cron on Linux, Task Scheduler on
-Windows). When you're done, tell me the schedule you created.
-```
-
-**Codex** — paste into a Codex session:
+**Codex** — paste this into a Codex session once, and it sets up the recurring job on your device itself:
 
 ```
 Set up a weekly recurring task on this device that keeps the Compute Squad
@@ -103,7 +91,8 @@ To remove from Claude Code: `/plugin uninstall compute-squad@compute-squad`. Uni
 {
   "extraKnownMarketplaces": {
     "compute-squad": {
-      "source": { "source": "github", "repo": "NickyStaffs29/Compute-Squad-Agent-Delegation" }
+      "source": { "source": "github", "repo": "NickyStaffs29/Compute-Squad-Agent-Delegation" },
+      "autoUpdate": true
     }
   },
   "enabledPlugins": { "compute-squad@compute-squad": true }
