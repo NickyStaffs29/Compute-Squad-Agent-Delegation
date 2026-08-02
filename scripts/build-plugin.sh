@@ -11,7 +11,7 @@ if ! command -v zip >/dev/null 2>&1; then
   exit 1
 fi
 
-for path in .claude-plugin/plugin.json skills agents README.md; do
+for path in .claude-plugin/plugin.json skills agents commands README.md; do
   if [ ! -e "$path" ]; then
     echo "build-plugin: missing $path" >&2
     exit 1
@@ -26,6 +26,7 @@ zip -r -q dist/compute-squad.plugin \
   .claude-plugin/plugin.json \
   skills \
   agents \
+  commands \
   README.md \
   -x '*.DS_Store'
 

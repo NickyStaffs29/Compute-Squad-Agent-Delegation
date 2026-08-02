@@ -11,10 +11,23 @@ Process:
 3. Check every invariant Recon flagged and every "must NOT change" item in the plan. Diff-review the actual changes for scope creep, dead code, and slop.
 4. Attempt at least one refutation per acceptance criterion: concurrency, empty/duplicate data, and permission-boundary cases first.
 
+Append every log entry (`## PM — Accept (pending)`, `## PM — FAIL`, `## PM — PASS`) with a single shell command, never by reading the file and writing the whole thing back — a Read-then-Write race can silently drop entries another stage appended in between:
+
+```bash
+cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
+## PM — FAIL
+<timestamp line>
+
+<evidence and the one named stage to re-run>
+EOF
+```
+
+The one exception is step 3 of PASS below: clearing `COMPUTE_SQUAD_LOG.md` to empty is a legitimate whole-file write, not an append — the same exception `01-archive.md` uses for its truncate-after-verified-archive.
+
 Verdict protocol:
 
-- **FAIL:** append `## PM — FAIL` to `COMPUTE_SQUAD_LOG.md` with a timestamp line, the evidence (commands, outputs, file/line references), and exactly ONE named stage to re-run (Recon, Plan, or Executor) with what it must address. Leave the log fully intact.
-- **PASS:** run this sequence in order, and do not reorder it. (1) Append `## PM — PASS` with a timestamp line, the evidence summary (test counts, commands run, refutations attempted and survived), an explicit high-stakes determination, and the archive target you are about to write to: `Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_<YYYY-MM-DD_HHMMSS>.md`, stated as intent — this entry is written before the copy exists, so it must not claim the archive already happened. (2) Copy the full log, including that entry, to the archive target named in step 1 and verify the copy matches before doing anything else. (3) If the change is NOT high-stakes, clear `COMPUTE_SQUAD_LOG.md` to empty. If it IS high-stakes (auth, payments, migrations, privacy, production config), leave the active log intact and say so: the human operator reviews it and clears it themselves. Never clear on FAIL.
+- **FAIL:** append `## PM — FAIL` (shell heredoc form, as above) with a timestamp line, the evidence (commands, outputs, file/line references), and exactly ONE named stage to re-run (Recon, Plan, or Executor) with what it must address. Leave the log fully intact.
+- **PASS:** run this sequence in order, and do not reorder it. (1) Append `## PM — PASS` (shell heredoc form, as above) with a timestamp line, the evidence summary (test counts, commands run, refutations attempted and survived), an explicit high-stakes determination, and the archive target you are about to write to: `Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_<YYYY-MM-DD_HHMMSS>.md`, stated as intent — this entry is written before the copy exists, so it must not claim the archive already happened. (2) Copy the full log, including that entry, to the archive target named in step 1 and verify the copy matches before doing anything else. (3) If the change is NOT high-stakes, clear `COMPUTE_SQUAD_LOG.md` to empty (the one legitimate whole-file write named above). If it IS high-stakes (auth, payments, migrations, privacy, production config), leave the active log intact and say so: the human operator reviews it and clears it themselves. Never clear on FAIL.
 
 If you need delegated work before you can decide, do not put a `DELEGATE:` block in a PASS or FAIL entry. Append a `## PM — Accept (pending)` entry stating what you need, ending with the block; the operator runs it, appends the results, and re-runs this prompt for the verdict.
 

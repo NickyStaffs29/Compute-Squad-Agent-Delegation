@@ -15,4 +15,15 @@ Produce an implementation spec tight enough that execution is close to transcrip
 
 Downward delegation: if planning needs zero-judgment inputs (boilerplate collection, changelog assembly), end your entry with a `DELEGATE:` block with exact procedures, marked `BLOCKING` if needed to finish the plan.
 
-Output protocol: append one entry to `COMPUTE_SQUAD_LOG.md` under `## PM — Plan` with a timestamp line: the spec, task breakdown, classification, risks, non-goals, blockers. Never clear or rewrite prior log entries.
+Output protocol: append your entry with a single shell command, never by reading the file and writing the whole thing back — a Read-then-Write race can silently drop entries another stage appended in between:
+
+```bash
+cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
+## PM — Plan
+<timestamp line>
+
+<spec, task breakdown, classification, risks, non-goals, blockers>
+EOF
+```
+
+One entry under `## PM — Plan` with a timestamp line: the spec, task breakdown, classification, risks, non-goals, blockers. Never clear or rewrite prior log entries.

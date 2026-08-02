@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
 metadata:
-  version: "3.5.0"
+  version: "3.6.0"
   author: "Nick Stafford"
 ---
 
@@ -112,6 +112,7 @@ When the user asks for an audit, adversarial review, or says "be thorough": afte
 ## Hard rules
 
 - Coordination happens only through `COMPUTE_SQUAD_LOG.md`; every stage appends, no stage rewrites history, and it is cleared only after a PASS: by the PM itself, or by the main session once a high-stakes review is done.
+- Every append is a single Bash heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ... EOF`), never a Read-then-Write of the whole file — that race can silently drop entries another stage appended in between. Whole-file `Write` on the active log is legitimate in exactly two places: squad-mech's truncate-after-verified-archive, and the PM's clear-on-PASS.
 - Every fresh log opens with a `## Goal — Locked` entry, appended by Stage 1 before Recon spawns. No stage acts on a goal it did not read from that entry.
 - No stage skips: even a one-line change gets Recon and Plan entries (they can be short).
 - The Executor never accepts its own work; the PM never writes product code; the intern never makes judgment calls.

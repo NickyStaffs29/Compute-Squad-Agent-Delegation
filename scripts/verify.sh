@@ -9,9 +9,9 @@
 #   3. skills/compute-squad/SKILL.md frontmatter parses and its metadata.version
 #      equals plugin.json's version.
 #   4. CHANGELOG.md has a heading for that version.
-#   5. dist/compute-squad.plugin matches skills/, agents/, README.md, and
-#      .claude-plugin/plugin.json by content (unzip + diff -r, not a rebuild+byte-diff,
-#      since zip embeds mtimes and a fresh rebuild would always differ).
+#   5. dist/compute-squad.plugin matches skills/, agents/, commands/, README.md,
+#      and .claude-plugin/plugin.json by content (unzip + diff -r, not a rebuild+
+#      byte-diff, since zip embeds mtimes and a fresh rebuild would always differ).
 #
 # Frontmatter is parsed with a small stdlib-only parser (no PyYAML dependency),
 # so failures are about the repo, not about whether a YAML library happens to
@@ -243,7 +243,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 unzip -q "$plugin_zip" -d "$tmpdir"
 
 check5_failed=0
-for target in skills agents README.md .claude-plugin/plugin.json; do
+for target in skills agents commands README.md .claude-plugin/plugin.json; do
   if [ ! -e "$tmpdir/$target" ]; then
     echo "FAIL: check 5: $plugin_zip has no $target" >&2
     check5_failed=1
@@ -265,6 +265,6 @@ if [ "$check5_failed" -ne 0 ]; then
   exit 1
 fi
 
-echo "PASS: check 5: $plugin_zip matches skills/, agents/, README.md, and plugin.json by content"
+echo "PASS: check 5: $plugin_zip matches skills/, agents/, commands/, README.md, and plugin.json by content"
 
 echo "verify.sh: all checks passed"

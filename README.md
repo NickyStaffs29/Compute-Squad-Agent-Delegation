@@ -58,6 +58,8 @@ Or grab [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-S
 
 The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
+Once installed, `/squad <goal>` runs the pipeline directly — same Stage 0 start as any of the trigger phrases below.
+
 **Update or remove.** From inside a Claude Code session:
 
 ```
@@ -76,7 +78,7 @@ Version history is in [CHANGELOG.md](CHANGELOG.md).
 run the squad: add rate limiting to the password-reset endpoint
 ```
 
-Any of these start a run: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `squad run`, `full pipeline on this`.
+Any of these start a run: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `squad run`, `full pipeline on this`, or the slash command `/squad <goal>`.
 
 In Claude Cowork, run it from a session with your project folder connected, so the agents can read and write the repo and the log.
 
@@ -193,6 +195,8 @@ Compute-Squad-Agent-Delegation/
 │   ├── squad-executor-opus.md # Opus · implementation on COMPLEX
 │   ├── squad-helper.md       # Sonnet · delegated execution-tier subtasks
 │   └── squad-mech.md         # Haiku · the intern
+├── commands/
+│   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
 ├── codex/                    # the pipeline as manual Codex session prompts
 ├── docs/example-log.md       # a complete worked run
 ├── scripts/build-plugin.sh   # rebuilds dist/ from source
@@ -201,7 +205,7 @@ Compute-Squad-Agent-Delegation/
 └── CHANGELOG.md              # version history
 ```
 
-`dist/compute-squad.plugin` is committed on purpose: Claude Cowork installs from a single downloadable file, so the package has to exist at a stable URL. It is a zip of `.claude-plugin/plugin.json`, `skills/`, `agents/`, and `README.md`. It is generated, never hand-edited. After changing any of those sources, run `scripts/build-plugin.sh` from the repo root and commit the rebuilt package with your change.
+`dist/compute-squad.plugin` is committed on purpose: Claude Cowork installs from a single downloadable file, so the package has to exist at a stable URL. It is a zip of `.claude-plugin/plugin.json`, `skills/`, `agents/`, `commands/`, and `README.md`. It is generated, never hand-edited. After changing any of those sources, run `scripts/build-plugin.sh` from the repo root and commit the rebuilt package with your change.
 
 ## FAQ
 

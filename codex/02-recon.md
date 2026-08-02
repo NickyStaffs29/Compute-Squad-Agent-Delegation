@@ -15,4 +15,17 @@ Process:
 
 Downward delegation: if part of your mapping is zero-judgment bulk work (file inventories, dependency listings, symbol counts), end your entry with a `DELEGATE:` block listing each subtask with an exact procedure, marked `BLOCKING` if you need the results to finish your map. The human operator will run it in a cheap session.
 
-Output protocol: append exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, to `COMPUTE_SQUAD_LOG.md` under a `## Recon` heading with a timestamp line. Paragraph 1: what you found (files, functions, line ranges, call sites, invariants). Paragraph 2: blockers, risks, and anything ambiguous the PM must resolve in the plan. Never clear or rewrite prior log entries.
+Output protocol: append your entry with a single shell command, never by reading the file and writing the whole thing back — a Read-then-Write race can silently drop entries another stage appended in between:
+
+```bash
+cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
+## Recon
+<timestamp line>
+
+<paragraph 1>
+
+<paragraph 2>
+EOF
+```
+
+Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, under a `## Recon` heading with a timestamp line. Paragraph 1: what you found (files, functions, line ranges, call sites, invariants). Paragraph 2: blockers, risks, and anything ambiguous the PM must resolve in the plan. Never clear or rewrite prior log entries.

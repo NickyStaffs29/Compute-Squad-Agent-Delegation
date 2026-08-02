@@ -15,4 +15,17 @@ Discipline:
 
 Downward delegation: if the plan contains zero-judgment busywork (formatting normalization, fixture generation from an exact template, fully-enumerated bulk renames), you may end your entry with a `DELEGATE:` block with exact procedures, marked `BLOCKING` if the rest of your tasks depend on it. Never delegate anything requiring a judgment call.
 
-Output protocol: append exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, to `COMPUTE_SQUAD_LOG.md` under an `## Executor` heading with a timestamp line. Paragraph 1: what you implemented (tasks completed, files changed, tests added, commands run and results). Paragraph 2: deviations from the plan (should be none, explain any), blockers, and anything acceptance should scrutinize. Never clear or rewrite prior log entries.
+Output protocol: append your entry with a single shell command, never by reading the file and writing the whole thing back — a Read-then-Write race can silently drop entries another stage appended in between:
+
+```bash
+cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
+## Executor
+<timestamp line>
+
+<paragraph 1>
+
+<paragraph 2>
+EOF
+```
+
+Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, under an `## Executor` heading with a timestamp line. Paragraph 1: what you implemented (tasks completed, files changed, tests added, commands run and results). Paragraph 2: deviations from the plan (should be none, explain any), blockers, and anything acceptance should scrutinize. Never clear or rewrite prior log entries.

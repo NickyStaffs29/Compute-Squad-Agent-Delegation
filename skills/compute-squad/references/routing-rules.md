@@ -43,6 +43,7 @@ Agent definitions use the `sonnet` / `opus` / `haiku` aliases so the squad track
 
 - Every fresh log opens with a `## Goal — Locked` entry: goal, acceptance criteria, out of scope, and assumptions, composed by Stage 0 and appended by Stage 1 right after the archive completes, before Recon spawns. Stage 0's resume check ("is this the same goal?") reads this entry, never the operator's memory of the original prompt.
 - All coordination through `COMPUTE_SQUAD_LOG.md` in the repo root; each stage appends one entry per spawn (`## Goal — Locked`, `## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS` / `## PM — FAIL`), with `## <Stage> (cont.)` for a re-spawn.
+- Every append is a single Bash heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ... EOF`), never a Read-then-Write of the whole file — that race can silently drop entries another stage appended in between. Whole-file `Write` on the active log is legitimate in exactly two places: squad-mech's truncate-after-verified-archive, and the PM's clear-on-PASS.
 - Archive any non-empty log to a timestamped file in `compute-squad-archive/` in the repo root before every new run, and again on PASS. Never discard a prior or failed run.
 - The active log is cleared only after a PASS, and only once the PASS entry is archived: by the PM on ordinary changes, by the main session on high-stakes changes after its own review.
 - Anti-slop discipline in the plan: YAGNI, stdlib/native first, no speculative abstractions.
