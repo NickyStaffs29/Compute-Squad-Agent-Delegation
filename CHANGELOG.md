@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.9.1 — 2026-08-17
+
+Aligns the product description across every surface, including the GitHub repository About text.
+
+- **One description everywhere.** `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, and
+  `.claude-plugin/marketplace.json` now carry a byte-identical description, and the two trailing
+  platform clauses are dropped — the sentence already names both platforms, so the clauses only
+  created two strings that could drift. `README.md`'s opening tagline is the same sentence without
+  the leading product name, which the `# Compute Squad` heading above it already supplies.
+- **Short enough for GitHub.** The canonical sentence was shortened to 335 characters. GitHub
+  rejects a repository description over 350 (HTTP 422), so the previous 384-character version could
+  not be used as the About text and that surface had to be worded separately.
+- **`scripts/verify.sh` check 7e.** Asserts the three manifest descriptions are byte-identical and
+  that the canonical string still fits GitHub's 350-character About limit, so neither the wording
+  nor the length can drift out of alignment again. The GitHub About text itself lives outside the
+  repository and cannot be checked by CI — it must be updated by hand when this string changes.
+
 ## 3.9.0 — 2026-08-17
 
 Applies every surviving finding from the documentation audit: the Rank 7 protocol consolidation, the

@@ -408,6 +408,7 @@ PYEOF
 # there being one canonical copy left to drift, not by a check.
 # ---------------------------------------------------------------------------
 python3 <<'PYEOF'
+import json
 import re
 import sys
 
@@ -526,6 +527,43 @@ for path, heading in routing_sections.items():
             fail(f"{path}: {heading!r} section is missing {model_id!r}")
 
 print("PASS: check 7: both Codex-routing restatements name all three Codex model IDs")
+
+# ---- 7e: the product description is one canonical string across every
+# manifest that carries one, and short enough to also serve as the GitHub
+# repository About text. GitHub rejects a description over 350 characters
+# (HTTP 422), so a canonical string longer than that could not be used on
+# every surface, and the surfaces would silently diverge again. The GitHub
+# About text itself lives outside this repository and cannot be checked here.
+description_fields = {
+    ".claude-plugin/plugin.json": lambda d: d["description"],
+    ".codex-plugin/plugin.json": lambda d: d["description"],
+    ".claude-plugin/marketplace.json": lambda d: d["plugins"][0]["description"],
+}
+GITHUB_DESCRIPTION_MAX = 350
+descriptions = {}
+for path, pick in description_fields.items():
+    try:
+        descriptions[path] = pick(json.loads(read(path)))
+    except (KeyError, IndexError):
+        fail(f"{path}: no product description field found where one is required")
+
+distinct = set(descriptions.values())
+if len(distinct) != 1:
+    detail = "; ".join(f"{p} = {d!r}" for p, d in descriptions.items())
+    fail(f"product description differs across manifests: {detail}")
+
+canonical = distinct.pop()
+if len(canonical) > GITHUB_DESCRIPTION_MAX:
+    fail(
+        f"product description is {len(canonical)} characters; GitHub rejects an About "
+        f"text over {GITHUB_DESCRIPTION_MAX}, so this string cannot be used on every surface"
+    )
+
+print(
+    f"PASS: check 7: product description is identical across "
+    f"{', '.join(description_fields)} and fits GitHub's About field "
+    f"({len(canonical)}/{GITHUB_DESCRIPTION_MAX} chars)"
+)
 PYEOF
 
 echo "verify.sh: all checks passed"

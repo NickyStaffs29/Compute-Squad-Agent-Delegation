@@ -1,6 +1,6 @@
 # Compute Squad
 
-A staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest-tier PM plans the work and adversarially accepts it, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier by the PM's own classification, and the cheapest tier handles zero-judgment busywork — all coordinated through a shared, auditable log.
+A staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest tier plans and adversarially accepts the work, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier, and the cheapest tier handles zero-judgment busywork — all through a shared, auditable log.
 
 Three steps to a working setup: **install**, **run**, **auto-update**. Each step shows Claude Code first, Codex right after — use whichever matches your setup. Everything else on this page is reference.
 
