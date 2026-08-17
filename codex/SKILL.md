@@ -6,11 +6,11 @@ description: >
   pipeline (Strategy -> Archive -> Recon -> Plan -> Execute -> Accept) with
   COMPUTE_SQUAD_LOG.md coordination.
 metadata:
-  version: "3.7.0"
+  version: "3.9.0"
   author: "Nick Stafford"
 ---
 
-# Compute Squad — Codex Manager Protocol
+# Compute Squad — Codex Protocol
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
 human decisions; named Codex agents own the stages after the goal is locked.
@@ -30,7 +30,8 @@ The profiles in `codex/profiles.toml` pin reasoning effort. The agent TOMLs in
 
 The `opus`, `sonnet`, and `haiku` suffixes are retained in agent names for
 compatibility with the Claude package. The Codex model fields are the source of
-truth for Codex routing.
+truth for Codex routing. Stage headings below use Sol, Terra, and Luna as
+shorthand for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` respectively.
 
 Before starting, ensure the seven files in `~/.codex/agents/` are installed as
 described in `codex/README.md`. If the named roles are unavailable, stop and
@@ -94,9 +95,9 @@ product code. Product-level, irreversible, or cost-bearing decisions become a
 
 Route exactly by the PM classification:
 
-- MECHANICAL -> `squad-executor-haiku` (Luna MAX).
-- STANDARD -> `squad-executor` (Terra MAX).
-- COMPLEX -> `squad-executor-opus` (Sol MAX).
+- MECHANICAL -> spawn `squad-executor-haiku` (Luna MAX).
+- STANDARD -> spawn `squad-executor` (Terra MAX).
+- COMPLEX -> spawn `squad-executor-opus` (Sol MAX).
 
 Each executor reads the complete log and implements exactly the PM plan. It
 does not improvise around an incomplete plan; it appends a `BLOCKER:` naming
@@ -123,9 +124,13 @@ item, and attempts a refutation for every acceptance criterion.
 
 Stages may end their own entry with a `DELEGATE:` block containing exact,
 zero-judgment procedures and a target tier: `intern` for `squad-mech`, or
-`execution` for `squad-helper`. The main session runs helpers, appends their
-results under `## Delegated — <stage>`, and respawns a blocking requester.
-Delegation flows downward only and is capped at five helpers per stage per run.
+`execution` for `squad-helper`. The main session spawns the requested helpers
+(`squad-mech` for intern tasks; `squad-helper` for execution tasks), appends
+their results under `## Delegated — <stage>`, and re-spawns a blocking
+requester. A re-spawned stage appends a `## <Stage> (cont.)` entry covering
+only the remainder of its work; the "exactly one entry" rule is per spawn,
+not per run. Delegation flows downward only and is capped at 5 helpers per
+stage per run.
 
 ## Log and escalation rules
 
@@ -136,10 +141,10 @@ Delegation flows downward only and is capped at five helpers per stage per run.
   state. The log clears only after a PASS and verified archive.
 - A blocker is always:
 
-```text
+```
 BLOCKER:
-- rerun: <Recon|Plan|Executor>   (or)   needs-human: <decision required>
-- why: <one sentence with evidence refs>
+- rerun: <Recon|Plan|Executor>   (or)   needs-human: <the decision required>
+- why: <one sentence, with evidence refs>
 ```
 
 - The same stage failing twice escalates one model tier on the third attempt.
@@ -156,5 +161,12 @@ only findings that survive refutation count as acceptance failures.
 ## Hard rules
 
 No stage skips. No executor acceptance. No PM product-code edits. No intern
-judgment calls. Keep diffs minimal, use existing project conventions, and stop
-at every `needs-human:` blocker.
+judgment calls. No self-absorption: the orchestrating session spawns the named
+agent for every stage in Model routing above and never performs a stage's
+analysis, writing, or verdict itself in its place. Codex delegation is
+model-driven, so this rule cannot be enforced mechanically — it is enforced by
+detection: every stage's log entry carries an `Agent: <name> (<model>)` line
+naming who actually produced it, so a collapsed run is visible in
+`COMPUTE_SQUAD_LOG.md` on inspection even though nothing here can force the
+spawn to happen. Keep diffs minimal, use existing project conventions, and
+stop at every `needs-human:` blocker.

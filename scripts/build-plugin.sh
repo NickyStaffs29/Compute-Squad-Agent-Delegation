@@ -22,13 +22,8 @@ python3 -c 'import json,sys; json.load(open(".claude-plugin/plugin.json"))'
 
 mkdir -p dist
 rm -f dist/compute-squad.plugin
-zip -r -q dist/compute-squad.plugin \
-  .claude-plugin/plugin.json \
-  skills \
-  agents \
-  commands \
-  README.md \
-  -x '*.DS_Store'
+git ls-files -z -- .claude-plugin/plugin.json skills agents commands README.md \
+  | xargs -0 zip -q dist/compute-squad.plugin
 
 echo "build-plugin: wrote dist/compute-squad.plugin"
 zip -sf dist/compute-squad.plugin

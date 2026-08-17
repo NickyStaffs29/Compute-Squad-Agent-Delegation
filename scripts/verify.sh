@@ -32,10 +32,10 @@ fi
 # Checks 1-4: JSON validity, agent frontmatter, SKILL.md version, changelog.
 # ---------------------------------------------------------------------------
 python3 <<'PYEOF'
-import glob
 import json
 import os
 import re
+import subprocess
 import sys
 
 
@@ -173,11 +173,19 @@ def parse_frontmatter(path):
     return data
 
 
-# ---- Check 2: every agents/*.md has frontmatter that parses, an allowed
-# model, and at least one <example> block in the description ----
-agent_paths = sorted(glob.glob("agents/*.md"))
+# ---- Check 2: every git-tracked agents/*.md has frontmatter that parses,
+# an allowed model, and at least one <example> block in the description.
+# Uses git ls-files, not a bare glob, so an untracked file sitting in
+# agents/ (e.g. a stray editor or Finder copy) cannot silently pass as an
+# 8th agent. ----
+agent_paths = sorted(
+    subprocess.run(
+        ["git", "ls-files", "--", "agents/*.md"],
+        check=True, capture_output=True, text=True,
+    ).stdout.split()
+)
 if not agent_paths:
-    fail(2, "no files matched agents/*.md")
+    fail(2, "git ls-files found no tracked agents/*.md")
 
 ALLOWED_MODELS = {"sonnet", "opus", "haiku"}
 EXAMPLE_RE = re.compile(r"<example>.*?</example>", re.DOTALL)
@@ -251,12 +259,16 @@ ok(4, f"{changelog_path} has a heading for version {plugin_version}")
 PYEOF
 
 # ---------------------------------------------------------------------------
-# Check 5: dist/compute-squad.plugin matches source by content (not bytes).
-#
-# We do NOT rebuild the zip and byte-diff it: zip embeds file mtimes, so a
-# rebuild from a fresh checkout always differs and the gate would be
-# permanently red. Instead, unzip the shipped artifact and diff its content
-# tree against the working tree.
+# Check 5: dist/compute-squad.plugin matches the git-tracked source set by
+# content (not bytes; zip embeds mtimes, so a byte-diff against a fresh
+# rebuild would always fail). Compared against `git ls-files`, not the live
+# working tree, so untracked files (e.g. a stray editor/Finder copy sitting
+# in agents/ or commands/) are correctly excluded from the comparison
+# instead of being reported as drift -- they were never supposed to be
+# packaged in the first place. Two sub-checks: the zip's file list must
+# equal the tracked set exactly (catches missing OR extra files), and each
+# tracked file's content must match its packaged copy (catches a stale
+# artifact that wasn't rebuilt after a source edit).
 # ---------------------------------------------------------------------------
 plugin_zip="dist/compute-squad.plugin"
 
@@ -275,23 +287,34 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 unzip -q "$plugin_zip" -d "$tmpdir"
 
+tracked_list="$tmpdir/.tracked-files.txt"
+zipped_list="$tmpdir/.zipped-files.txt"
+git ls-files -- .claude-plugin/plugin.json skills agents commands README.md | sort > "$tracked_list"
+unzip -Z1 "$plugin_zip" | grep -v '/$' | sort > "$zipped_list"
+
 check5_failed=0
-for target in skills agents commands README.md .claude-plugin/plugin.json; do
-  if [ ! -e "$tmpdir/$target" ]; then
-    echo "FAIL: check 5: $plugin_zip has no $target" >&2
+if ! diff -u "$tracked_list" "$zipped_list"; then
+  echo "FAIL: check 5: $plugin_zip file list does not match the git-tracked source set (see diff above)" >&2
+  check5_failed=1
+fi
+
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  if [ ! -e "$f" ]; then
+    echo "FAIL: check 5: working tree has no $f (tracked but missing)" >&2
     check5_failed=1
     continue
   fi
-  if [ ! -e "$target" ]; then
-    echo "FAIL: check 5: working tree has no $target" >&2
+  if [ ! -e "$tmpdir/$f" ]; then
+    echo "FAIL: check 5: $plugin_zip has no $f" >&2
     check5_failed=1
     continue
   fi
-  if ! diff -r "$tmpdir/$target" "$target"; then
-    echo "FAIL: check 5: $plugin_zip is out of sync with $target (see diff above)" >&2
+  if ! diff -u "$tmpdir/$f" "$f"; then
+    echo "FAIL: check 5: $plugin_zip is out of sync with $f (see diff above)" >&2
     check5_failed=1
   fi
-done
+done < "$tracked_list"
 
 if [ "$check5_failed" -ne 0 ]; then
   echo "FAIL: check 5: $plugin_zip drifted from source; rebuild with scripts/build-plugin.sh and commit" >&2
@@ -369,6 +392,140 @@ if manifest.get("skills") != "./skills/":
     fail(".codex-plugin/plugin.json does not point at ./skills/")
 
 print("PASS: check 6: Codex skill, agents, profiles, routing, and generator sync are valid")
+PYEOF
+
+# ---------------------------------------------------------------------------
+# Check 7: cross-file verbatim-block and shared-fact diffs. Rank 7 of the
+# 2026-08-17 documentation audit found the protocol restated as independent
+# full prose in up to four files, and one of the smallest, simplest blocks
+# (the BLOCKER grammar) had already silently drifted. Consolidation moved
+# the full prose retellings into two canonical files (skills/compute-squad/
+# SKILL.md for Claude, codex/SKILL.md for Codex); this check protects the
+# small number of blocks that still must read identically in more than one
+# file for runtime reasons, so the next drift fails CI instead of shipping.
+# It cannot catch prose that differs in wording while still agreeing on the
+# underlying fact -- that class of drift is addressed structurally, by
+# there being one canonical copy left to drift, not by a check.
+# ---------------------------------------------------------------------------
+python3 <<'PYEOF'
+import re
+import sys
+
+
+def fail(msg):
+    print(f"FAIL: check 7: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def extract_fenced_block(text, path, opening_line, next_line, closing_line="```"):
+    """Return the lines from next_line (inclusive) up to the next
+    closing_line, where next_line must immediately follow a line matching
+    opening_line. Raises if no such delimiter pair is found."""
+    lines = text.splitlines()
+    start = None
+    for i in range(len(lines) - 1):
+        if lines[i] == opening_line and lines[i + 1] == next_line:
+            start = i
+            break
+    if start is None:
+        fail(f"{path}: no {opening_line!r} line immediately followed by {next_line!r}")
+    end = None
+    for i in range(start + 2, len(lines)):
+        if lines[i] == closing_line:
+            end = i
+            break
+    if end is None:
+        fail(f"{path}: no closing {closing_line!r} found after line {start + 1}")
+    return lines[start + 1:end]
+
+
+def extract_section(text, path, heading):
+    """Return the lines from a '## heading' line up to (not including) the
+    next line starting with '## ', or end of file."""
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if line.strip() == heading:
+            start = i
+            break
+    if start is None:
+        fail(f"{path}: no heading {heading!r}")
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        if lines[i].startswith("## "):
+            end = i
+            break
+    return lines[start:end]
+
+
+# ---- 7a: the Goal — Locked template is byte-identical in all three files
+# that carry it.
+goal_locked_paths = [
+    "skills/compute-squad/SKILL.md",
+    "codex/SKILL.md",
+    "codex/README.md",
+]
+goal_locked_blocks = {}
+for path in goal_locked_paths:
+    text = read(path)
+    goal_locked_blocks[path] = extract_fenced_block(text, path, "```markdown", "## Goal — Locked")
+
+ref_path, ref_block = next(iter(goal_locked_blocks.items()))
+for path, block in goal_locked_blocks.items():
+    if block != ref_block:
+        fail(f"{path}: Goal — Locked template differs from {ref_path}")
+
+print(f"PASS: check 7: Goal — Locked template is byte-identical across {', '.join(goal_locked_paths)}")
+
+# ---- 7b: the BLOCKER grammar's fenced wire-format block is byte-identical
+# in both SKILL.md files.
+blocker_paths = ["skills/compute-squad/SKILL.md", "codex/SKILL.md"]
+blocker_blocks = {}
+for path in blocker_paths:
+    text = read(path)
+    blocker_blocks[path] = extract_fenced_block(text, path, "```", "BLOCKER:")
+
+ref_path, ref_block = next(iter(blocker_blocks.items()))
+for path, block in blocker_blocks.items():
+    if block != ref_block:
+        fail(f"{path}: BLOCKER grammar block differs from {ref_path}")
+
+print(f"PASS: check 7: BLOCKER grammar block is byte-identical across {', '.join(blocker_paths)}")
+
+# ---- 7c: the "5 helpers per stage per run" cap names the same digit
+# everywhere it's restated.
+cap_paths = [
+    "skills/compute-squad/SKILL.md",
+    "codex/SKILL.md",
+    "README.md",
+    "skills/compute-squad/references/routing-rules.md",
+]
+cap_re = re.compile(r"5[^0-9]{0,20}per\s+stage\s+per\s+run")
+for path in cap_paths:
+    if not cap_re.search(read(path)):
+        fail(f"{path}: no '5 ... per stage per run' helper-cap phrase found")
+
+print(f"PASS: check 7: the 5-helper-per-stage-per-run cap reads '5' in {', '.join(cap_paths)}")
+
+# ---- 7d: both Codex-routing restatements still name all three Codex model
+# IDs.
+codex_model_ids = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")
+routing_sections = {
+    "skills/compute-squad/SKILL.md": "## Codex model routing",
+    "codex/SKILL.md": "## Model routing",
+}
+for path, heading in routing_sections.items():
+    section = "\n".join(extract_section(read(path), path, heading))
+    for model_id in codex_model_ids:
+        if model_id not in section:
+            fail(f"{path}: {heading!r} section is missing {model_id!r}")
+
+print("PASS: check 7: both Codex-routing restatements name all three Codex model IDs")
 PYEOF
 
 echo "verify.sh: all checks passed"

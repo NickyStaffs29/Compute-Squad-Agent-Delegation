@@ -7,7 +7,7 @@
     {
       "name": "compute-squad",
       "source": "./",
-      "description": "A four-tier agent delegation pipeline: your main session runs strategy and gap clarification, an Opus PM plans and accepts the work, Sonnet executes, and Haiku handles intern-tier busywork, coordinated through COMPUTE_SQUAD_LOG.md."
+      "description": "Compute Squad is a staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest-tier PM plans the work and adversarially accepts it, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier by the PM's own classification, and the cheapest tier handles zero-judgment busywork — all coordinated through a shared, auditable log. This is the Claude Code plugin; a native Codex plugin ships from the same repository."
     }
   ]
 }

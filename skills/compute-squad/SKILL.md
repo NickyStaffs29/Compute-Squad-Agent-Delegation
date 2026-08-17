@@ -7,11 +7,11 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
 metadata:
-  version: "3.7.0"
+  version: "3.9.0"
   author: "Nick Stafford"
 ---
 
-# Compute Squad — Squad Manager Protocol (v3)
+# Compute Squad Protocol (v3)
 
 Run the goal through the pipeline with the v3 role hierarchy:
 
@@ -93,7 +93,7 @@ Spawn `squad-pm` with mode ACCEPT. Being Opus, it is never weaker than the Sonne
 
 ## Intra-stage delegation (the DELEGATE protocol)
 
-The role hierarchy is fractal: every level pushes its own busywork down a tier. Subagents cannot spawn subagents, so the Squad Manager acts as the switchboard:
+The role hierarchy is fractal: every level pushes its own busywork down a tier. Subagents cannot spawn subagents, so the orchestrating session acts as the switchboard:
 
 1. Any stage may end its log entry with a `DELEGATE:` block listing subtasks below its tier, each with an exact procedure and a target tier (`intern` for zero-judgment work, `execution` for tightly-specced Sonnet work).
 2. On seeing a `DELEGATE:` block, spawn the requested helpers (`squad-mech` for intern tasks; `squad-helper` for execution tasks). Helpers return their results in their final message; you append those results to the log under `## Delegated — <stage>`, then continue the pipeline. If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. A re-spawned stage appends a `## <Stage> (cont.)` entry covering only the remainder of its work; the "exactly one entry" rule is per spawn, not per run.

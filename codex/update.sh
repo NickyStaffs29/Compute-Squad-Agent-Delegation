@@ -22,6 +22,11 @@ fi
 mkdir -p "$codex_home/agents"
 cp "$repo_root"/codex/agents/*.toml "$codex_home/agents/"
 
+retired_agents=(squad-design.toml squad-manager.toml squad-verifier.toml)
+for name in "${retired_agents[@]}"; do
+  rm -f "$codex_home/agents/$name"
+done
+
 sync_profile() {
   local profile="$1"
   local values

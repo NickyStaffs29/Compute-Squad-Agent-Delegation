@@ -21,9 +21,10 @@ Output protocol: append your entry with a single shell command, never by reading
 cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
 ## PM — Plan
 <timestamp line>
+Agent: squad-pm (gpt-5.6-sol)
 
 <spec, task breakdown, classification, risks, non-goals, blockers>
 EOF
 ```
 
-One entry under `## PM — Plan` with a timestamp line: the spec, task breakdown, classification, risks, non-goals, blockers. Never clear or rewrite prior log entries.
+One entry under `## PM — Plan` with a timestamp line and an `Agent:` line: the spec, task breakdown, classification, risks, non-goals, blockers. Never clear or rewrite prior log entries.

@@ -1,7 +1,7 @@
 {
   "name": "compute-squad",
-  "version": "3.7.0",
-  "description": "A four-tier agent delegation pipeline for Claude Code and Codex: strategy, planning and acceptance, execution, and intern-tier busywork coordinated through COMPUTE_SQUAD_LOG.md.",
+  "version": "3.9.0",
+  "description": "Compute Squad is a staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest-tier PM plans the work and adversarially accepts it, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier by the PM's own classification, and the cheapest tier handles zero-judgment busywork — all coordinated through a shared, auditable log.",
   "author": {
     "name": "Nick Stafford"
   },

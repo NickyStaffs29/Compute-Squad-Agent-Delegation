@@ -1,5 +1,74 @@
 # Changelog
 
+## 3.9.0 — 2026-08-17
+
+Applies every surviving finding from the documentation audit: the Rank 7 protocol consolidation, the
+three-way naming gap, and the lower-priority findings. Follow-up to 3.8.0's Codex
+delegation-guarantee pass.
+
+- **Rank 7: one canonical protocol description.** `skills/compute-squad/SKILL.md` (Claude Code) and
+  `codex/SKILL.md` (Codex) are the two canonical, runtime-loaded full descriptions of the pipeline.
+  `README.md`'s "How a run works" and "The delegation structure", and `codex/README.md`'s "How to
+  run it", no longer independently retell all six stages; they summarize and point at the canonical
+  files, keeping only the human-only color and the content that is structurally load-bearing (the
+  `## Goal — Locked` template). `scripts/verify.sh` gains check 7: byte-identical diffs for the
+  Goal-Locked template (3 files) and the BLOCKER grammar block (2 files), plus presence checks for
+  the 5-helper cap (4 files) and the three Codex model IDs (2 files), so the next silent drift fails
+  CI instead of shipping. The BLOCKER grammar's existing drift between the two SKILL.md files (a
+  dropped article and comma) is fixed as part of this pass.
+- **Naming gap resolved.** "Squad Manager," "the orchestrating session," and `codex/SKILL.md`'s H1
+  "Codex Manager Protocol" named the same actor three ways. All three collapse to "the orchestrating
+  session" repo-wide (33 tracked "Squad Manager" occurrences plus one more in `docs/example-log.md`
+  a plain grep missed because it line-wrapped mid-word). `CHANGELOG.md`'s own historical entries are
+  left untouched as a historical record.
+- **CONTRIBUTING.md rewritten.** Names all five version-bump locations explicitly, names
+  `scripts/verify.sh` as the local pre-commit gate matching CI, and fixes the self-contradiction
+  between its "five places" opening line and its own seven-item sync-rule list.
+- **Canonical product description.** One description, varying only by a trailing platform clause,
+  now lives in `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, and
+  `.claude-plugin/marketplace.json`; `.codex-plugin/plugin.json`'s
+  `interface.shortDescription`/`longDescription` are updated to match. All copies name the
+  MECHANICAL/STANDARD/COMPLEX three-way routing instead of flat "Sonnet executes."
+  `.agents/plugins/marketplace.json` is confirmed to have no `description` field in its real schema
+  and is left alone. `README.md`'s opening tagline and
+  `skills/compute-squad/references/routing-rules.md`'s summary line, the last two places still
+  describing a flat "four-tier" pipeline with "Sonnet executes", are brought in line with the same
+  wording; the stale "Updated 2026-08-02" stamp is dropped from the routing reference.
+- **Prerequisites documented.** Both install sections in `README.md`, and `codex/README.md`'s
+  native-install section, now state their model-access prerequisite (Opus for Claude;
+  `gpt-5.6-sol`/`terra`/`luna` for Codex) and the Codex CLI 0.134+ floor, previously only a comment
+  in `codex/profiles.toml`.
+- **Build and verify harden against stray files.** `scripts/build-plugin.sh` now zips the
+  git-tracked file set (`git ls-files`) instead of `zip -r` over live directories, so an untracked
+  file cannot enter `dist/compute-squad.plugin`. `scripts/verify.sh` check 2 asserts the agent set
+  against `git ls-files agents/*.md` instead of a bare glob.
+- **README repo-layout tree completed.** Adds the seven tracked paths it omitted, including
+  `scripts/verify.sh` (the actual CI gate), `codex/README.md`, `codex/update.sh`,
+  `codex/build-agents.py`, `.github/`, `.gitignore`, and `LICENSE`.
+- **Lower-priority findings.** Fixed: `codex/SKILL.md` documents the `(cont.)` re-spawn convention
+  (B3); `codex/README.md`'s updater-order sentence now matches `codex/update.sh`'s actual order
+  (B4); the Codex CLI version floor is reader-facing (D6); the unused "Fable" row is removed from
+  `routing-rules.md`'s cost table (D7); "Claude Cowork" is glossed at first use (D8); `codex/SKILL.md`
+  glosses Sol/Terra/Luna where it first uses the shorthand (D10). Declined, with reasons logged:
+  `codex/build-agents.py`'s unguarded tier-term substitution (D2, latent risk only, no live misfire,
+  a word-boundary fix carries its own miss-risk); the duplicated Codex install command block in
+  `README.md`/`codex/README.md` (C4, two lines of copy-paste-stable CLI syntax, not protocol prose).
+- **GitHub repository metadata.** Replacement About description, homepage, and topics text produced
+  for the user to paste by hand; this run does not change GitHub settings.
+
+Version bumped to 3.9.0 in all five synced locations; `dist/compute-squad.plugin` rebuilt;
+`codex/agents/*.toml` regenerated from `agents/*.md` via `python3 codex/build-agents.py`.
+
+## 3.8.0 — 2026-08-17
+
+Closes the Codex delegation-guarantee gap: explicit spawn wording, self-reporting log attribution, a documented Luna fallback, a safe agent prune, and an accurate README.
+
+- **Codex spawn wording.** `codex/SKILL.md`'s Stage 4 routing table and Intra-stage delegation section use the explicit "spawn" verb on every branch, matching the Claude-side skill, plus a new anti-absorption sentence in Hard rules: the orchestrating session must spawn the named agent at every stage instead of doing the stage's work itself.
+- **Log entry attribution.** `agents/squad-recon.md`, `agents/squad-pm.md`, `agents/squad-executor.md`, `agents/squad-executor-haiku.md`, and `agents/squad-executor-opus.md` add an `Agent: <name> (<tier>)` line to their log-entry heredoc templates, regenerated into `codex/agents/*.toml` and mirrored by hand in `codex/02-recon.md` through `codex/05-pm-accept.md` and one worked run in `docs/example-log.md`, so a collapsed single-session Codex run is visible in `COMPUTE_SQUAD_LOG.md` without external tooling.
+- **Luna subagent fallback documented.** `codex/README.md` documents the reported Multi-Agent V2 restriction on `gpt-5.6-luna` as a subagent target and the manual, per-run workaround; this is documentation only, not a default routing change, since the restriction is unverified against official docs.
+- **`codex/update.sh` prunes retired agents.** Removes the three known-retired agent TOMLs (`squad-design.toml`, `squad-manager.toml`, `squad-verifier.toml`) from `$CODEX_HOME/agents` by explicit name, leaving vibecheck's `vc-*.toml` files untouched.
+- **README accuracy.** Removes the false "no agent-spawning at all" claim about the Codex path.
+
 ## 3.7.0 — 2026-08-02
 
 Native Codex plugin packaging brings the Compute Squad workflow to Codex without dropping the existing Claude package.

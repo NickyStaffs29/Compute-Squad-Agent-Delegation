@@ -1,12 +1,12 @@
 # Compute Squad
 
-A four-tier agent delegation pipeline for Claude Code (and Codex): your main session runs strategy, an Opus PM plans and accepts the work, Sonnet executes, and Haiku handles the busywork — coordinated through a shared, auditable log.
+A staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest-tier PM plans the work and adversarially accepts it, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier by the PM's own classification, and the cheapest tier handles zero-judgment busywork — all coordinated through a shared, auditable log.
 
 Three steps to a working setup: **install**, **run**, **auto-update**. Each step shows Claude Code first, Codex right after — use whichever matches your setup. Everything else on this page is reference.
 
 ## 1. Install
 
-**Claude Code.** Paste these two lines in your terminal:
+**Claude Code.** Requires Opus access on your Claude Code plan — the PM stage runs on Opus with no fallback tier. Paste these two lines in your terminal:
 
 ```bash
 claude plugin marketplace add NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -22,7 +22,7 @@ Or from inside a Claude Code session:
 
 That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
-**Codex.** Prerequisites: a working `git`, `/bin/bash`, and a logged-in Codex CLI. The first two commands install the native plugin; a checkout is also required because the updater copies the seven named agent TOMLs and generates the four Codex V2 profile files:
+**Codex.** Prerequisites: Codex CLI 0.134 or newer, a working `git`, `/bin/bash`, a logged-in Codex CLI, and access to `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — the pipeline hard-codes all three with no fallback tier. The first two commands install the native plugin; a checkout is also required because the updater copies the seven named agent TOMLs and generates the four Codex V2 profile files:
 
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -110,7 +110,7 @@ To remove from Claude Code: `/plugin uninstall compute-squad@compute-squad`. Uni
 }
 ```
 
-**Claude Cowork.** Download [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin), drop it into any chat, and accept the install. In Cowork, run the squad from a session with your project folder connected so the agents can read and write the repo and the log.
+**Claude Cowork.** Claude Cowork is Anthropic's drop-a-file chat installer. Download [`dist/compute-squad.plugin`](https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation/raw/main/dist/compute-squad.plugin), drop it into any chat, and accept the install. In Cowork, run the squad from a session with your project folder connected so the agents can read and write the repo and the log.
 
 </details>
 
@@ -141,22 +141,24 @@ One skill. Seven agents. A shared log. A role hierarchy that mirrors how a funct
 
 ## How a run works
 
-Six things happen, in order. Nothing skips.
+Six stages run in order, every time. Nothing skips, even for a one-line change — the entries can be
+short, but the discipline can't.
 
-**Stage 0: Strategy. Your session, before any agent spawns.**
-The goal gets interrogated. What does done look like. What is out of scope. What could this break. Gaps get surfaced and clarified with you in one batched pass, not dripped across the run. Then the goal and acceptance criteria get locked and composed into a `## Goal — Locked` entry. From this point no agent can redefine them, and every downstream stage reads this entry instead of trusting its spawn prompt. Any change routes back to you. If the session is unattended and nobody answers, Stage 0 makes the most reasonable call on each gap, states every assumption in writing, and proceeds rather than stalling.
+- **Stage 0 — Strategy**, your session, before any agent spawns: interrogates the goal, clarifies
+  gaps with you, locks the goal and acceptance criteria into the log's `## Goal — Locked` entry.
+- **Stage 1 — Archive**, `squad-mech`: starts every run from a clean log. Failed runs are never
+  discarded. They are evidence.
+- **Stage 2 — Recon**, `squad-recon`: maps the codebase read-only.
+- **Stage 3 — Plan**, `squad-pm` (PLAN mode): turns the map into a spec and classifies the work.
+- **Stage 4 — Execute**, the executor the classification routes to: implements exactly what the plan
+  says.
+- **Stage 5 — Accept**, `squad-pm` (ACCEPT mode): tries to fail the work, then PASS or FAIL. Say "be
+  thorough" and it adds an audit fan-out.
 
-**Stage 1: Archive.** `squad-mech` moves any prior log to a timestamped archive file, then appends the `## Goal — Locked` entry from Stage 0 as the first entry of the fresh log, before Recon spawns. Failed runs are never discarded. They are evidence.
-
-**Stage 2: Recon.** `squad-recon` maps the codebase read-only: exact files, functions, line ranges, every call site, every invariant the change must not break.
-
-**Stage 3: Plan.** `squad-pm` turns the map into a spec and an ordered task list tight enough that execution needs zero judgment calls. It classifies the work MECHANICAL, STANDARD, or COMPLEX.
-
-**Stage 4: Execute.** `squad-executor` implements exactly what the plan says. Production quality. No scaffolding, no TODOs, no drive-by refactors. Tests green before it logs done.
-
-**Stage 5: Accept.** `squad-pm` comes back in acceptance mode and tries to fail the work. It re-runs every verification command itself, checks every invariant, and attempts at least one refutation per acceptance criterion. FAIL names exactly one stage to re-run. PASS archives the log, then clears it. On a high-stakes change (auth, payments, migrations, privacy, production config) the PM leaves the log intact instead, your session does one more review, and your session clears it.
-
-Say "be thorough" and acceptance adds an audit fan-out: parallel Sonnet finders across five dimensions (runtime integrity, security and privacy, dead code, accessibility, docs drift), with Opus skeptics refuting each finding before it counts. A finding that survives a skeptic is a finding. Everything else is noise. The briefs the finders and skeptics run on are in [`skills/compute-squad/references/audit-prompts.md`](skills/compute-squad/references/audit-prompts.md).
+The full protocol for each stage — grammar, PASS/FAIL/BLOCKER handling, escalation, and the
+audit-grade fan-out — is canonical in [`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md)
+for Claude Code and [`codex/SKILL.md`](codex/SKILL.md) for Codex. This page is a summary, not a
+second copy.
 
 A complete worked run with every log entry format is in [`docs/example-log.md`](docs/example-log.md).
 
@@ -216,21 +218,19 @@ Its one skill beyond following procedure is knowing what it is not: handed anyth
 
 ## The delegation structure
 
-Four rules generate the whole system.
+Four rules generate the whole system: route by decision density, not task difficulty; review from a
+tier above the work by default; push busywork down a tier through the `DELEGATE:` protocol, downward
+only and capped at 5 helpers per stage per run; and escalate on evidence, never on vibes. Opus costs
+about 1.67x Sonnet per token — a wrong answer that forces an upstream re-run costs more than the tier
+difference every time, which makes routing up on uncertainty the cheap option. The full rules, the
+escalation ladder, and the blocker grammar are canonical in
+[`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md) for Claude Code and
+[`codex/SKILL.md`](codex/SKILL.md) for Codex.
 
-**1. Route by decision density, not task difficulty.**
-Planning and acceptance are where errors cascade, so they run Opus. Mapping and implementation are volume work against a spec, so they run Sonnet by default — or Haiku, when the PM's own classification says the work is transcription-grade (MECHANICAL). Zero-judgment steps run Haiku. Your top-tier session does the one thing only it can do: talk to you, and judge. Opus costs about 1.67x Sonnet per token. A wrong answer that forces an upstream re-run costs more than the tier difference every time, which makes routing up on uncertainty the cheap option.
-
-**2. The reviewer is never below the work, and a tier above by default.**
-The Opus PM accepts Sonnet execution. When execution escalates to Opus, acceptance holds at Opus, and high-stakes changes add a top-tier review in your session. The executor never accepts its own output. Nobody has to remember this rule. The structure enforces it.
-
-**3. The hierarchy is fractal. Every level pushes busywork down.**
-The PM does not spend Opus tokens assembling changelogs. Recon does not burn its context window on file inventories. Any stage can end its log entry with a `DELEGATE:` block: subtasks, exact procedures, target tier. Subagents cannot spawn subagents, so the orchestrating session acts as the switchboard, runs the helpers (`squad-mech` for intern work, `squad-helper` for execution work), writes their returned results into the log, and re-spawns the requesting stage if it marked the request BLOCKING. Delegation flows downward only, capped at 5 helpers per stage per run. A stage that needs more than 5 helpers has a scoping problem, and the protocol makes it say so.
-
-**4. Escalation runs on evidence, never on vibes.**
-Same stage fails acceptance twice: it gets one model tier up on the third attempt. Three total FAILs: the run stops and comes back to you with the full log history. Anything that would change the locked goal returns to Stage 0 and the human. Always. A blocker is never freeform prose: it's a `BLOCKER:` block at the end of a stage's own entry, either `rerun: <stage>` (re-runs that stage and everything after it, counting toward the three-FAIL stop) or `needs-human: <decision>` (returns to Stage 0).
-
-Underneath all four sits the log. `COMPUTE_SQUAD_LOG.md` is the only coordination channel. Every stage appends. No stage rewrites history. Every fresh log opens with a locked `## Goal — Locked` entry, so no stage ever has to trust a prompt over the record. It is cleared only after a PASS and only after that PASS is archived, and failed runs archive rather than vanish. Durable, auditable state is what lets a FAIL re-run one stage instead of the whole pipeline, and it is why the same protocol runs in Codex with no agent-spawning at all.
+Underneath all four sits the log, `COMPUTE_SQUAD_LOG.md` — durable, auditable state is what lets a
+FAIL re-run one stage instead of the whole pipeline, and it is why the same protocol runs in Codex
+too: the native plugin spawns the same named agents, and the manual fallback sequences the same
+stages by hand when the plugin path is unavailable.
 
 ## Repo layout
 
@@ -243,6 +243,8 @@ Compute-Squad-Agent-Delegation/
 │   └── plugin.json           # native Codex plugin manifest
 ├── .agents/plugins/
 │   └── marketplace.json      # makes this repo discoverable in Codex
+├── .github/workflows/
+│   └── ci.yml                # runs scripts/verify.sh on every push
 ├── skills/compute-squad/
 │   ├── SKILL.md              # the orchestration protocol
 │   └── references/
@@ -259,15 +261,22 @@ Compute-Squad-Agent-Delegation/
 ├── commands/
 │   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
 ├── codex/
+│   ├── README.md             # Codex install, routing, and manual fallback
 │   ├── SKILL.md              # Codex-specific routing reference
 │   ├── agents/*.toml         # generated Codex agent definitions
+│   ├── build-agents.py       # generates codex/agents/*.toml from agents/*.md
 │   ├── profiles.toml         # Sol/Terra/Luna profile reference
+│   ├── update.sh             # installs/refreshes the native Codex plugin
 │   └── 01-05*.md             # manual-session fallback prompts
 ├── docs/example-log.md       # a complete worked run
-├── scripts/build-plugin.sh   # rebuilds dist/ from source
+├── scripts/
+│   ├── build-plugin.sh       # rebuilds dist/ from the git-tracked source set
+│   └── verify.sh             # the CI gate; run it before every commit
 ├── dist/compute-squad.plugin # drag-and-drop install for Claude Cowork
+├── .gitignore                # excludes COMPUTE_SQUAD_LOG.md and its archive
 ├── CONTRIBUTING.md           # the sync rule: skill, agents, codex, dist change together
-└── CHANGELOG.md              # version history
+├── CHANGELOG.md              # version history
+└── LICENSE                   # MIT
 ```
 
 `dist/compute-squad.plugin` is committed on purpose: Claude Cowork installs from a single downloadable file, so the package has to exist at a stable URL. It is a zip of `.claude-plugin/plugin.json`, `skills/`, `agents/`, `commands/`, and `README.md`. It is generated, never hand-edited. After changing any of those sources, run `scripts/build-plugin.sh` from the repo root and commit the rebuilt package with your change.

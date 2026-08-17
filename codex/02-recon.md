@@ -21,6 +21,7 @@ Output protocol: append your entry with a single shell command, never by reading
 cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
 ## Recon
 <timestamp line>
+Agent: squad-recon (gpt-5.6-terra)
 
 <paragraph 1>
 
@@ -28,4 +29,4 @@ cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
 EOF
 ```
 
-Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, under a `## Recon` heading with a timestamp line. Paragraph 1: what you found (files, functions, line ranges, call sites, invariants). Paragraph 2: blockers, risks, and anything ambiguous the PM must resolve in the plan. Never clear or rewrite prior log entries.
+Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, under a `## Recon` heading with a timestamp line and an `Agent:` line. Paragraph 1: what you found (files, functions, line ranges, call sites, invariants). Paragraph 2: blockers, risks, and anything ambiguous the PM must resolve in the plan. Never clear or rewrite prior log entries.

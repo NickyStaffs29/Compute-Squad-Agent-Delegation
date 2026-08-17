@@ -1,6 +1,6 @@
 # Compute Squad v3 — Role Hierarchy and Routing Rules
 
-Updated 2026-08-02. v3 restructures roles around a clean four-tier hierarchy: main session = strategy, Opus = PM, Sonnet = execution, Haiku = intern.
+v3 structures roles by decision density: main session = strategy, Opus = PM, Haiku = intern, and execution routes to Haiku, Sonnet, or Opus according to the PM's own MECHANICAL, STANDARD, or COMPLEX classification.
 
 ## Roles and model routing
 
@@ -26,12 +26,12 @@ Updated 2026-08-02. v3 restructures roles around a clean four-tier hierarchy: ma
 3. **Escalate on repeated FAIL.** Same stage fails twice → one tier up for the third attempt (Sonnet → Opus → flag the user for a top-tier main-session pass). For execution, the escalation ladder is `squad-executor-haiku` → `squad-executor` → `squad-executor-opus` (haiku → sonnet → opus); two FAILs at a tier moves execution up one tier. Three total FAILs on a run → stop and hand back to the user with the log history.
 4. **Strategy changes go to the user.** Anything that would alter the locked goal or acceptance criteria returns to Stage 0 and the user. No agent, including the PM, renegotiates strategy.
 5. **Adversarial verification** (audit-grade runs): fan out Sonnet finder agents across dimensions (runtime integrity, security/privacy, dead code/slop, UI/accessibility, docs drift); Opus skeptics attempt to refute each finding; only skeptic-confirmed findings count.
-6. **The hierarchy is fractal (DELEGATE protocol).** Every level pushes its own busywork down a tier. The runtime is flat (subagents cannot spawn subagents), so stages request delegation via a `DELEGATE:` block in their log entry and the Squad Manager executes it on their behalf: intern tasks go to `squad-mech`, tightly-specced execution tasks go to `squad-helper`. Helpers return results in their final message and the Squad Manager appends them under `## Delegated — <stage>`; `BLOCKING` requests re-spawn the requesting stage, which appends a `## <Stage> (cont.)` entry. Downward only; capped at 5 helpers per stage per run.
+6. **The hierarchy is fractal (DELEGATE protocol).** Every level pushes its own busywork down a tier. The runtime is flat (subagents cannot spawn subagents), so stages request delegation via a `DELEGATE:` block in their log entry and the orchestrating session executes it on their behalf: intern tasks go to `squad-mech`, tightly-specced execution tasks go to `squad-helper`. Helpers return results in their final message and the orchestrating session appends them under `## Delegated — <stage>`; `BLOCKING` requests re-spawn the requesting stage, which appends a `## <Stage> (cont.)` entry. Downward only; capped at 5 helpers per stage per run.
 7. **The blocker grammar.** Mirrors the DELEGATE block: a stage that hits a blocker mid-work ends its own log entry with a `BLOCKER:` block instead of freeform prose — `rerun: <Recon|Plan|Executor>` with a one-line `why:`, or `needs-human: <the decision required>` with a one-line `why:`. A `rerun:` blocker re-runs that stage and everything after it and counts toward the three-FAIL stop (rule 3). A `needs-human:` blocker returns to Stage 0 (rule 4). Freeform prose blockers are a protocol violation.
 
 ## Cost posture (July 2026, $/M input/output)
 
-Fable 5 $10/$50 · Opus 5 $5/$25 · Sonnet 5 $3/$15 · Haiku 4.5 $1/$5.
+Opus 5 $5/$25 · Sonnet 5 $3/$15 · Haiku 4.5 $1/$5.
 
 v3 concentrates Opus spend in the two decision-dense PM passes and pushes volume work (mapping, implementation) to Sonnet. On list prices, a typical run comes in roughly 30-40% below an all-Opus worker pool; the trade is a hard dependency on plan quality, which rule 3 backstops. The frame is capacity: cheaper runs mean more runs, more parallel goals, and top-tier attention reserved for strategy instead of supervision.
 

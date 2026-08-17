@@ -22,6 +22,7 @@ Assumptions: none.
 ```markdown
 ## Recon
 2026-07-25 14:02 UTC
+Agent: squad-recon (Sonnet)
 
 The reset endpoint is POST /api/auth/reset-request in src/server/auth/auth.routes.ts
 (lines 141-168), calling requestPasswordReset() in src/server/auth/reset.service.ts
@@ -56,6 +57,7 @@ mfa.service.test.ts: 19 (procedure ran as specified; no judgment applied).
 ```markdown
 ## PM — Plan
 2026-07-25 14:09 UTC
+Agent: squad-pm (Opus)
 
 Classification: STANDARD. Spec: enforce a per-account 60s cooldown inside
 requestPasswordReset(), not the route, so every future call site inherits it.
@@ -81,6 +83,7 @@ risk — use the suite's existing clock helper. No blockers.
 ```markdown
 ## Executor
 2026-07-25 14:21 UTC
+Agent: squad-executor (Sonnet)
 
 Implemented tasks 1-3 exactly as specified: cooldown check added to
 reset.service.ts (lines 31-42) using the newest-token query; short-circuit returns
@@ -98,6 +101,7 @@ response.
 ```markdown
 ## PM — PASS
 2026-07-25 14:33 UTC
+Agent: squad-pm (Opus)
 
 Re-ran npm test and npm run ci:verify independently: GREEN (2,754/12, matching).
 Verified invariants: response bodies byte-identical between cooldown-hit and normal
@@ -109,8 +113,8 @@ timing — the cooldown path still performs the token query, timing delta neglig
 Diff review: no scope creep, no dead code. HIGH-STAKES: yes — the change sits on the
 password-reset auth path and the no-account-existence-leak invariant. Verdict: PASS.
 Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md.
-Leaving the active log intact for the main session's high-stakes review; the Squad
-Manager clears it afterwards.
+Leaving the active log intact for the main session's high-stakes review; the
+orchestrating session clears it afterwards.
 ```
 
 ---

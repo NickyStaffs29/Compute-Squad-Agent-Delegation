@@ -21,6 +21,7 @@ Output protocol: append your entry with a single shell command, never by reading
 cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
 ## Executor
 <timestamp line>
+Agent: squad-executor (<model you were launched with>)
 
 <paragraph 1>
 
@@ -28,4 +29,4 @@ cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
 EOF
 ```
 
-Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, under an `## Executor` heading with a timestamp line. Paragraph 1: what you implemented (tasks completed, files changed, tests added, commands run and results). Paragraph 2: deviations from the plan (should be none, explain any), blockers, and anything acceptance should scrutinize. Never clear or rewrite prior log entries.
+Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, under an `## Executor` heading with a timestamp line and an `Agent:` line naming the actual Codex model this session ran on (`gpt-5.6-terra`, `gpt-5.6-luna`, or `gpt-5.6-sol`). Paragraph 1: what you implemented (tasks completed, files changed, tests added, commands run and results). Paragraph 2: deviations from the plan (should be none, explain any), blockers, and anything acceptance should scrutinize. Never clear or rewrite prior log entries.

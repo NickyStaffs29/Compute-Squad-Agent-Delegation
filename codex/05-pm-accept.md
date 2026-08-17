@@ -17,6 +17,7 @@ Append every log entry (`## PM — Accept (pending)`, `## PM — FAIL`, `## PM �
 cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
 ## PM — FAIL
 <timestamp line>
+Agent: squad-pm (gpt-5.6-sol)
 
 <evidence and the one named stage to re-run>
 EOF
