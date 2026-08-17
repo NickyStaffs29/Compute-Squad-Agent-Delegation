@@ -6,7 +6,7 @@ description: >
   pipeline (Strategy -> Archive -> Recon -> Plan -> Execute -> Accept) with
   COMPUTE_SQUAD_LOG.md coordination.
 metadata:
-  version: "3.9.1"
+  version: "3.9.2"
   author: "Nick Stafford"
 ---
 

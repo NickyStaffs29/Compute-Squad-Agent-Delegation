@@ -22,7 +22,7 @@ Or from inside a Claude Code session:
 
 That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
-**Codex.** Prerequisites: Codex CLI 0.134 or newer, a working `git`, `/bin/bash`, a logged-in Codex CLI, and access to `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — the pipeline hard-codes all three with no fallback tier. The first two commands install the native plugin; a checkout is also required because the updater copies the seven named agent TOMLs and generates the four Codex V2 profile files:
+**Codex.** Prerequisites: Codex CLI 0.134 or newer, a working `git`, `/bin/bash`, a logged-in Codex CLI, and access to `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — the pipeline hard-codes all three with no fallback tier. Those IDs resolve on the author's account as of August 2026; they are not stable public API guarantees, so verify them against your own account before relying on the Codex path. The first two commands install the native plugin; a checkout is also required because the updater copies the seven named agent TOMLs and generates the four Codex V2 profile files:
 
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -290,7 +290,7 @@ Subagents run headless. They cannot ask you anything, and clarifying gaps with t
 Yes. Agents use tier aliases, which resolve to the newest model in each class at runtime. New generation ships, the squad picks it up, zero changes required. Agent frontmatter also accepts `inherit` and explicit model IDs. Pin an explicit ID only if a workflow regression-tests better on an older snapshot.
 
 **Why is Sonnet execution safe?**
-Three backstops. The plan is required to carry the intelligence. Acceptance always reviews from a tier up. And the PM's COMPLEX classification escalates execution to Opus when a tight spec cannot fully de-risk the work.
+Three backstops. The plan is required to carry the intelligence. Acceptance is never below the work it reviews, and a tier above by default — on COMPLEX work, execution and acceptance both run on Opus. And the PM's COMPLEX classification escalates execution to Opus when a tight spec cannot fully de-risk the work.
 
 **Why a shared log instead of passing context directly?**
 Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. The append-only file protocol is portable across the Claude and Codex plugin implementations.

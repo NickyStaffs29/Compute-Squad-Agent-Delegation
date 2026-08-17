@@ -1,5 +1,13 @@
 # Leftover Findings — v3.3.0 → v3.6.0 hardening, blind re-audit
 
+> **Historical snapshot, taken at v3.6.0.** Preserved as an audit record; line numbers and
+> statuses below reflect the v3.6.0 tree, not the current one. Findings acted on since:
+> N1 (the undefined "Squad Manager" actor) was resolved in 3.9.0 by renaming to "the
+> orchestrating session" repo-wide; F4 (the FAQ's "tier up" acceptance claim) was corrected
+> in 3.9.2. N5 (no CI gate tying `codex/02-05*.md` to `agents/*.md`) remains open by
+> choice — those files are hand-maintained fallbacks. Later findings are tracked in
+> CHANGELOG.md, not here.
+
 Three blind auditors (protocol consistency, packaging/tooling, claims accuracy) re-ran the
 original analysis against the v3.6.0 working tree with no access to the findings list, the
 phase history, or the hardening brief. This file reports what is left.

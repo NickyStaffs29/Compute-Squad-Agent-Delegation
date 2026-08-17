@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.9.2 — 2026-08-17
+
+Accuracy pass from an external-persona review: closes the last self-diagnosed claim errors and
+scopes every unverifiable assertion to its evidence.
+
+- **README FAQ tier claim corrected (F4, finally).** "Acceptance always reviews from a tier up"
+  misstated the design — on COMPLEX work, execution and acceptance both run on Opus. The FAQ now
+  matches `references/routing-rules.md`'s accurate phrasing: never below the work, a tier above by
+  default. This was the one finding from `LEFTOVER_FINDINGS.md` still open in README prose.
+- **`LEFTOVER_FINDINGS.md` marked as a historical snapshot.** A header now states it reflects the
+  v3.6.0 tree, records which findings were since resolved (N1 in 3.9.0, F4 here), and notes N5
+  stays open by choice. The file is an audit record, not a live punch list.
+- **Pricing and cost claims scoped to their evidence.** The cost table is labeled as list prices
+  observed on the author's account (July 2026) to verify before relying on, and the 30-40%
+  figure is labeled a back-of-envelope estimate with its uniform-token-volume assumption stated,
+  not a measurement.
+- **Codex model IDs scoped to their evidence.** README's Codex prerequisites now state the three
+  hard-coded model IDs resolve on the author's account as of August 2026 and are not stable
+  public API guarantees.
+
 ## 3.9.1 — 2026-08-17
 
 Aligns the product description across every surface, including the GitHub repository About text.
