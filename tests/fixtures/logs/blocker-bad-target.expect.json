@@ -1,0 +1,15 @@
+{
+  "note": "A rerun: item naming a stage the grammar does not list.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "- rerun: <Recon|Plan|Executor>   (or)   needs-human: <the decision required>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "blocker"
+    ]
+  }
+}

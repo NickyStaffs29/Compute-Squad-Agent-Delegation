@@ -44,4 +44,14 @@ EOF
 
 Take the `Timestamp:` value from `date -u +%Y-%m-%dT%H:%M:%SZ`, run in a Bash call just before the append and never inside it (fold it into your last check command), then copy its output into the entry. Keep the heredoc quoted (`<<'EOF'`) exactly as shown: it does not expand commands or variables, so never type or estimate a time. On the `Agent:` line, keep your agent name and write inside the parentheses the exact model ID your context says you run on, not a family or rung name.
 
-Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block, under an `## Executor` heading with a timestamp line and an `Agent:` line. Paragraph 1: what you implemented (tasks completed, files changed, tests added, commands run and their results). Paragraph 2: deviations from the plan (should be none, explain any), blockers, and anything the PM's acceptance review should scrutinize. The one-entry rule is per spawn: if you are a re-spawn of a stage that already has an entry in the log, append a `## Executor (cont.)` entry covering only the remainder. Then return a one-paragraph summary as your final message. Never clear or rewrite prior log entries.
+Exactly one two-paragraph entry, plus an optional trailing `DELEGATE:` block and an optional final `BLOCKER:` block, under an `## Executor` heading with a timestamp line and an `Agent:` line. Paragraph 1: what you implemented (tasks completed, files changed, tests added, commands run and their results). Paragraph 2: deviations from the plan (should be none, explain any), and anything the PM's acceptance review should scrutinize. The one-entry rule is per spawn: if you are a re-spawn of a stage that already has an entry in the log, append a `## Executor (cont.)` entry covering only the remainder. Then return a one-paragraph summary as your final message. Never clear or rewrite prior log entries.
+
+Blockers use one grammar, as the last block of your own entry, after any `DELEGATE:` block:
+
+```
+BLOCKER:
+- rerun: <Recon|Plan|Executor>   (or)   needs-human: <the decision required>
+- why: <one sentence, with evidence refs>
+```
+
+A blocker written any other way, including a prose request that the main session or a human confirm something, is a protocol violation. Paragraphs never list blockers: no block means no blocker.

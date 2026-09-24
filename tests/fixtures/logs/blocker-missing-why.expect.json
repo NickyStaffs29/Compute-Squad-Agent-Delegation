@@ -1,0 +1,15 @@
+{
+  "note": "A BLOCKER: block with no why: item.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "- why: <one sentence, with evidence refs>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "blocker"
+    ]
+  }
+}

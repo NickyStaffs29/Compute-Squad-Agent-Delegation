@@ -1,0 +1,19 @@
+{
+  "note": "A blocker listed in a paragraph instead of a BLOCKER: block.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Paragraphs never list blockers: no block means no blocker."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Freeform prose blockers are a protocol violation"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "blocker-prose"
+    ]
+  }
+}

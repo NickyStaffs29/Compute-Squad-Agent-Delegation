@@ -1,0 +1,17 @@
+{
+  "note": "A pending acceptance entry that ends with a needs-human BLOCKER: block, where the run stops for the user.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "A pending entry uses `## PM — Accept (pending)` and ends with its `DELEGATE:` or `BLOCKER:` block."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A `needs-human:` blocker returns to Stage 0"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  }
+}

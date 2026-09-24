@@ -35,7 +35,7 @@ src/server/auth/__tests__/reset.routes.test.ts (14 cases). Invariant flagged in
 CLAUDE.md: auth responses must be generic (no account-existence leaks), and logs
 carry codes only, never addresses.
 
-Blockers/risks: none blocking. The PM must decide where the cooldown state lives —
+Risks: none blocking. The PM must decide where the cooldown state lives —
 the password_reset_tokens table already stores created_at per account, so a query
 against the newest row avoids a schema change. Ambiguity for the plan: whether a
 cooldown rejection returns 429 or the endpoint's existing generic 200 (the
@@ -77,7 +77,7 @@ Must NOT change: response envelope shape, the global IP limiter, schema,
 migrations. Verification plan: npm test (auth suite), npm run ci:verify, grep the
 diff for logged addresses. Non-goals: per-IP throttling, admin-triggered resets
 (different service path). Risks: none material; fake-timer flake is the main test
-risk — use the suite's existing clock helper. No blockers.
+risk — use the suite's existing clock helper.
 ```
 
 ```markdown
@@ -92,7 +92,7 @@ to reset.routes.test.ts using the suite's clock helper. Commands: auth suite 17/
 green; npm run ci:verify GREEN (2,754 passed / 12 skipped); diff grep clean of
 addresses.
 
-Deviations: none. Blockers: none. For acceptance: scrutinize the timezone handling
+Deviations: none. For acceptance: scrutinize the timezone handling
 on the created_at comparison (I used the DB's UTC timestamps directly) and confirm
 the no-second-token assertion actually queries the table rather than trusting the
 response.
@@ -112,11 +112,11 @@ create tokens (pre-existing behavior, out of locked scope, noted for the user);
 timing — the cooldown path still performs the token query, timing delta negligible.
 Diff review: no scope creep, no dead code. HIGH-STAKES: yes — the change sits on the
 password-reset auth path and the no-account-existence-leak invariant. Verdict: PASS.
-Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md.
 Leaving the active log intact for the main session's high-stakes review; the
 orchestrating session clears it afterwards.
+Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_norun.md
 ```
 
 ---
 
-The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM then makes the copy, reads it back to verify it matches, and reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and clears `COMPUTE_SQUAD_LOG.md` itself as the last step of the run. On an ordinary, non-high-stakes change the PM would clear the log itself right after the verified archive. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.
+The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM's archive command appends that line as the entry's last, then writes the copy and verifies it with `cmp`, and the PM reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_norun.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and closes the run as its last step with the archive command, which archives the log again and clears `COMPUTE_SQUAD_LOG.md` only after `cmp` succeeds. On an ordinary, non-high-stakes change the PM's archive command writes the copy, verifies it with `cmp`, and clears the log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.

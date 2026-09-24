@@ -1,0 +1,15 @@
+{
+  "note": "The main session appends a second batch of helper results as (cont.), which only the three stage headings may add.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Only `## Recon`, `## PM — Plan`, and `## Executor` may add ` (cont.)`."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "heading"
+    ]
+  }
+}

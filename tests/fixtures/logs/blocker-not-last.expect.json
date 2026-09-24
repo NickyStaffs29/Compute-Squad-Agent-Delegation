@@ -1,0 +1,15 @@
+{
+  "note": "A DELEGATE: block after the BLOCKER: block, so the blocker no longer ends the entry.",
+  "cites": [
+    {
+      "file": "agents/squad-executor.md",
+      "text": "Blockers use one grammar, as the last block of your own entry, after any `DELEGATE:` block:"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "blocker"
+    ]
+  }
+}

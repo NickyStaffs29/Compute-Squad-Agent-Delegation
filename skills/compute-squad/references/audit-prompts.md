@@ -1,6 +1,6 @@
 # Audit-grade run: finder and skeptic briefs
 
-Use these on audit-grade runs, after execution and before the PM's verdict. Spawn the five finders in parallel on Sonnet, scoped to the diff and the files Recon mapped. Then run the skeptic on Opus over every finding they return. Only skeptic-CONFIRMED findings count as FAIL evidence.
+Use these on audit-grade runs, after execution and before the PM's verdict. Spawn the five finders in parallel on the mid rung, scoped to the diff and the files Recon mapped. Then run the skeptic on the top rung over every finding they return. Only skeptic-CONFIRMED findings count as FAIL evidence.
 
 Every finder returns findings in this format, one per finding, and nothing else:
 
@@ -33,7 +33,7 @@ Audit any user-facing surface the change touches. Check keyboard operability and
 
 Audit whether the documentation still matches the code after the change. Compare README, in-repo docs, comments, examples, and configuration samples against the actual behavior and signatures the change produced. Flag stale instructions, renamed or removed options still documented, new behavior documented nowhere, and version or count claims that no longer hold. Quote both sides of every contradiction. Report each with the file, line, the claim, and the evidence.
 
-## Skeptic brief (Opus)
+## Skeptic brief (top rung)
 
 You are given one finding from a finder agent. Your job is to refute it, not to confirm it. First read the locked goal: `awk '/^## Goal/{p=1; print; next} /^## /{p=0} p' COMPUTE_SQUAD_LOG.md` (if it prints more than one entry, the last governs). To refute a finding as out of the locked scope, quote the Out of scope or criterion text you rely on; a defect this change introduced is never out of scope. Read the cited file and line yourself, reconstruct the surrounding context, and try to show the claim is wrong, already handled elsewhere, unreachable in practice, or out of the locked scope. Verify by reproduction where reproduction is possible: run the command, trace the concrete input, or point to the guard that prevents it. Return exactly one verdict, `CONFIRMED` or `REFUTED` (or `NEEDS-HUMAN`, only where the next paragraph allows it), with the reproduction or the reasoning that decided it. Default to `REFUTED` when you are uncertain or cannot reproduce, because an unconfirmed finding costs a re-run for nothing.
 

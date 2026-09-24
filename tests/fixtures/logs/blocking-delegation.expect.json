@@ -1,0 +1,21 @@
+{
+  "note": "A BLOCKING delegation: the Delegated entry names the requesting stage, the re-spawned Executor continues under (cont.), and an ordinary PASS ends with the line the archive command appends.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. A re-spawned stage appends a `## <Stage> (cont.)` entry covering only the remainder of its work"
+    },
+    {
+      "file": "agents/squad-helper.md",
+      "text": "The orchestrating session appends your results to the log under `## Delegated — <requesting stage>`."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "It appends `Archive target: <path>` as the last line of your entry"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  }
+}

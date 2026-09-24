@@ -5,8 +5,8 @@ The repository ships a native Codex plugin plus five prompt files for older Code
 ## Native Codex install
 
 Requires Codex CLI 0.134 or newer, a working `git`, `/bin/bash`, and access to `gpt-5.6-sol`,
-`gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — Model routing in
-[`codex/SKILL.md`](SKILL.md) hard-codes all three with no fallback tier. A stage whose
+`gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — the agent TOMLs in
+[`codex/agents/`](agents/) pin all three with no fallback tier. A stage whose
 model your account cannot use stops the run and reports the setup gap.
 
 ```bash
@@ -94,8 +94,9 @@ The fallback has one execute prompt file, not three; you pick the model per run.
 generated TOMLs preserve the three routing variants (`squad-executor-haiku`, `squad-executor`, and
 `squad-executor-opus`) with fixed Codex model IDs.
 
-After session 1 (`01-archive.md`) reports the fresh log is ready, append the `## Goal — Locked`
-entry yourself as its first entry, before pasting `02-recon.md`:
+After session 1 (`01-archive.md`) reports an archive path or an already-empty log (not
+`ARCHIVE FAILED`), append the `## Goal — Locked` entry yourself as its first entry, before pasting
+`02-recon.md`:
 
 ```markdown
 ## Goal — Locked
@@ -116,11 +117,13 @@ the run and hand the full log history back to you — a separate rule from Stage
 any change to the locked goal itself returns there.
 
 **On PASS:** the accept session archives the log, verifies the copy, then clears the active log —
-unless it flagged the change high-stakes, in which case it leaves the log intact for your own review
-and you clear it once that review is done.
+unless it flagged the change high-stakes, in which case it leaves the log intact for your own review.
+Once that review is done, close the run with the archive command in the Hard rules of
+[`skills/compute-squad/SKILL.md`](../skills/compute-squad/SKILL.md), which archives the log again and
+clears it only after `cmp` succeeds.
 
-Delegation and the full blocker grammar work exactly as in the native plugin path; see "Intra-stage
-delegation" and "Log and escalation rules" in [`codex/SKILL.md`](SKILL.md) for the complete rules.
-The one difference here: since you are pasting each stage by hand, you are the one who runs any
-`DELEGATE:` subtask and pastes the next stage's prompt, in place of the orchestrating session. You,
+Each prompt file is generated from the matching agent definition in `agents/` by
+`codex/build-agents.py`, so it carries the native path's delegation, continuation, and blocker
+rules; never hand-edit it. Since you paste each stage by hand, you run any `DELEGATE:` subtask,
+append its results, and paste the next stage's prompt, in place of the orchestrating session. You,
 not any session, own the goal and acceptance criteria.

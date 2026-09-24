@@ -1,16 +1,7 @@
----
-name: compute-squad
-description: >
-  Use when the user asks to run the squad, run compute squad, compute squad this,
-  squad run, or wants a code change executed through the Compute Squad delegation
-  pipeline (Strategy -> Archive -> Recon -> Plan -> Execute -> Accept) with
-  COMPUTE_SQUAD_LOG.md coordination.
-metadata:
-  version: "3.10.0"
-  author: "Nick Stafford"
----
+# Compute Squad: Codex reading copy
 
-# Compute Squad — Codex Protocol
+Version: 3.11.0
+No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
 human decisions; named Codex agents own the stages after the goal is locked.
@@ -68,13 +59,18 @@ run.
 
 ## Stage 1 — Archive (`squad-mech`, Luna MAX)
 
-Spawn `squad-mech` to archive a non-empty `COMPUTE_SQUAD_LOG.md` to a timestamped
-file under `compute-squad-archive/`, verify the copy, and leave a fresh empty
-active log. If the log does not exist, it creates an empty one. Append the
-Stage 0 locked-goal entry after the archive and before Recon starts.
+Spawn `squad-mech` to archive a non-empty `COMPUTE_SQUAD_LOG.md` with the
+archive command in the shared skill's Hard rules: it names the copy under
+`compute-squad-archive/` from `date -u` and the run ID, never overwrites an
+existing archive, verifies the copy with `cmp`, and only then empties the active
+log. If the log does not exist, it creates an empty one. After squad-mech
+reports an archive path or an already-empty log, append the Stage 0
+locked-goal entry as the first entry of the fresh log, before Recon starts. If
+it reports `ARCHIVE FAILED`, append nothing, give the user its message, and
+stop.
 
-Never discard a prior or failed run. The only whole-file clear before a PASS is
-the verified archive procedure here.
+Never discard a prior or failed run. The only clear before a PASS is the
+verified archive procedure here.
 
 ## Stage 2 — Recon (`squad-recon`, Terra MAX)
 
@@ -111,9 +107,12 @@ and the Executor's entries last, reruns the project's verification commands,
 checks every invariant and must-not-change item, and attempts a refutation for
 every acceptance criterion.
 
-- **PASS:** append the PASS entry, copy and verify the full log to the named
-  archive target, then clear the active log only for a non-high-stakes change.
-  Leave high-stakes logs intact for final main-session review.
+- **PASS:** append the PASS entry, archive the full log with the archive
+  command, which verifies the copy with `cmp`, then clear the active log only
+  for a non-high-stakes change. Leave high-stakes logs intact for final
+  main-session review, which closes the run with the same archive command.
+  That closing archive is the main session's own step, not a stage's work, so
+  the hard rule against doing a stage's work does not cover it.
 - **FAIL:** append evidence and exactly one stage to rerun (Recon, Plan, or
   Executor). Leave the log intact and rerun that stage plus every later stage.
 - **Accept pending:** append a pending entry and `DELEGATE:` block when
@@ -164,16 +163,13 @@ only findings that survive refutation count as acceptance failures.
 ## Hard rules
 
 No stage skips. No executor acceptance. No PM product-code edits. No intern
-judgment calls. No self-absorption: the orchestrating session spawns the named
-agent for every stage in Model routing above and never performs a stage's
-analysis, writing, or verdict itself in its place. Codex delegation is
-model-driven, so this rule cannot be enforced mechanically — it is enforced by
-detection: every stage's log entry carries an
-`Agent: <name> (<model ID as the agent's context states it>)` line naming who
-actually produced it, so a collapsed run is visible in `COMPUTE_SQUAD_LOG.md`
-on inspection even though nothing here can force the spawn to happen. Keep
-diffs minimal, use existing project conventions, and stop at every
-`needs-human:` blocker.
+judgment calls. The orchestrating session spawns the named agent for every
+stage and never does a stage's work (archive, map, plan, execute, accept)
+itself in that agent's place. If a stage's named agent is not installed on this
+host, stop and report the setup gap instead of running a different pipeline.
+Every stage entry's `Agent:` line names the agent that wrote it, so an absorbed
+stage shows in the log. Keep diffs minimal, use existing project conventions,
+and stop at every `needs-human:` blocker.
 
 If a spawn fails because its model is unavailable to the account, stop and
 report the setup gap with the spawn's error text. Never run that stage on a

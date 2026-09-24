@@ -1,0 +1,17 @@
+{
+  "note": "A stage ends its entry with a DELEGATE: block and then a well-formed BLOCKER: block whose why item wraps onto an indented line.",
+  "cites": [
+    {
+      "file": "agents/squad-executor.md",
+      "text": "Blockers use one grammar, as the last block of your own entry, after any `DELEGATE:` block:"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "- rerun: <Recon|Plan|Executor>   (or)   needs-human: <the decision required>"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "note": "Section 6, S1 baseline: to shelve an approved plan, the 3.9.2 main session improvised this heading. The closed list rejects it.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Log entries use only these headings:"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Any other heading or suffix is a protocol violation."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "heading"
+    ]
+  }
+}

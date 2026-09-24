@@ -1,5 +1,133 @@
 # Changelog
 
+## 3.11.0 — 2026-09-24
+
+Lands work order WO-2 of the 3.9.2 analysis: structural sync and CI pins. No stage gains a mode,
+an entry type, or a routing decision, and no model assignment changes: every rung still maps to
+the same Claude alias and Codex ID. The Codex no-hooks manifest check in `scripts/verify.sh` is
+unchanged.
+
+- **The routing reference is gone (finding 5).** `skills/compute-squad/references/routing-rules.md`
+  is deleted. Its two unique lines moved: the escalation ban is now the first bullet under
+  SKILL.md's Escalation rules ("never on vibes"), where its "FAIL rules below" reference holds,
+  rather than in Hard rules as section 4 says; the heading list became finding 9's closed list.
+  SKILL.md's pointer and audit-paragraph reference and `README.md`'s tree line are gone. Check 7c
+  no longer reads the file, and new check 7o fails if any tracked file other than `CHANGELOG.md`
+  and `LEFTOVER_FINDINGS.md` names it.
+- **Closed heading list (finding 9, existing headings only).** A new Hard rule in SKILL.md lists
+  the eight headings the log uses today and allows ` (cont.)` only on `## Recon`, `## PM — Plan`,
+  and `## Executor`. New check 7i reads the list from that bullet and fails on any heading a
+  template writes or a tracked doc names that is not on it, and on any listed heading no runtime
+  file uses. The report's `## Status`, `## Decision`, `## High-stakes review`, and
+  `## Audit Findings` headings, its Attempt-based `(cont.)` clause, and its other three bullets
+  are left to the work orders that introduce them.
+- **One archive command (finding 11, without the one-active-run rule).** SKILL.md's Hard rules
+  hold the one command that writes every archive copy: it names the copy from `date -u` and the
+  run ID, refuses to overwrite (`set -C`), verifies with `cmp`, and clears the log only after
+  `cmp` succeeds. `agents/squad-mech.md` runs it without reading the log, `agents/squad-pm.md`
+  runs a form that appends the `Archive target:` line first, and both report `ARCHIVE FAILED:`
+  on failure; SKILL.md Stage 1, `codex/SKILL.md`, and `codex/README.md` stop the run on that
+  line. The read-back check and the whole-file `Write` clear are gone. The report writes these
+  steps on top of finding 3 (WO-3e); to keep today's high-stakes flow, the PM still archives
+  without clearing on a high-stakes PASS (its form ends `archived, log kept:`), and the main
+  session closes the run by running the archive command itself instead of clearing the log. A
+  high-stakes run therefore leaves two archives, and the rules name three legitimate clears, not
+  two. SKILL.md's Stage 5 and `codex/SKILL.md` say this closing archive is the main session's own
+  step, not a stage's work, so it does not conflict with finding 19's no-absorption rule. `README.md`, `docs/example-log.md` (new archive name, `Archive target:` as the entry's last
+  line), and `codex/SKILL.md` match. New check 7j requires every archive block in SKILL.md, the
+  mech and PM bodies, their TOMLs, and `codex/01-archive.md` and `codex/05-pm-accept.md` to match
+  SKILL.md's command, and bans the old read-back and whole-file `Write` wording in any case, with
+  or without backticks, across line breaks.
+- **One blocker grammar in every log-writing body (finding 13, phase 2).** `agents/squad-recon.md`,
+  `agents/squad-pm.md`, and the three executor bodies carry SKILL.md's `BLOCKER:` block and the
+  ban on prose blockers. Entry shapes gain an optional final `BLOCKER:` block and drop
+  "blockers" from paragraph 2 and the PLAN template; Recon states that a goal that cannot be met
+  is a `needs-human:` blocker, and `README.md` says the same. `docs/example-log.md` drops its
+  prose "Blockers" lines and the Plan entry's closing "No blockers.". This closes N4. The shared-span row 7k holds the span byte-identical
+  across the five bodies and `codex/02-recon.md` to `codex/05-pm-accept.md`.
+- **Rungs, not models, in protocol text (finding 8, rung words and model-name ban).** SKILL.md's
+  role list, stage headings, routing lines, ACCEPT paragraph, escalation bullet, DELEGATE step,
+  and audit paragraph say top, mid, or bottom rung; `agents/squad-pm.md` and
+  `references/audit-prompts.md` do the same. The old Codex routing section is now
+  `## Model routing`, whose block between `<!-- routing:begin -->` and `<!-- routing:end -->` is
+  the one place the skill names models, with today's ladder. The audit paragraph tells Claude
+  Code to pass each rung's alias as the Agent tool's `model` parameter, which keeps finders on
+  `sonnet` and the skeptic on `opus`. New check 7l fails on a model family name, a `gpt-` ID, a
+  price pair, or a cost ratio in 16 protocol files outside that block. Check 7d now checks the
+  markers and requires every model an agent file or TOML pins to appear in the block. The
+  executor renames, `models.conf`, and the generated blocks are left to WO-3a and WO-3b.
+- **The Codex prompts are generated and `codex/SKILL.md` is a reading copy (finding 19).**
+  `codex/build-agents.py` now writes `codex/01-archive.md` to `codex/05-pm-accept.md` from the
+  agent bodies (the PM body split at its PLAN and ACCEPT headings), each marked as generated on
+  line 2, and `--check` covers them with the TOMLs. The prompts now carry finding 28's G1, G3,
+  and G4 wording and finding 5's precedence clause, and say `Bash` where they said "shell".
+  `codex/SKILL.md` loses its frontmatter and opens as a reading copy no host loads; its
+  anti-absorption sentences move into a new SKILL.md Hard rule (never do a stage's work, stop on
+  a missing agent, the `Agent:` line shows an absorbed stage), so the rule 3.8.0 added now
+  loads. This corrects 3.9.0's description of `codex/SKILL.md` as runtime-loaded, and closes N5
+  and F14. `README.md`, `codex/README.md`, and `CONTRIBUTING.md` (sync list gains
+  `commands/squad.md`, so its count of places becomes eight; generated files marked, in the list
+  and the pre-commit checklist; the version step names the `Version:` line) match.
+  Check 3 reads the reading-copy title and `Version:` line, check 6 requires exactly the five
+  prompts with their markers, and new check 7s keeps frontmatter out of any SKILL.md outside
+  `skills/` and the no-absorption rule in both SKILL.md files.
+- **Shared text stays inline, pinned by one table (finding 24).** `CONTRIBUTING.md` says a stage's
+  rules live in its own body and shared text is a row in the shared-span table. New check 7p is
+  that table, 16 rows: append-how, append-why, pointer, and per-spawn; finding 5's two
+  precedence rows; the blocker grammar (7k); the executor and ACCEPT output forms and the check
+  line (7n, finding 12); the three ACCEPT `awk` reads (finding 15); `REFUSED:` in
+  `squad-helper.md` and `squad-mech.md` and SKILL.md's refusal route (finding 28); and the
+  switchboard phrase (finding 18). A built-in self-test changes one character in every row's
+  span in every file and fails if the row lets it through.
+- **Pins deferred from WO-1 (findings 17, 18, 27, 28).** New check 7q caps each agent description
+  at 500 bytes with no `<commentary>` and a mention of the compute-squad skill. New check 7r fails
+  if any agent's one-line `tools:` list includes `Agent` or `Task`, or if the line is missing.
+  Check 2 allows only the keys `name`, `description`, `model`, `color`, `tools`, and
+  `omitClaudeMd`, with `omitClaudeMd` after `model`. Check 7c now also reads the Recon, PM, and
+  three executor bodies. It keeps `codex/SKILL.md`, which the report drops on the premise that the
+  file is retired; finding 19 keeps it as a reading copy that still states the cap.
+- **Check 8, behavior without a model (finding 26, checks 8a and 8e).** `tests/check_logs.py`
+  (Python 3.9 stdlib) lints a log against rules it reads from SKILL.md: headings on the closed
+  list, the Goal entry first, one `date -u` timestamp per entry in order, and the `BLOCKER:`
+  grammar with no prose blocker lines. Its heading rule also requires a `## Delegated — <stage>`
+  entry to answer a `DELEGATE:` block in the nearest stage entry above it and to name that
+  stage (its heading, or the heading's first or last part, with or without a suffix such as
+  `(pending)`), from the `<requesting stage>` wording in `agents/squad-helper.md` and
+  `agents/squad-mech.md`; the report does not name this rule. Check 8a lints
+  `docs/example-log.md` clean and runs 15 fixtures in `tests/fixtures/logs/`: 4 must pass,
+  among them an ACCEPT-mode delegation, and 11 must fail on exactly their listed rule, among
+  them `invented-heading.log.md`; every fixture cites protocol text that must still exist, and
+  every rule has a failing fixture. Check 8e runs `codex/update.sh` with the new stub
+  `tests/stubs/ok` as `git` and `codex` in a temp `CODEX_HOME` and asserts the prune, the seven
+  TOMLs installed byte for byte, the profiles, and untouched user files. `README.md`'s tree and
+  `CONTRIBUTING.md` describe check 8. The report's wording for the verify.sh header, the
+  `CONTRIBUTING.md` paragraph, and the README tree line also names 8b to 8d, 8f, the grant hook,
+  the archive command, and the live harness; those do not exist yet, so the landed wording names
+  only the log linter (8a) and `codex/update.sh` (8e), and the work orders that add the rest
+  extend it.
+- **Not landed in this release.**
+  - The report pins `REFUSED:` in SKILL.md, but the G2 text WO-1 landed there never contains it;
+    the "refusal route" row pins that G2 sentence instead.
+  - Finding 11's steps assume finding 3. WO-3e removes the PM's high-stakes archive form and the
+    main session's closing archive when squad-mech takes over the high-stakes close.
+  - Checks 8b, 8c, 8d, and 8f, the repo fixtures, and the live harness; linter rules for text
+    later work orders add; shared-span rows for findings 4, 9's fixed fields, 13's executor parts,
+    14, and 18's delegation text; and finding 5's pins for WO-3f text.
+  - The generated `codex/03-pm-plan.md` carries two preamble phrases that point at ACCEPT-only
+    steps, a consequence of the report's preamble rule.
+  - Known inconsistency, still open for WO-3d: the stage bodies say any re-spawn appends a
+    `(cont.)` entry, while SKILL.md's DELEGATE step 2 says a re-spawn after a request that was not
+    `BLOCKING` writes a complete entry.
+  - Every Codex model ID stays `gpt-5.6-*` until WO-0.
+- **Acceptance not run live.** No live reference run was made, so cost against WO-1's baseline and
+  the absence of reads of the deleted file are unconfirmed. The archive command was checked in
+  temp directories under bash and dash (a pre-existing target and an unwritable archive
+  directory leave every file unchanged and truncate nothing) and by two single-stage Haiku
+  `squad-mech` probes, which ran the command verbatim and reported `ARCHIVE FAILED:` on a forced
+  collision without retrying. The PM's archive forms, the rung-word routing, and the audit alias
+  line were not run on a model. Codex behavior is source-read only: the finding 19 live scenario
+  and a manual Codex run need the Codex CLI, which is not installed here.
+
 ## 3.10.0 — 2026-09-24
 
 Lands work order WO-1 of the 3.9.2 analysis: wording and description cuts that need no new

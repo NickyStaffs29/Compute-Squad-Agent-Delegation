@@ -155,10 +155,9 @@ short, but the discipline can't.
 - **Stage 5 — Accept**, `squad-pm` (ACCEPT mode): tries to fail the work, then PASS or FAIL. Say "be
   thorough" and it adds an audit fan-out.
 
-The full protocol for each stage — grammar, PASS/FAIL/BLOCKER handling, escalation, and the
-audit-grade fan-out — is canonical in [`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md)
-for Claude Code and [`codex/SKILL.md`](codex/SKILL.md) for Codex. This page is a summary, not a
-second copy.
+The full protocol for each stage (grammar, PASS/FAIL/BLOCKER handling, escalation, and the
+audit-grade fan-out) is canonical in [`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md),
+which Claude Code and the Codex plugin both load. This page is a summary, not a second copy.
 
 A complete worked run with every log entry format is in [`docs/example-log.md`](docs/example-log.md).
 
@@ -167,7 +166,7 @@ A complete worked run with every log entry format is in [`docs/example-log.md`](
 A run creates two things in your project root:
 
 - `COMPUTE_SQUAD_LOG.md`, the active log every stage appends to.
-- `compute-squad-archive/`, timestamped copies of past runs. The log is archived before a new run starts and again on PASS, so a failed run is never lost.
+- `compute-squad-archive/`, copies of past runs named by UTC time and run ID. The log is archived before a new run starts and again on PASS, and an existing archive is never overwritten, so a failed run is never lost.
 
 Both are run state, not source. Add them to your `.gitignore` unless you specifically want run history in version control:
 
@@ -184,7 +183,7 @@ A first run in a project with no log file is normal. Stage 1 creates it empty an
 
 The mapper. Given a locked goal, it sweeps the codebase and pins down exactly what the change touches: files, functions, line ranges, call sites, tests, migrations, config, and the invariants that must survive (auth boundaries, privacy rules, logging hygiene). It reads whole subsystems rather than fragments. It writes nothing except its log entry.
 
-Its standard: the PM should never have to guess. Ambiguity Recon cannot resolve gets named explicitly in its entry, so the plan resolves it on purpose instead of by accident.
+Its standard: the PM should never have to guess. Ambiguity Recon cannot resolve gets named explicitly in its entry, so the plan resolves it on purpose instead of by accident. A goal that cannot be met as written stops as a `needs-human:` blocker.
 
 ### squad-pm (Opus, two modes)
 
@@ -224,8 +223,7 @@ only and capped at 5 helpers per stage per run; and escalate on evidence, never 
 answer that forces an upstream re-run costs more than running the stage one rung higher, which makes
 routing up on uncertainty the cheap option. The full rules, the
 escalation ladder, and the blocker grammar are canonical in
-[`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md) for Claude Code and
-[`codex/SKILL.md`](codex/SKILL.md) for Codex.
+[`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md), which both hosts load.
 
 Underneath all four sits the log, `COMPUTE_SQUAD_LOG.md` — durable, auditable state is what lets a
 FAIL re-run one stage instead of the whole pipeline, and it is why the same protocol runs in Codex
@@ -248,7 +246,6 @@ Compute-Squad-Agent-Delegation/
 ├── skills/compute-squad/
 │   ├── SKILL.md              # the orchestration protocol
 │   └── references/
-│       ├── routing-rules.md  # full routing rules, escalation, cost posture
 │       └── audit-prompts.md  # finder and skeptic briefs for audit-grade runs
 ├── agents/
 │   ├── squad-recon.md        # Sonnet · read-only mapping
@@ -262,16 +259,17 @@ Compute-Squad-Agent-Delegation/
 │   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
 ├── codex/
 │   ├── README.md             # Codex install, routing, and manual fallback
-│   ├── SKILL.md              # Codex-specific routing reference
+│   ├── SKILL.md              # reading copy with Codex model names; no host loads it
 │   ├── agents/*.toml         # generated Codex agent definitions
-│   ├── build-agents.py       # generates codex/agents/*.toml from agents/*.md
+│   ├── build-agents.py       # generates the agent TOMLs and 01-05*.md from agents/*.md
 │   ├── profiles.toml         # Sol/Terra/Luna profile reference
 │   ├── update.sh             # installs/refreshes the native Codex plugin
-│   └── 01-05*.md             # manual-session fallback prompts
+│   └── 01-05*.md             # manual-session fallback prompts (generated)
 ├── docs/example-log.md       # a complete worked run
 ├── scripts/
 │   ├── build-plugin.sh       # rebuilds dist/ from the git-tracked source set
 │   └── verify.sh             # the CI gate; run it before every commit
+├── tests/                    # check 8 log linter and fixtures (not packaged)
 ├── dist/compute-squad.plugin # drag-and-drop install for Claude Cowork
 ├── .gitignore                # excludes COMPUTE_SQUAD_LOG.md and its archive
 ├── CONTRIBUTING.md           # the sync rule: skill, agents, codex, dist change together
