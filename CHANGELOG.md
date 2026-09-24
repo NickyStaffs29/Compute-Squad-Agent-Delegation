@@ -1,5 +1,121 @@
 # Changelog
 
+## 3.10.0 — 2026-09-24
+
+Lands work order WO-1 of the 3.9.2 analysis: wording and description cuts that need no new
+machinery. Agent names, tools, models, and colors are unchanged, and so is `scripts/verify.sh`.
+
+- **Shorter agent descriptions (finding 17).** Each of the seven `agents/*.md` descriptions is now
+  one or two sentences and one short `<example>`, with no `<commentary>` and no capitalized model
+  family name (`Opus`, `Sonnet`, `Haiku`), and each defers to the compute-squad skill. On a Sonnet 5
+  main session the plugin's per-session cost fell from 3,282 to 1,475 tokens (plugin on minus
+  plugin off). The skill's trigger phrase
+  `recon-plan-execute-verify` is now `recon-plan-execute-accept`, and `CONTRIBUTING.md` asks for
+  one `<example>` of at most 500 bytes per description.
+- **squad-mech no longer loads `CLAUDE.md` (finding 27).** `agents/squad-mech.md` sets
+  `omitClaudeMd: true`. A probe spawn in a directory whose `CLAUDE.md` held a marker line could not
+  quote the marker; the 3.9.2 agent quoted it.
+- **Recon stops reading project instruction files itself (finding 22).** The step that read
+  `AGENTS.md` and `CLAUDE.md` is gone from `agents/squad-recon.md` and `codex/02-recon.md`, and
+  the later steps are renumbered. `codex/README.md` now says Codex injects `AGENTS.md` itself and
+  explains `project_doc_fallback_filenames` for projects that keep their rules only in `CLAUDE.md`.
+- **PM wording and the Codex agent generator (finding 23).** `agents/squad-pm.md` drops
+  "Opus-tier" and "Sonnet-safe", names the log and its archive as the only files the PM authors in
+  the repository, and runs refutation probes from stdin or from a `mktemp -d` directory outside
+  the repository that it deletes; `codex/05-pm-accept.md` step 4 gets the same probe rule. The
+  PM's last sentence now makes clearing the log on an ordinary PASS the one exception to "never
+  clear". `codex/build-agents.py` drops the "RUN THIS AGENT" header and `MODEL_DEFAULTS` (so a
+  changed model ID no longer raises `KeyError`), writes a version comment as the first line of
+  each `codex/agents/*.toml`, and rejects a backslash in a body as it already rejected a triple
+  quote. `CONTRIBUTING.md`'s release step says to regenerate the TOMLs.
+- **Delegation gaps closed and one template per PM mode (finding 28).** In
+  `skills/compute-squad/SKILL.md` and `agents/squad-recon.md`, a stage that needs a stronger model
+  ends its entry with a `BLOCKER:` naming its own stage; `agents/squad-pm.md` says the PM, already
+  on the top rung, uses `needs-human:`. The executor bodies get no such line, because finding 28
+  leaves the Executor's route to finding 13. A helper that refuses begins its final message with
+  `REFUSED:` (`squad-helper.md`, `squad-mech.md`), and the orchestrating session re-spawns the
+  requesting stage even when its request was not `BLOCKING`; `README.md`'s helper and intern
+  paragraphs now describe that route. The orchestrating session never spawns a sixth helper for a
+  stage, and the Recon, PM, and three executor bodies state the 5-helper cap. The "entries can be
+  short" rule moved from SKILL.md into the Recon and PM bodies as "Length follows the change". In
+  `agents/squad-pm.md` the PLAN template moved from the common section into the PLAN section, and a
+  new ACCEPT template before "Delegating before a verdict" replaces the three "(Bash heredoc form,
+  as above)" references. The ACCEPT template carries only the fields the log has today (heading,
+  `Timestamp:`, `Agent:`, and the body); the report's `Attempt:`, `Answers:`, `High-stakes:`,
+  `Rerun:`, and `Tested:` lines are defined by findings 9 and 2 and land with them. The timestamp
+  paragraph stays in the common section, since it governs entries in both modes. The Codex prompts
+  already have one template per mode (`codex/03-pm-plan.md`, `codex/05-pm-accept.md`).
+- **Command output capture (finding 12).** The three executor bodies and `codex/04-execute.md` run
+  each verification command through a `set -o pipefail` form that prints the exit code and the
+  last 40 lines and keeps the full output in a temp file. ACCEPT step 2 in `agents/squad-pm.md` and
+  `codex/05-pm-accept.md` re-runs every verification command in the plan and the project's full
+  suites with the same form plus a grep for failing lines, and records each command with its exit
+  code. ACCEPT still re-runs everything itself.
+- **ACCEPT reads the Executor's account last (finding 15).** ACCEPT step 1 reads the log in three
+  `awk` passes: the goal alone, then everything except the goal and the Executor's entries, and the
+  Executor's entries only after its own checks and refutations. SKILL.md's Stage 5 spawn prompt
+  names only the mode and the repo root. Mirrored in `codex/05-pm-accept.md`, `codex/SKILL.md`,
+  and `README.md`.
+- **Plan `Totals:` line (finding 16, phase 1).** PLAN states every quantity the work produces once
+  on a `Totals:` line, checks every task and test against it, and sizes the plan to the work.
+  `agents/squad-pm.md` and `codex/03-pm-plan.md`.
+- **Switchboard rationale corrected (finding 18, phase 1).** SKILL.md and
+  `references/routing-rules.md` no longer claim subagents cannot spawn subagents. They now say no
+  squad agent has a spawn tool and some hosts disable nested spawning. The switchboard is unchanged.
+- **Real timestamps and model IDs in log entries (finding 21, phase 1).** Every stage template in
+  the five log-writing agent bodies and in `codex/02-recon.md` to `codex/05-pm-accept.md` has a
+  `Timestamp:` line taken from `date -u +%Y-%m-%dT%H:%M:%SZ` and an `Agent:` line carrying the
+  model ID the agent's context states, in place of a free-form time and a fixed model name. A new
+  hard rule in both SKILL.md files applies the timestamp rule to the main session too.
+  `codex/04-execute.md` no longer lists Codex model IDs, `codex/SKILL.md`'s Agent-line description
+  matches, and `docs/example-log.md` uses the new line forms. The paragraph after each template
+  differs from the report's text: with the report's wording, 2 of 4 Haiku executor probes put
+  `date` in the append command and switched to an unquoted heredoc, and 1 of 4 dropped the agent
+  name. The landed text says to run `date` in a separate call, keep `<<'EOF'`, and keep the agent
+  name; 4 of 4 Haiku probes and 1 Sonnet Recon probe followed it.
+- **Stale cost figures removed (finding 8, phase 1).** `README.md` drops the 30 to 40% saving and
+  the 1.67x Opus-to-Sonnet ratio. Its cost FAQ is now a dated 2026-09-24 snapshot of one measured
+  3.9.2 run with that day's list prices, ending with finding 25's sentence on what drives cost.
+  `references/routing-rules.md` drops its July 2026 price list, the 1.67x ratio, and the 30-40%
+  estimate, and `README.md`'s repository tree now describes that file as holding cost posture, not
+  cost math.
+- **Protocol outranks the spawn prompt (finding 5, precedence clause).** The five log-writing
+  agent bodies say their own protocol and the log outrank the spawn prompt and that a conflict is
+  named in the entry. `squad-mech` gets the same rule for its procedures.
+- **An unavailable model stops the run (finding 7).** A new hard rule in SKILL.md and
+  `codex/SKILL.md`: if a spawn fails because its model is unavailable to the account, stop and
+  report the setup gap with the spawn's error text, and never run that stage on a lower rung, with
+  another agent, or in the main session. `codex/SKILL.md`'s setup paragraph now covers unavailable
+  models as well as unavailable roles. `README.md`'s Claude Code install line and
+  `codex/README.md`'s requirements paragraph state the stop.
+- **The skeptic reads the locked goal and stops defaulting to REFUTED on security findings
+  (finding 20, Goal read and skeptic default).** The skeptic brief in `references/audit-prompts.md`
+  reads the Goal entry first, quotes the scope text it relies on to refute a finding as out of
+  scope, and never treats a defect the change introduced as out of scope. A security or privacy
+  finding whose reproduction needs credentials, production configuration, or an external service
+  the run does not have now gets `NEEDS-HUMAN` with what reproduction would need, never `REFUTED`,
+  once the skeptic has traced the configuration the repository holds. The concurrency and
+  accessibility carve-out stays, reworded without em dashes. `SKILL.md`'s audit paragraph does not
+  route `NEEDS-HUMAN` yet: it still counts only skeptic-confirmed findings as FAIL evidence, so a
+  `NEEDS-HUMAN` finding reaches the main session in the skeptic's reply and waits for WO-3f's audit
+  procedure to stop the run for the user.
+- **Not landed in this release.**
+  - Every `scripts/verify.sh` part of these findings (among them finding 17's description pins,
+    finding 27's frontmatter-key allowlist, and finding 28's and finding 15's pins), because WO-1
+    allows no change to the script.
+  - The three `## Goal — Locked` templates keep `<timestamp line>`, since check 7a holds them
+    byte-identical.
+  - The manual Codex prompts `codex/02-recon.md` to `codex/05-pm-accept.md` do not yet carry
+    finding 28's G1, G3, and G4 wording or finding 5's precedence clause. The generated
+    `codex/agents/*.toml` files do. The prompts catch up when WO-2 generates them from the bodies.
+  - Known inconsistency: the stage bodies still say a re-spawn appends a `(cont.)` entry, while
+    SKILL.md's DELEGATE step 2 now says a re-spawn after a request that was not `BLOCKING` writes a
+    complete entry under its plain heading. Finding 9 (WO-3d) aligns the bodies.
+- **Acceptance not run live.** No full reference run was made. The `date -u` timestamps and model
+  IDs were checked with single-stage probes only (Recon on Sonnet 5 and the Haiku executor, under a
+  Haiku main session). The PM on Opus was not probed, and timestamp order across a full run is
+  unconfirmed.
+
 ## 3.9.2 — 2026-08-17
 
 Accuracy pass from an external-persona review: closes the last self-diagnosed claim errors and

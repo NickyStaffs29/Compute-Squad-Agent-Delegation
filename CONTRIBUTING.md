@@ -28,7 +28,7 @@ generated Codex agents, and a handful of blocks and facts that must read identic
 
 - `bash scripts/verify.sh` passes locally.
 - Agent and skill frontmatter parses as valid YAML, with `model` set to `sonnet`, `opus`, or
-  `haiku`, and at least one `<example>` block in each agent description.
+  `haiku`, and one short `<example>` block in each agent description of at most 500 bytes.
 - `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` parse as valid JSON.
 - `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` parse as valid JSON.
 - `python3 codex/build-agents.py --check` passes; generated TOMLs are never hand-edited.
@@ -37,4 +37,4 @@ generated Codex agents, and a handful of blocks and facts that must read identic
 - Bump the version to the same string in all five places `scripts/verify.sh` checks —
   `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `skills/compute-squad/SKILL.md`
   (`metadata.version`), `codex/SKILL.md` (`version:`), and the new `CHANGELOG.md` heading — then
-  rebuild `dist/compute-squad.plugin` with `scripts/build-plugin.sh`.
+  rebuild `dist/compute-squad.plugin` with `scripts/build-plugin.sh` and regenerate `codex/agents/*.toml` with `python3 codex/build-agents.py`, whose first line carries the version.

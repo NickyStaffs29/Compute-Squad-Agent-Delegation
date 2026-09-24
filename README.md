@@ -6,7 +6,7 @@ Three steps to a working setup: **install**, **run**, **auto-update**. Each step
 
 ## 1. Install
 
-**Claude Code.** Requires Opus access on your Claude Code plan — the PM stage runs on Opus with no fallback tier. Paste these two lines in your terminal:
+**Claude Code.** Requires access to every model the routing table below names; the PM runs on the top rung with no fallback, and a stage whose model is unavailable stops the run. Paste these two lines in your terminal:
 
 ```bash
 claude plugin marketplace add NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -126,7 +126,7 @@ Everything below is background on how the pipeline works. You don't need any of 
 
 Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
 
-What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. That routing is also the math that makes the pipeline affordable: on list prices, it puts a run roughly 30 to 40% below an all-Opus worker pool running the same stages — the comparison is to a pool of Opus agents, not a single session.
+What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. Prices are not a routing input; one measured run's cost is a dated snapshot in the FAQ.
 
 One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
@@ -192,7 +192,7 @@ The project manager. Plans work, accepts deliverables, never writes product code
 
 **PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-haiku`, COMPLEX routes it to `squad-executor-opus`, and STANDARD stays on `squad-executor`.
 
-**ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, so the Executor's framing cannot anchor it. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
+**ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, and reads the Executor's account only after its own checks and refutations. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
 
 Decisions the PM is not allowed to make: anything product-level, irreversible, or cost-bearing, and anything that would change the locked goal. Those get logged as named blockers and go back to the human. Guessing past a blocker is a protocol violation, not initiative.
 
@@ -208,21 +208,21 @@ It runs the project's own test and verify commands as it goes and will not log c
 
 ### squad-helper (Sonnet, the delegated worker)
 
-The execution-tier half of the DELEGATE protocol. When a stage delegates a subtask that is too specified to need judgment but too involved for the intern, `squad-helper` runs the exact procedure and returns the result in its final message. It never writes the log; the orchestrating session does. Handed anything that needs a design decision, it refuses and sends it back as a plan defect.
+The execution-tier half of the DELEGATE protocol. When a stage delegates a subtask that is too specified to need judgment but too involved for the intern, `squad-helper` runs the exact procedure and returns the result in its final message. It never writes the log; the orchestrating session does. Handed anything that needs a design decision, it refuses with `REFUSED:` and the step, and the stage that asked for it does that step itself or ends its entry with a blocker.
 
 ### squad-mech (Haiku, the intern)
 
 Zero-judgment busywork, executed exactly. Log archival before every run (verified copy first, truncate second, never the reverse). File rotation. Formatting normalization. Inventories. Fixture generation from an exact template.
 
-Its one skill beyond following procedure is knowing what it is not: handed anything that requires a judgment call, it refuses and reports that the task needs a higher tier. An intern that knows its lane is worth more than a mid-level that does not.
+Its one skill beyond following procedure is knowing what it is not: handed anything that requires a judgment call, it refuses with `REFUSED:` and the step, which goes back to whoever requested it. An intern that knows its lane is worth more than a mid-level that does not.
 
 ## The delegation structure
 
 Four rules generate the whole system: route by decision density, not task difficulty; review from a
 tier above the work by default; push busywork down a tier through the `DELEGATE:` protocol, downward
-only and capped at 5 helpers per stage per run; and escalate on evidence, never on vibes. Opus costs
-about 1.67x Sonnet per token — a wrong answer that forces an upstream re-run costs more than the tier
-difference every time, which makes routing up on uncertainty the cheap option. The full rules, the
+only and capped at 5 helpers per stage per run; and escalate on evidence, never on vibes. A wrong
+answer that forces an upstream re-run costs more than running the stage one rung higher, which makes
+routing up on uncertainty the cheap option. The full rules, the
 escalation ladder, and the blocker grammar are canonical in
 [`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md) for Claude Code and
 [`codex/SKILL.md`](codex/SKILL.md) for Codex.
@@ -248,7 +248,7 @@ Compute-Squad-Agent-Delegation/
 ├── skills/compute-squad/
 │   ├── SKILL.md              # the orchestration protocol
 │   └── references/
-│       ├── routing-rules.md  # full routing rules, escalation, cost math
+│       ├── routing-rules.md  # full routing rules, escalation, cost posture
 │       └── audit-prompts.md  # finder and skeptic briefs for audit-grade runs
 ├── agents/
 │   ├── squad-recon.md        # Sonnet · read-only mapping
@@ -299,7 +299,7 @@ Durability and auditability. FAILs re-run stages against full history. Failed ru
 The stages are mandatory. Their length is not. A one-line change gets a three-sentence Recon entry and a four-line plan. The discipline is the constant; the overhead scales with the work.
 
 **What does a run cost?**
-The floor is five agent spawns: the intern, Recon, the PM twice, and the Executor. DELEGATE helpers and an audit fan-out add more on top. As a rough order of magnitude, a small change runs a few hundred thousand tokens end to end, and an audit-grade run is a multiple of that. Treat both as ballpark, not a quote: the real number tracks how much code Recon has to read.
+The floor is five agent spawns: the intern, Recon, the PM twice, and the Executor. DELEGATE helpers, FAIL re-runs, and an audit fan-out add more. Snapshot 2026-09-24: one measured run of 3.9.2 on an eight-file fixture repo with a top-rung main session billed about 1.6M input and 47k output tokens and cost $3.00 at list prices, two thirds of it in the main session. List prices that day per million input and output tokens: Fable 5.1 $10/$50, Opus 5.5 $4/$20, Sonnet 5 $2/$10, Haiku 4.5 $1/$5. Treat it as one data point, not a quote; the real number tracks the main session's turns, how much each stage reads (re-sent on every later call), and how many stages re-run.
 
 **What if I stop a run halfway?**
 Nothing is lost. The log keeps every entry completed so far. Start a new run and Stage 1 archives it before clearing. Or say you want to resume, and the squad picks up from the last logged entry instead of starting over.

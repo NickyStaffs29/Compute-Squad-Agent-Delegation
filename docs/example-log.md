@@ -8,7 +8,7 @@ Stage 0 (strategy) happens in the main session before the log starts: the goal g
 
 ```markdown
 ## Goal — Locked
-2026-07-25 13:58 UTC
+Timestamp: 2026-07-25T13:58:41Z
 
 Goal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.
 Acceptance criteria:
@@ -21,8 +21,8 @@ Assumptions: none.
 
 ```markdown
 ## Recon
-2026-07-25 14:02 UTC
-Agent: squad-recon (Sonnet)
+Timestamp: 2026-07-25T14:02:17Z
+Agent: squad-recon (claude-sonnet-5)
 
 The reset endpoint is POST /api/auth/reset-request in src/server/auth/auth.routes.ts
 (lines 141-168), calling requestPasswordReset() in src/server/auth/reset.service.ts
@@ -48,7 +48,7 @@ DELEGATE:
 
 ```markdown
 ## Delegated — Recon
-2026-07-25 14:04 UTC
+Timestamp: 2026-07-25T14:04:09Z
 
 reset.routes.test.ts: 14 · login.routes.test.ts: 22 · session.service.test.ts: 11 ·
 mfa.service.test.ts: 19 (procedure ran as specified; no judgment applied).
@@ -56,8 +56,8 @@ mfa.service.test.ts: 19 (procedure ran as specified; no judgment applied).
 
 ```markdown
 ## PM — Plan
-2026-07-25 14:09 UTC
-Agent: squad-pm (Opus)
+Timestamp: 2026-07-25T14:09:33Z
+Agent: squad-pm (claude-opus-5-5)
 
 Classification: STANDARD. Spec: enforce a per-account 60s cooldown inside
 requestPasswordReset(), not the route, so every future call site inherits it.
@@ -82,8 +82,8 @@ risk — use the suite's existing clock helper. No blockers.
 
 ```markdown
 ## Executor
-2026-07-25 14:21 UTC
-Agent: squad-executor (Sonnet)
+Timestamp: 2026-07-25T14:21:52Z
+Agent: squad-executor (claude-sonnet-5)
 
 Implemented tasks 1-3 exactly as specified: cooldown check added to
 reset.service.ts (lines 31-42) using the newest-token query; short-circuit returns
@@ -100,8 +100,8 @@ response.
 
 ```markdown
 ## PM — PASS
-2026-07-25 14:33 UTC
-Agent: squad-pm (Opus)
+Timestamp: 2026-07-25T14:33:04Z
+Agent: squad-pm (claude-opus-5-5)
 
 Re-ran npm test and npm run ci:verify independently: GREEN (2,754/12, matching).
 Verified invariants: response bodies byte-identical between cooldown-hit and normal

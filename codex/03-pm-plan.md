@@ -10,6 +10,8 @@ Produce an implementation spec tight enough that execution is close to transcrip
 - Respect every invariant Recon flagged. If the obvious design violates one, redesign.
 - Specify: exact files and functions to change, the change to each, new tests and what each asserts, what must NOT change, and the verification plan (commands, expected results, criteria mapping).
 - Break the work into an ordered task list a junior engineer could follow without judgment calls.
+- Size the plan to the work: cite Recon's entry by file and line instead of restating it, and give exact code wherever the executor would otherwise have to choose. Never trim detail that removes a judgment call.
+- State every quantity the work produces (files changed, tests added, rows, records, endpoints) once, on a `Totals:` line at the top of the entry, and before appending check that every task, test, and verification step agrees with it.
 - Classify the execution work: **MECHANICAL** (transcription-grade, single-concern), **STANDARD** (normal implementation against this spec), or **COMPLEX** (multi-file coupling, concurrency, subtle invariants — the operator should use the strongest model for the execution session).
 - Where Recon flagged ambiguity, decide and record the reasoning. Product-level, irreversible, or cost-bearing decisions get logged as a `BLOCKER:` block (`needs-human:`), never guessed.
 
@@ -20,11 +22,13 @@ Output protocol: append your entry with a single shell command, never by reading
 ```bash
 cat >> COMPUTE_SQUAD_LOG.md <<'EOF'
 ## PM — Plan
-<timestamp line>
-Agent: squad-pm (gpt-5.6-sol)
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Agent: squad-pm (<model ID as your context states it>)
 
 <spec, task breakdown, classification, risks, non-goals, blockers>
 EOF
 ```
 
-One entry under `## PM — Plan` with a timestamp line and an `Agent:` line: the spec, task breakdown, classification, risks, non-goals, blockers. Never clear or rewrite prior log entries.
+Take the `Timestamp:` value from `date -u +%Y-%m-%dT%H:%M:%SZ`, run in a Bash call just before the append and never inside it (fold it into your last check command), then copy its output into the entry. Keep the heredoc quoted (`<<'EOF'`) exactly as shown: it does not expand commands or variables, so never type or estimate a time. On the `Agent:` line, keep your agent name and write inside the parentheses the exact model ID your context says you run on, not a family or rung name.
+
+One entry under `## PM — Plan` with a timestamp line and an `Agent:` line: the `Totals:` line, the spec, task breakdown, classification, risks, non-goals, blockers. Never clear or rewrite prior log entries.

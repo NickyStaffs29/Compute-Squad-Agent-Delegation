@@ -6,7 +6,8 @@ The repository ships a native Codex plugin plus five prompt files for older Code
 
 Requires Codex CLI 0.134 or newer, a working `git`, `/bin/bash`, and access to `gpt-5.6-sol`,
 `gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — Model routing in
-[`codex/SKILL.md`](SKILL.md) hard-codes all three with no fallback tier.
+[`codex/SKILL.md`](SKILL.md) hard-codes all three with no fallback tier. A stage whose
+model your account cannot use stops the run and reports the setup gap.
 
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -24,6 +25,8 @@ bash "$HOME/src/compute-squad/codex/update.sh"
 The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, removes any retired agent TOMLs the repo no longer ships, and writes the four current Codex V2 profile files. The native plugin manifest supplies the skill and command; this updater supplies the separate agent TOMLs and profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME` to absolute paths; use an absolute path to the updater script as well.
 
 `codex/profiles.toml` is the repository reference for those V2 profile files, not a file to copy verbatim into `$CODEX_HOME/config.toml`. Current Codex loads a selected profile from `$CODEX_HOME/<profile>.config.toml`; the updater extracts each `[profiles.<name>]` table into that format. The `compute-squad` profile is the one selected by the quick-start command and controls the top-level session. Native named agents use the `model` and `model_reasoning_effort` fields in their own TOMLs; the other three profiles are for manual or fallback launches. Each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
+
+Codex injects `AGENTS.md` into a session by itself, and no squad stage reads project instruction files. If your project keeps its rules only in `CLAUDE.md`, add `project_doc_fallback_filenames = ["CLAUDE.md"]` to `$CODEX_HOME/config.toml`. Codex loads one instruction file per directory, so a directory that has both files contributes only `AGENTS.md`.
 
 After installing or updating the plugin, start a new Codex session before running:
 

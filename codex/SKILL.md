@@ -6,7 +6,7 @@ description: >
   pipeline (Strategy -> Archive -> Recon -> Plan -> Execute -> Accept) with
   COMPUTE_SQUAD_LOG.md coordination.
 metadata:
-  version: "3.9.2"
+  version: "3.10.0"
   author: "Nick Stafford"
 ---
 
@@ -34,8 +34,8 @@ truth for Codex routing. Stage headings below use Sol, Terra, and Luna as
 shorthand for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` respectively.
 
 Before starting, ensure the seven files in `~/.codex/agents/` are installed as
-described in `codex/README.md`. If the named roles are unavailable, stop and
-report the setup gap instead of improvising a different pipeline.
+described in `codex/README.md`. If the named roles or their models are
+unavailable, stop and report the setup gap instead of improvising a different pipeline.
 
 ## Stage 0 — Strategy (main session)
 
@@ -106,10 +106,10 @@ own work.
 
 ## Stage 5 — Accept (`squad-pm`, Sol MAX, ACCEPT mode)
 
-Spawn `squad-pm` in ACCEPT mode after execution. It re-derives expectations
-from the locked criteria before reading the Executor account, reruns the
-project's verification commands, checks every invariant and must-not-change
-item, and attempts a refutation for every acceptance criterion.
+Spawn `squad-pm` in ACCEPT mode after execution. It reads the goal alone first
+and the Executor's entries last, reruns the project's verification commands,
+checks every invariant and must-not-change item, and attempts a refutation for
+every acceptance criterion.
 
 - **PASS:** append the PASS entry, copy and verify the full log to the named
   archive target, then clear the active log only for a non-high-stakes change.
@@ -137,6 +137,9 @@ stage per run.
 - Every stage appends to `COMPUTE_SQUAD_LOG.md`; no stage rewrites history.
 - Every append uses one shell heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ...
   EOF`) so concurrent entries cannot be silently dropped.
+- Every entry's `Timestamp:` line is the output of `date -u +%Y-%m-%dT%H:%M:%SZ`
+  from a Bash call made just before the append, never a typed or estimated
+  time; the main session's entries follow the same rule.
 - Every fresh run starts with `## Goal — Locked` after Stage 1 archives prior
   state. The log clears only after a PASS and verified archive.
 - A blocker is always:
@@ -165,8 +168,13 @@ judgment calls. No self-absorption: the orchestrating session spawns the named
 agent for every stage in Model routing above and never performs a stage's
 analysis, writing, or verdict itself in its place. Codex delegation is
 model-driven, so this rule cannot be enforced mechanically — it is enforced by
-detection: every stage's log entry carries an `Agent: <name> (<model>)` line
-naming who actually produced it, so a collapsed run is visible in
-`COMPUTE_SQUAD_LOG.md` on inspection even though nothing here can force the
-spawn to happen. Keep diffs minimal, use existing project conventions, and
-stop at every `needs-human:` blocker.
+detection: every stage's log entry carries an
+`Agent: <name> (<model ID as the agent's context states it>)` line naming who
+actually produced it, so a collapsed run is visible in `COMPUTE_SQUAD_LOG.md`
+on inspection even though nothing here can force the spawn to happen. Keep
+diffs minimal, use existing project conventions, and stop at every
+`needs-human:` blocker.
+
+If a spawn fails because its model is unavailable to the account, stop and
+report the setup gap with the spawn's error text. Never run that stage on a
+lower rung, with a different agent, or in the main session.

@@ -5,9 +5,9 @@ description: >
   "compute squad this", "squad run", or wants a code change executed through the
   Compute Squad delegation pipeline (Strategy → Archive → Recon → Plan → Execute → Accept)
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
-  for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-verify").
+  for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-accept").
 metadata:
-  version: "3.9.2"
+  version: "3.10.0"
   author: "Nick Stafford"
 ---
 
@@ -85,7 +85,7 @@ When unsure, route up: a wrong answer that forces a re-run costs more than the t
 
 ## Stage 5 — Accept (squad-pm in ACCEPT mode, Opus)
 
-Spawn `squad-pm` with mode ACCEPT. Being Opus, it is never weaker than the Sonnet execution it reviews; if execution ran on `squad-executor-opus`, acceptance stays at Opus.
+Spawn `squad-pm` with mode ACCEPT. Being Opus, it is never weaker than the Sonnet execution it reviews; if execution ran on `squad-executor-opus`, acceptance stays at Opus. Its spawn prompt names the mode and the repo root and nothing else: no reading list, no checklist, and no summary of the plan or of the Executor's account.
 
 - **PASS:** the PM appends its PASS entry, archives the full log to `compute-squad-archive/` and verifies the copy, then clears the active log only if the change is not high-stakes. If it flagged the change high-stakes (auth, payments, migrations, privacy, production config), the PM leaves the active log intact: do the final review directly in the main session, then clear the log yourself before declaring the run complete. Report outcome and evidence to the user either way.
 - **FAIL:** the PM names exactly one stage to re-run (Recon, Plan, or Executor). Re-run that stage and all stages after it with the log intact.
@@ -93,12 +93,12 @@ Spawn `squad-pm` with mode ACCEPT. Being Opus, it is never weaker than the Sonne
 
 ## Intra-stage delegation (the DELEGATE protocol)
 
-The role hierarchy is fractal: every level pushes its own busywork down a tier. Subagents cannot spawn subagents, so the orchestrating session acts as the switchboard:
+The role hierarchy is fractal: every level pushes its own busywork down a tier. Stages do not spawn agents themselves: no squad agent is given a tool for it, and some hosts disable nested spawning. So the orchestrating session acts as the switchboard:
 
 1. Any stage may end its log entry with a `DELEGATE:` block listing subtasks below its tier, each with an exact procedure and a target tier (`intern` for zero-judgment work, `execution` for tightly-specced Sonnet work).
-2. On seeing a `DELEGATE:` block, spawn the requested helpers (`squad-mech` for intern tasks; `squad-helper` for execution tasks). Helpers return their results in their final message; you append those results to the log under `## Delegated — <stage>`, then continue the pipeline. If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. A re-spawned stage appends a `## <Stage> (cont.)` entry covering only the remainder of its work; the "exactly one entry" rule is per spawn, not per run.
-3. Delegation only flows downward. A stage that wants a higher tier is asking for escalation, not delegation; that goes through the escalation rules.
-4. Cap helper fan-out at 5 per stage per run; past that, the stage's scoping is the problem, and it should say so in its entry instead.
+2. On seeing a `DELEGATE:` block, spawn the requested helpers (`squad-mech` for intern tasks; `squad-helper` for execution tasks). Helpers return their results in their final message; you append those results to the log under `## Delegated — <stage>`, then continue the pipeline. If a helper refused a step or reports one that did not run as the procedure says, append that report the same way and re-spawn the requesting stage even if its request was not `BLOCKING`; the stage does that step itself or ends its entry with a `BLOCKER:` block. A stage whose request was not `BLOCKING` appends a new, complete entry under its plain heading, never `(cont.)`. If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. A re-spawned stage appends a `## <Stage> (cont.)` entry covering only the remainder of its work; the "exactly one entry" rule is per spawn, not per run.
+3. Delegation only flows downward. A stage that needs a stronger model ends its entry with a `BLOCKER:` block naming its own stage (`rerun: Recon`, `rerun: Plan`, or `rerun: Executor`); treat it as a FAIL of that stage under the escalation rules. A stage on the top rung asks with `needs-human:` instead.
+4. Spawn at most 5 helpers per stage per run, counted from that stage's `## Delegated — <stage>` entries. Never spawn a sixth: append `## Delegated — <stage>` listing each subtask left undone as `not run: helper cap reached`, and re-spawn the stage, which does those subtasks itself under step 2's heading rule.
 
 Typical uses: Recon delegates bulk file inventories or dependency listings to the intern; the PM delegates boilerplate collection or changelog assembly; the Executor delegates formatting normalization or fixture generation.
 
@@ -126,7 +126,9 @@ When the user asks for an audit, adversarial review, or says "be thorough": afte
 
 - Coordination happens only through `COMPUTE_SQUAD_LOG.md`; every stage appends, no stage rewrites history, and it is cleared only after a PASS: by the PM itself, or by the main session once a high-stakes review is done.
 - Every append is a single Bash heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ... EOF`), never a Read-then-Write of the whole file — that race can silently drop entries another stage appended in between. Whole-file `Write` on the active log is legitimate in exactly two places: squad-mech's truncate-after-verified-archive, and the PM's clear-on-PASS.
+- Every entry's `Timestamp:` line is the output of `date -u +%Y-%m-%dT%H:%M:%SZ` from a Bash call made just before the append, never a typed or estimated time; the main session's entries follow the same rule.
 - Every fresh log opens with a `## Goal — Locked` entry, appended by Stage 1 before Recon spawns. No stage acts on a goal it did not read from that entry.
-- No stage skips: even a one-line change gets Recon and Plan entries (they can be short).
+- No stage skips: even a one-line change gets Recon and Plan entries.
 - The Executor never accepts its own work; the PM never writes product code; the intern never makes judgment calls.
 - Anti-slop discipline everywhere: YAGNI, stdlib/native first, no speculative abstractions, no scaffolding.
+- If a spawn fails because its model is unavailable to the account, stop and report the setup gap with the spawn's error text. Never run that stage on a lower rung, with a different agent, or in the main session.
