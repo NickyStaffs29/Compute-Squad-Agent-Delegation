@@ -49,6 +49,34 @@ if [[ $review -eq 1 && ! -t 0 ]]; then
   exit 2
 fi
 
+# One update at a time. The lock is taken before anything below reads the
+# checkout, the installed plugins, the catalog, or the saved choices, and held
+# until the install ends, so a review can never save choices while another
+# update validates, renders, or installs a build from the old ones. An update
+# that cannot take it stops here with nothing saved or installed. It sits
+# beside $state, not in it, so a refusal never creates or removes $state.
+lock="$codex_home/compute-squad.lock"
+catalog=""
+have_lock=0
+cleanup() {
+  if [[ -n "$catalog" ]]; then
+    rm -f "$catalog"
+  fi
+  if [[ $have_lock -eq 1 ]]; then
+    rmdir "$lock" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+if ! mkdir "$lock" 2>/dev/null; then
+  if [[ -d "$lock" ]]; then
+    echo "update: another update is running (or one was killed: then remove $lock); nothing was saved or installed" >&2
+  else
+    echo "update: cannot create $lock; nothing was saved or installed" >&2
+  fi
+  exit 1
+fi
+have_lock=1
+
 "$git_bin" -C "$repo_root" pull --ff-only
 if ! dirty="$("$git_bin" -C "$repo_root" status --porcelain --untracked-files=no)"; then
   echo "update: git status failed in $repo_root; $unchanged" >&2
@@ -95,7 +123,6 @@ for id in $installed; do
 done
 
 catalog="$(mktemp)"
-trap 'rm -f "$catalog"' EXIT
 have_catalog=1
 if ! "$codex_bin" debug models > "$catalog" 2>/dev/null; then
   have_catalog=0
@@ -156,13 +183,6 @@ if [[ $have_catalog -eq 1 ]]; then
 else
   echo "update: WARN: your saved models were not checked against the catalog" >&2
 fi
-
-lock="$state/update.lock"
-if ! mkdir "$lock" 2>/dev/null; then
-  echo "update: another update is running (or one was killed: then remove $lock); nothing was installed" >&2
-  exit 1
-fi
-trap 'rm -f "$catalog"; rmdir "$lock" 2>/dev/null || true' EXIT
 
 rm -rf "$build.new"
 if ! tiers="$("$python_bin" "$build_agents" --render-codex "$build.new" "$choices")"; then

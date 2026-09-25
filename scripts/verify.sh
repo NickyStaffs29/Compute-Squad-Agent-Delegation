@@ -3575,8 +3575,11 @@ print(
 # list, another installed copy of the plugin); the chooser (Enter keeps the
 # release defaults, labelled as such; each rejection with its reason; `no`
 # and end of input cancel); first setup; routine updates (same catalog, a
-# failed or unreadable catalog, a leftover build.new, a held lock); the
-# catalog fingerprint; a changed catalog without and with a terminal;
+# failed or unreadable catalog, a leftover build.new, a held lock); two
+# overlapping updates (a review while a scheduled update installs, and a
+# scheduled update while a review waits for answers), driven in lockstep by
+# the stub's pause point, where the second must stop at the lock with the
+# saved choices byte for byte; the catalog fingerprint; a changed catalog without and with a terminal;
 # unreadable saved choices; and a saved model the catalog retires or drops.
 # Every install must put the plugin, agents, and profiles from one build that
 # carries the saved choices, remove the remote plugin, prune the retired
@@ -3717,40 +3720,67 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     env.pop("STUB_GIT_STATUS", None)
 
-    def run_update(label, args=(), answers=None, extra_env=None):
-        """Run codex/update.sh; answers, when given, are typed on a terminal."""
-        if os.path.exists(stub_log):
-            os.remove(stub_log)
-        run_env = dict(env, **(extra_env or {}))
-        cmd = ["bash", "codex/update.sh", *args]
-        # The updater runs in its own session, so a timeout kills it and
-        # every process it started (a chooser waiting for input would
-        # otherwise keep the output pipes open and hang this check).
+    runs = []
+
+    def start_update(label, args=(), terminal=False, extra_env=None, log=None):
+        """Start codex/update.sh in its own session, its output going to
+        files, so a check can start a second update while this one runs. With
+        terminal, its stdin is a pty the answers are typed into later."""
+        log = log or stub_log
+        if os.path.exists(log):
+            os.remove(log)
+        runs.append(label)
+        out_path = os.path.join(tmp, f"run-{len(runs)}.out")
+        err_path = os.path.join(tmp, f"run-{len(runs)}.err")
         master = None
-        if answers is None:
-            stdin = subprocess.DEVNULL
-        else:
+        if terminal:
             master, stdin = pty.openpty()
             attrs = termios.tcgetattr(stdin)
             attrs[3] &= ~termios.ECHO
             termios.tcsetattr(stdin, termios.TCSANOW, attrs)
-        proc = subprocess.Popen(cmd, env=run_env, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                text=True, start_new_session=True)
+        else:
+            stdin = subprocess.DEVNULL
+        with open(out_path, "w", encoding="utf-8") as out_f, open(err_path, "w", encoding="utf-8") as err_f:
+            proc = subprocess.Popen(["bash", "codex/update.sh", *args], env=dict(env, STUB_LOG=log, **(extra_env or {})),
+                                    stdin=stdin, stdout=out_f, stderr=err_f, start_new_session=True)
+        if master is not None:
+            os.close(stdin)
+        return {"label": label, "proc": proc, "master": master, "out": out_path, "err": err_path, "log": log}
+
+    def finish_update(run, answers=None):
+        """Type the answers, if any, and wait for the run. A timeout kills the
+        updater and every process it started (a chooser waiting for input
+        would otherwise hang this check)."""
         try:
-            if master is not None:
-                os.close(stdin)
-                os.write(master, answers.encode("utf-8"))
-            out, err = proc.communicate(timeout=120)
+            if answers is not None:
+                os.write(run["master"], answers.encode("utf-8"))
+            run["proc"].wait(timeout=120)
         except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
-            proc.communicate()
-            fail(f"codex/update.sh ({label}) did not finish within 120 seconds")
+            os.killpg(run["proc"].pid, signal.SIGKILL)
+            run["proc"].wait()
+            fail(f"codex/update.sh ({run['label']}) did not finish within 120 seconds:\n"
+                 f"{read(run['out'])}{read(run['err'])}")
         finally:
-            if master is not None:
-                os.close(master)
-        rc = proc.returncode
-        calls = read(stub_log).splitlines() if os.path.exists(stub_log) else []
-        return rc, out, err, calls
+            if run["master"] is not None:
+                os.close(run["master"])
+        calls = read(run["log"]).splitlines() if os.path.exists(run["log"]) else []
+        return run["proc"].returncode, read(run["out"]), read(run["err"]), calls
+
+    def run_update(label, args=(), answers=None, extra_env=None):
+        """Run codex/update.sh; answers, when given, are typed on a terminal."""
+        return finish_update(start_update(label, args, answers is not None, extra_env), answers)
+
+    def wait_for(what, ready, run):
+        """Wait until ready() holds while run is still going."""
+        deadline = time.monotonic() + 60
+        while not ready():
+            if run["proc"].poll() is not None or time.monotonic() > deadline:
+                if run["proc"].poll() is None:
+                    os.killpg(run["proc"].pid, signal.SIGKILL)
+                    run["proc"].wait()
+                fail(f"codex/update.sh ({run['label']}): waited for {what}; it exited {run['proc'].returncode}:\n"
+                     f"{read(run['out'])}{read(run['err'])}")
+            time.sleep(0.05)
 
     def expect(label, cond, what, rc, out, err, calls):
         if not cond:
@@ -4011,7 +4041,7 @@ with tempfile.TemporaryDirectory() as tmp:
     ran.append("an unreadable catalog format warns and installs the saved choices")
 
     # A second update while one holds the lock installs nothing.
-    lock = os.path.join(codex_home, "compute-squad", "update.lock")
+    lock = os.path.join(codex_home, "compute-squad.lock")
     os.makedirs(lock)
     before = snapshot(codex_home)
     rc, out, err, calls = run_update("a held lock")
@@ -4019,6 +4049,59 @@ with tempfile.TemporaryDirectory() as tmp:
     expect_untouched("a held lock", before, rc, out, err, calls)
     os.rmdir(lock)
     ran.append("a held lock stops")
+
+    # The lock covers every write of the saved choices through validation,
+    # rendering, and installation, so a review and a scheduled update never
+    # interleave. First a scheduled update, paused by the stub inside
+    # `codex plugin add` while it installs the build rendered from the saved
+    # choices: a review that would change them stops at the lock before it
+    # asks anything, the choices stay byte for byte, and the scheduled update
+    # finishes with them.
+    pause = os.path.join(tmp, "pause")
+    os.makedirs(pause)
+    other_log = os.path.join(tmp, "stub-calls-other.txt")
+    new_mid = "stub-top\nmax\nstub-mid\nmax\nstub-low\nmax\nhigh\nyes\n"
+    scheduled = start_update("a scheduled update installing", extra_env={"STUB_PAUSE_DIR": pause}, log=other_log)
+    wait_for("the stub to pause it inside codex plugin add", lambda: os.path.exists(os.path.join(pause, "paused")),
+             scheduled)
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("a review during a scheduled install", ["--review-models"], answers=new_mid)
+    expect("a review during a scheduled install", rc == 1 and "another update is running" in err
+           and "listing is availability" not in out and read(choices_path) == first_text,
+           "it should stop at the lock before asking, with the saved choices byte for byte", rc, out, err, calls)
+    expect_untouched("a review during a scheduled install", before, rc, out, err, calls)
+    with open(os.path.join(pause, "go"), "w", encoding="utf-8"):
+        pass
+    rc, out, err, calls = finish_update(scheduled)
+    expect("a scheduled update installing", rc == 0 and read(choices_path) == first_text and not os.path.exists(lock),
+           "it should finish with the saved choices and release the lock", rc, out, err, calls)
+    expect_installed("a scheduled update installing", rc, out, err, calls)
+    ran.append("a review cannot save choices while a scheduled update installs")
+
+    # Then a review waiting at the chooser holds the lock: a scheduled update
+    # stops at it and changes nothing, and the review saves and installs its
+    # new choices.
+    review = start_update("a review waiting for answers", ["--review-models"], terminal=True, log=other_log)
+    wait_for("the chooser to ask for the top tier's model", lambda: "top tier model [" in read(review["out"]), review)
+    if not os.path.isdir(lock):
+        os.killpg(review["proc"].pid, signal.SIGKILL)
+        review["proc"].wait()
+        fail("codex/update.sh (a review waiting for answers): it should hold the update lock while it asks, so no "
+             "other update can install from choices it is about to replace")
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("a scheduled update during a review")
+    expect("a scheduled update during a review", rc == 1 and "another update is running" in err,
+           "it should stop at the lock", rc, out, err, calls)
+    expect_untouched("a scheduled update during a review", before, rc, out, err, calls)
+    rc, out, err, calls = finish_update(review, new_mid)
+    _text, tiers, main, _fp = saved_choices()
+    expect("a review waiting for answers", rc == 0 and tiers == dict(CHOSEN, mid=("stub-mid", "max"))
+           and main == MAIN_EFFORT and not os.path.exists(lock),
+           "it should save and install its new choices and release the lock", rc, out, err, calls)
+    expect_installed("a review waiting for answers", rc, out, err, calls)
+    with open(choices_path, "w", encoding="utf-8") as f:
+        f.write(first_text)
+    ran.append("a scheduled update cannot install while a review holds the lock")
 
     # What the fingerprint ignores and what it notices. An odd entry for a
     # model nobody chose does not block the status.
