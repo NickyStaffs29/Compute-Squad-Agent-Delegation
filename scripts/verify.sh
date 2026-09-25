@@ -3586,6 +3586,7 @@ print(
 # timeout. Last, codex/build-agents.py --validate-catalog runs on its own
 # against stub catalogs, one per remaining rule.
 import pty  # noqa: E402
+import signal  # noqa: E402
 import termios  # noqa: E402
 
 RETIRED = (
@@ -3722,31 +3723,32 @@ with tempfile.TemporaryDirectory() as tmp:
             os.remove(stub_log)
         run_env = dict(env, **(extra_env or {}))
         cmd = ["bash", "codex/update.sh", *args]
+        # The updater runs in its own session, so a timeout kills it and
+        # every process it started (a chooser waiting for input would
+        # otherwise keep the output pipes open and hang this check).
+        master = None
+        if answers is None:
+            stdin = subprocess.DEVNULL
+        else:
+            master, stdin = pty.openpty()
+            attrs = termios.tcgetattr(stdin)
+            attrs[3] &= ~termios.ECHO
+            termios.tcsetattr(stdin, termios.TCSANOW, attrs)
+        proc = subprocess.Popen(cmd, env=run_env, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, start_new_session=True)
         try:
-            if answers is None:
-                run = subprocess.run(cmd, env=run_env, stdin=subprocess.DEVNULL,
-                                     capture_output=True, text=True, timeout=120)
-                rc, out, err = run.returncode, run.stdout, run.stderr
-            else:
-                master, slave = pty.openpty()
-                attrs = termios.tcgetattr(slave)
-                attrs[3] &= ~termios.ECHO
-                termios.tcsetattr(slave, termios.TCSANOW, attrs)
-                proc = subprocess.Popen(cmd, env=run_env, stdin=slave, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE, text=True)
-                os.close(slave)
+            if master is not None:
+                os.close(stdin)
                 os.write(master, answers.encode("utf-8"))
-                try:
-                    out, err = proc.communicate(timeout=120)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.communicate()
-                    raise
-                finally:
-                    os.close(master)
-                rc = proc.returncode
+            out, err = proc.communicate(timeout=120)
         except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.communicate()
             fail(f"codex/update.sh ({label}) did not finish within 120 seconds")
+        finally:
+            if master is not None:
+                os.close(master)
+        rc = proc.returncode
         calls = read(stub_log).splitlines() if os.path.exists(stub_log) else []
         return rc, out, err, calls
 
