@@ -26,7 +26,7 @@ test. Risks: none.
 
 ## Executor
 Timestamp: 2026-09-01T12:12:20Z
-Agent: squad-executor-haiku (claude-haiku-5)
+Agent: squad-executor-mechanical (claude-sonnet-5)
 
 Added docs/release-notes/2.4.0.md with 6 functions (task 1). `npm test` -> exit
 0; 4 passed (task 2).

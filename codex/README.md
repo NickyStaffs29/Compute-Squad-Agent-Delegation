@@ -4,10 +4,9 @@ The repository ships a native Codex plugin plus five prompt files for older Code
 
 ## Native Codex install
 
-Requires Codex CLI 0.134 or newer, a working `git`, `/bin/bash`, and access to `gpt-5.6-sol`,
-`gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — the agent TOMLs in
-[`codex/agents/`](agents/) pin all three with no fallback tier. A stage whose
-model your account cannot use stops the run and reports the setup gap.
+Requires Codex CLI 0.144 or newer, a working `git`, `/bin/bash`, and access on your Codex account
+to the three models in the generated routing table under How to run it, one per rung with no
+fallback. A stage whose model your account cannot use stops the run and reports the setup gap.
 
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -22,7 +21,7 @@ git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME
 bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, removes any retired agent TOMLs the repo no longer ships, and writes the four current Codex V2 profile files. The native plugin manifest supplies the skill and command; this updater supplies the separate agent TOMLs and profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME` to absolute paths; use an absolute path to the updater script as well.
+The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, removes any retired agent TOMLs the repo no longer ships, and writes the four current Codex V2 profile files. Before it installs anything, it checks every pinned model and reasoning effort against `codex debug models`, and it stops with the installed setup unchanged if a model is missing, retired, or lacks that effort. The native plugin manifest supplies the skill and command; this updater supplies the separate agent TOMLs and profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME` to absolute paths; use an absolute path to the updater script as well.
 
 `codex/profiles.toml` is the repository reference for those V2 profile files, not a file to copy verbatim into `$CODEX_HOME/config.toml`. Current Codex loads a selected profile from `$CODEX_HOME/<profile>.config.toml`; the updater extracts each `[profiles.<name>]` table into that format. The `compute-squad` profile is the one selected by the quick-start command and controls the top-level session. Native named agents use the `model` and `model_reasoning_effort` fields in their own TOMLs; the other three profiles are for manual or fallback launches. Each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
 
@@ -36,7 +35,7 @@ codex --profile compute-squad "Run the squad: <goal>"
 codex exec --profile compute-squad "Run the squad: <goal>"
 ```
 
-The first form opens an interactive session; `codex exec` is the non-interactive form. The routing is Sol (`gpt-5.6-sol`) for strategy, PM, and COMPLEX execution; Terra (`gpt-5.6-terra`) for Recon and standard execution; and Luna (`gpt-5.6-luna`) for MECHANICAL and intern work. Worker profiles use `max` reasoning.
+The first form opens an interactive session; `codex exec` is the non-interactive form. The top rung runs strategy, the PM, and COMPLEX execution; the mid rung runs Recon and standard execution; the bottom rung runs MECHANICAL and intern work. The generated table under How to run it names each rung's model and effort.
 
 ## Updating an installed setup
 
@@ -47,18 +46,18 @@ CODEX_BIN="$(command -v codex)" GIT_BIN="$(command -v git)" \
   bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The updater refreshes the local clone with `git pull --ff-only` first, then runs `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, then copies the agent definitions and profile values. There is no separate `codex plugin update` command. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute paths to the updater, `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME`; schedulers do not reliably inherit an interactive shell's `PATH`. If `CODEX_BIN` is a runtime shim, include its interpreter's directory in that `PATH`. On macOS, put these values in the LaunchAgent's `EnvironmentVariables` dictionary, use a per-user LaunchAgent, and do not place shell assignments or `$HOME` in launchd's `ProgramArguments`. Use the scheduler's native stdout/stderr log settings. The updater does not create a schedule itself.
+The updater refreshes the local clone with `git pull --ff-only` first, then checks every pinned model against `codex debug models` and stops with `$CODEX_HOME` unchanged if the check fails, then runs `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, then copies the agent definitions and profile values. There is no separate `codex plugin update` command. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute paths to the updater, `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME`; schedulers do not reliably inherit an interactive shell's `PATH`. If `CODEX_BIN` is a runtime shim, include its interpreter's directory in that `PATH`. The model check runs `python3` from that `PATH`; without it, the updater checks model names only and warns that reasoning efforts were not validated. On macOS, put these values in the LaunchAgent's `EnvironmentVariables` dictionary, use a per-user LaunchAgent, and do not place shell assignments or `$HOME` in launchd's `ProgramArguments`. Use the scheduler's native stdout/stderr log settings. The updater does not create a schedule itself.
 
-## Luna subagent fallback
+## Bottom-rung subagent fallback
 
-`gpt-5.6-luna` is documented as a valid Codex subagent model, and `squad-mech`
-and `squad-executor-haiku` are routed to it by default (see Model routing in
-`codex/SKILL.md`). Some Multi-Agent V2 setups have been reported to reject
-Luna as a delegation target; this repo has not verified that against official
-Codex docs, so the shipped TOMLs and profiles keep `gpt-5.6-luna` as the
-default, and `scripts/verify.sh` holds them to `models.conf`.
+`squad-mech` and `squad-executor-mechanical` run on the bottom-rung Codex model
+by default (see the generated table under How to run it). Some Multi-Agent V2
+setups have been reported to reject that model family as a delegation target;
+this repo has not verified that against official Codex docs, so the shipped
+TOMLs and profiles keep the bottom rung as the default, and `scripts/verify.sh`
+holds them to `models.conf`.
 
-If a `squad-mech` or `squad-executor-haiku` spawn fails specifically because
+If a `squad-mech` or `squad-executor-mechanical` spawn fails specifically because
 the target model is rejected as a subagent, apply one of these manually for
 that run only — do not hand-edit the shipped TOMLs or profiles to work around
 an unverified, possibly session-specific restriction:
@@ -66,8 +65,8 @@ an unverified, possibly session-specific restriction:
 - Launch that one session with `multi_agent_version = "v1"` in its profile, or
   use your Codex client's "delegate new thread" phrasing if it documents one.
 - Or run the affected stage through the manual fallback below
-  (`01-archive.md` or `04-execute.md`) at `gpt-5.6-terra` instead of
-  `gpt-5.6-luna` for that stage only.
+  (`01-archive.md` or `04-execute.md`) on the mid-rung model instead of the
+  bottom-rung one, for that stage only.
 
 ## Manual fallback
 
@@ -93,8 +92,8 @@ Then run the sessions in order:
 <!-- routing:end -->
 
 The fallback has one execute prompt file, not three; you pick the model per run. The native plugin's
-generated TOMLs preserve the three routing variants (`squad-executor-haiku`, `squad-executor`, and
-`squad-executor-opus`) with fixed Codex model IDs.
+generated TOMLs preserve the three routing variants (`squad-executor-mechanical`, `squad-executor`, and
+`squad-executor-complex`) with fixed Codex model IDs.
 
 After session 1 (`01-archive.md`) reports an archive path or an already-empty log (not
 `ARCHIVE FAILED`), append the `## Goal — Locked` entry yourself as its first entry, before pasting
@@ -113,9 +112,10 @@ Assumptions: <only for unattended runs; otherwise "none">
 Sessions 2 through 5 read the goal and acceptance criteria from that entry — nothing to fill in on
 their end.
 
-**On FAIL:** re-run the named stage's session (and every stage after it) with the log intact; the
-same stage failing twice escalates to a stronger model for the third attempt. Three total FAILs stop
-the run and hand the full log history back to you — a separate rule from Stage 0's, which is that
+**On FAIL:** re-run the named stage's session (and every stage after it) with the log intact. Each FAIL
+or `rerun:` blocker counts against the stage it names, and that stage's next session runs one model
+rung up (bottom to mid, mid to top); a stage already on the top rung re-runs there. Three total FAILs
+stop the run and hand the full log history back to you, a separate rule from Stage 0's, which is that
 any change to the locked goal itself returns there.
 
 **On PASS:** the accept session archives the log, verifies the copy, then clears the active log —

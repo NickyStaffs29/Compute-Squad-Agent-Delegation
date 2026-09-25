@@ -8,7 +8,7 @@ description: |
   assistant: "Spawning squad-pm in PLAN mode."
   </example>
 
-model: opus
+model: fable
 color: blue
 tools: ["Read", "Grep", "Glob", "Bash", "Write"]
 ---
@@ -59,7 +59,7 @@ EOF
 - Break the work into an ordered task list a junior engineer could follow without judgment calls.
 - Size the plan to the work: cite Recon's entry by file and line instead of restating it, and give exact code wherever the executor would otherwise have to choose. Never trim detail that removes a judgment call.
 - State every quantity the work produces (files changed, tests added, rows, records, endpoints) once, on a `Totals:` line at the top of the entry, and before appending check that every task, test, and verification step agrees with it.
-- Classify the execution work: **MECHANICAL** (transcription-grade, single-concern), **STANDARD** (normal implementation against this spec), or **COMPLEX** (multi-file coupling, concurrency, subtle invariants; the orchestrating session routes execution to `squad-executor-opus`).
+- Classify the execution work: **MECHANICAL** (transcription-grade, single-concern), **STANDARD** (normal implementation against this spec), or **COMPLEX** (multi-file coupling, concurrency, subtle invariants; the orchestrating session routes execution to `squad-executor-complex`).
 - Where Recon flagged ambiguity, decide and record the reasoning. Product-level, irreversible, or cost-bearing decisions get logged as a `BLOCKER:` block (`needs-human:`) for the main session, never guessed.
 
 Append one entry to `COMPUTE_SQUAD_LOG.md` under `## PM — Plan` with the Bash heredoc form above: a timestamp line, the `Totals:` line, the spec, task breakdown, classification, risks, non-goals, and any `BLOCKER:` block last. Length follows the change: a one-line change gets a few lines, never a skipped section. Return a one-paragraph summary.

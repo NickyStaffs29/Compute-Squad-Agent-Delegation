@@ -7,18 +7,18 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-accept").
 metadata:
-  version: "3.12.0"
+  version: "4.0.0"
   author: "Nick Stafford"
 ---
 
 # Compute Squad Protocol (v3)
 
-Run the goal through the pipeline with the v3 role hierarchy. Each role runs on a rung of the host's model ladder (top, mid, bottom); the routing block below is the only place this skill names models.
+Run the goal through the pipeline with the v3 role hierarchy. Each role runs on a rung of the host's model ladder (top, mid, bottom); the generated routing block below is the only place this skill names models.
 
 - **Main session (top rung recommended): strategy.** Interrogates the goal, identifies gaps, clarifies them with the user, locks acceptance criteria, renders final judgment. Runs directly in the main session because only the main session can ask the user questions.
 - **PM, top rung.** Plans the work and accepts the deliverable (`squad-pm`, PLAN and ACCEPT modes).
 - **Recon, mid rung.** Maps the codebase (`squad-recon`).
-- **Execution, one rung per classification.** The same executor protocol under three names: `squad-executor-haiku` (bottom), `squad-executor` (mid), `squad-executor-opus` (top).
+- **Execution, one rung per classification.** The same executor protocol under three names: `squad-executor-mechanical` (bottom), `squad-executor` (mid), `squad-executor-complex` (top).
 - **Delegated work.** Tightly-specced execution subtasks (`squad-helper`) and zero-judgment busywork (`squad-mech`, the intern, bottom rung).
 
 Coordinate exclusively through `COMPUTE_SQUAD_LOG.md` in the repo root.
@@ -27,10 +27,10 @@ Coordinate exclusively through `COMPUTE_SQUAD_LOG.md` in the repo root.
 
 <!-- routing:begin -->
 Generated from `models.conf` (reviewed 2026-09-24); edit that file, never this block.
-Rungs (Claude alias, Codex ID): top `opus`, `gpt-5.6-sol`; mid `sonnet`, `gpt-5.6-terra`; bottom `haiku`, `gpt-5.6-luna`.
-- Top: main session, `squad-pm`, `squad-executor-opus`, audit skeptic.
-- Mid: `squad-recon`, `squad-executor`, `squad-helper`, audit finders.
-- Bottom: `squad-executor-haiku`, `squad-mech`.
+Rungs (Claude alias, Codex ID): top `fable`, `gpt-5.6-sol`; mid `opus`, `gpt-5.6-terra`; bottom `sonnet`, `gpt-5.6-luna`.
+- Top: main session, `squad-pm`, `squad-executor-complex`, audit skeptic.
+- Mid: `squad-recon`, `squad-executor`, audit finders; in Codex also `squad-helper`.
+- Bottom: `squad-executor-mechanical`, `squad-mech`; in Claude Code also `squad-helper`.
 Codex effort: `high` for the main session, `max` for every other role. Agent files already pin their models. To spawn on a rung (escalation, finders, skeptic), pass the rung's alias as the Agent tool's `model` in Claude Code; in Codex a named agent keeps its pinned model, so pass the rung's ID and effort only for finders and the skeptic.
 <!-- routing:end -->
 
@@ -74,15 +74,15 @@ If the PM logs a named blocker requiring a human decision, return to Stage 0: su
 
 Route by the PM's classification:
 
-- **MECHANICAL** → spawn `squad-executor-haiku` (bottom rung).
+- **MECHANICAL** → spawn `squad-executor-mechanical` (bottom rung).
 - **STANDARD** → spawn `squad-executor` (mid rung).
-- **COMPLEX** → spawn `squad-executor-opus` (top rung), the same protocol on the strongest rung.
+- **COMPLEX** → spawn `squad-executor-complex` (top rung), the same protocol on the strongest rung.
 
 When unsure, route up: a wrong answer that forces a re-run costs more than running the stage one rung higher.
 
 ## Stage 5 — Accept (squad-pm in ACCEPT mode)
 
-Spawn `squad-pm` with mode ACCEPT. It runs on the top rung, so it is never below the execution it reviews and is a rung above it by default; if execution ran on `squad-executor-opus`, acceptance shares the top rung. Its spawn prompt names the mode and the repo root and nothing else: no reading list, no checklist, and no summary of the plan or of the Executor's account.
+Spawn `squad-pm` with mode ACCEPT. It runs on the top rung, so it is never below the execution it reviews and is a rung above it by default. When execution ran on the top rung (COMPLEX work, or after escalation), acceptance shares that rung, and four controls stand in for the missing one: ACCEPT is a fresh spawn that never saw the Executor's working context, it derives its expectations from the locked criteria before it reads the Executor's entry, every criterion it marks met is reproduced rather than inspected, and a high-stakes change still gets the main-session review before archive. Its spawn prompt names the mode and the repo root and nothing else: no reading list, no checklist, and no summary of the plan or of the Executor's account.
 
 - **PASS:** the PM appends its PASS entry, archives the full log to `compute-squad-archive/` with the archive command (Hard rules), which verifies the copy with `cmp`, then clears the active log only if the change is not high-stakes. If it flagged the change high-stakes (auth, payments, migrations, privacy, production config), the PM leaves the active log intact: do the final review directly in the main session, then close the run by running the archive command yourself, which archives the log as it then stands and clears it only after `cmp` succeeds, before declaring the run complete. This closing archive is the main session's own step, not a stage's work, so the Hard rule against doing a stage's work yourself does not cover it. Report outcome and evidence to the user either way.
 - **FAIL:** the PM names exactly one stage to re-run (Recon, Plan, or Executor). Re-run that stage and all stages after it with the log intact.
@@ -102,7 +102,10 @@ Typical uses: Recon delegates bulk file inventories or dependency listings to th
 ## Escalation rules
 
 - Escalate a stage only on the PM's COMPLEX classification or under the FAIL rules below, never on vibes.
-- Same stage fails twice → escalate that stage one rung on the third attempt (mid → top → flag the user for a top-tier main-session pass) instead of retrying on the same rung. For execution, the escalation ladder is `squad-executor-haiku` → `squad-executor` → `squad-executor-opus` (bottom → mid → top); two FAILs at a tier moves execution up one tier.
+- A FAIL is charged to the stage its `## PM — FAIL` entry or `- rerun:` line names, not to the stage that wrote it, and counts once toward the three-FAIL stop.
+- The named stage's next attempt runs one rung above its previous attempt: bottom to mid, mid to top. A stage already on the top rung re-runs there. Stages that re-run only because they follow the named stage keep their rung.
+- Execution runs on the higher of the latest plan's classification rung and the rung escalation has reached: `squad-executor-mechanical` (bottom), `squad-executor` (mid), `squad-executor-complex` (top). Within the three-FAIL stop, execution reaches the top rung from any classification.
+- Recon escalates by model, not by agent. In Claude Code, spawn `squad-recon` with the Agent tool's `model` parameter set to the next rung's alias from the routing block. In Codex an agent's pinned model takes precedence over a spawn argument, so Recon re-runs on its own rung. Plan runs on the top rung and re-runs there.
 - Three total FAILs on one run → stop, summarize the log history, and hand back to the user.
 - Anything that would change the locked goal or acceptance criteria → back to Stage 0 with the user. Always.
 

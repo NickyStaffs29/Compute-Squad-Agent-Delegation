@@ -22,7 +22,7 @@ Or from inside a Claude Code session:
 
 That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
-**Codex.** Prerequisites: Codex CLI 0.134 or newer, a working `git`, `/bin/bash`, a logged-in Codex CLI, and access to `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` on your Codex account — the pipeline hard-codes all three with no fallback tier. Those IDs resolve on the author's account as of August 2026; they are not stable public API guarantees, so verify them against your own account before relying on the Codex path. The first two commands install the native plugin; a checkout is also required because the updater copies the seven named agent TOMLs and generates the four Codex V2 profile files:
+**Codex.** Prerequisites: Codex CLI 0.144 or newer, a working `git`, `/bin/bash`, a logged-in Codex CLI, and access on your Codex account to the three Codex models in the routing table below, one per rung with no fallback. `codex debug models` lists what your CLI resolves, and `codex/update.sh` refuses to install a model that list lacks. The first two commands install the native plugin; a checkout is also required because the updater copies the seven named agent TOMLs and generates the four Codex V2 profile files:
 
 ```bash
 codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -78,7 +78,7 @@ scheduled task. For local-project runs, keep the computer on and the Codex
 desktop app available.
 ```
 
-The updater runs `git pull --ff-only`, `codex plugin marketplace upgrade compute-squad`, and `codex plugin add compute-squad@compute-squad`, then refreshes the agents and Codex V2 profile files. There is no `codex plugin update` command; the top-level `codex update` updates the CLI itself, not this plugin. Start a new Codex session after a plugin update.
+The updater runs `git pull --ff-only`, then checks every pinned model against `codex debug models` and stops with nothing installed if the check fails, then runs `codex plugin marketplace upgrade compute-squad` and `codex plugin add compute-squad@compute-squad` and refreshes the agents and Codex V2 profile files. There is no `codex plugin update` command; the top-level `codex update` updates the CLI itself, not this plugin. Start a new Codex session after a plugin update.
 
 Prefer manual updates? In Claude Code, run these whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):
 
@@ -126,7 +126,7 @@ Everything below is background on how the pipeline works. You don't need any of 
 
 Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
 
-What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. Prices are not a routing input; one measured run's cost is a dated snapshot in the FAQ.
+What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. The ladder is placed where a wrong call is expensive, not where tokens are cheap: the top rung plans and accepts, every stage that exercises judgment runs on the mid rung or above, and the bottom rung takes only transcription-grade and zero-judgment work. What it buys is capacity and review that is independent of the work, not a smaller bill. Prices are not a routing input; one measured run's cost is a dated snapshot in the FAQ.
 
 One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
@@ -136,13 +136,13 @@ Snapshot of `models.conf`, reviewed 2026-09-24. Routing reads `models.conf`; thi
 | Role | Agent | Claude Code | Codex | Owns |
 |---|---|---|---|---|
 | Strategy | main session | your session model; top recommended | `gpt-5.6-sol` high | Goal, gaps, acceptance criteria, final judgment |
-| PM | `squad-pm` | `opus` (top) | `gpt-5.6-sol` max | The plan and the acceptance decision |
-| Recon | `squad-recon` | `sonnet` (mid) | `gpt-5.6-terra` max | Mapping the codebase |
-| Execution | `squad-executor` | `sonnet` (mid) | `gpt-5.6-terra` max | Implementing the plan |
-| Execution on MECHANICAL | `squad-executor-haiku` | `haiku` (bottom) | `gpt-5.6-luna` max | The same executor protocol, bottom rung |
-| Execution on COMPLEX | `squad-executor-opus` | `opus` (top) | `gpt-5.6-sol` max | The same executor protocol, top rung |
-| Delegated execution | `squad-helper` | `sonnet` (mid) | `gpt-5.6-terra` max | Tightly-specced subtasks |
-| Intern | `squad-mech` | `haiku` (bottom) | `gpt-5.6-luna` max | Busywork. Nothing that requires judgment |
+| PM | `squad-pm` | `fable` (top) | `gpt-5.6-sol` max | The plan and the acceptance decision |
+| Recon | `squad-recon` | `opus` (mid) | `gpt-5.6-terra` max | Mapping the codebase |
+| Execution | `squad-executor` | `opus` (mid) | `gpt-5.6-terra` max | Implementing the plan |
+| Execution on MECHANICAL | `squad-executor-mechanical` | `sonnet` (bottom) | `gpt-5.6-luna` max | The same executor protocol, bottom rung |
+| Execution on COMPLEX | `squad-executor-complex` | `fable` (top) | `gpt-5.6-sol` max | The same executor protocol, top rung |
+| Delegated execution | `squad-helper` | `sonnet` (bottom) | `gpt-5.6-terra` max | Tightly-specced subtasks |
+| Intern | `squad-mech` | `sonnet` (bottom) | `gpt-5.6-luna` max | Busywork. Nothing that requires judgment |
 <!-- routing:end -->
 
 ## How a run works
@@ -185,23 +185,23 @@ A first run in a project with no log file is normal. Stage 1 creates it empty an
 
 ## The agents
 
-### squad-recon (Sonnet, read-only)
+### squad-recon (mid rung, read-only)
 
 The mapper. Given a locked goal, it sweeps the codebase and pins down exactly what the change touches: files, functions, line ranges, call sites, tests, migrations, config, and the invariants that must survive (auth boundaries, privacy rules, logging hygiene). It reads whole subsystems rather than fragments. It writes nothing except its log entry.
 
 Its standard: the PM should never have to guess. Ambiguity Recon cannot resolve gets named explicitly in its entry, so the plan resolves it on purpose instead of by accident. A goal that cannot be met as written stops as a `needs-human:` blocker.
 
-### squad-pm (Opus, two modes)
+### squad-pm (top rung, two modes)
 
 The project manager. Plans work, accepts deliverables, never writes product code. One agent, two invocations per run.
 
-**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-haiku`, COMPLEX routes it to `squad-executor-opus`, and STANDARD stays on `squad-executor`.
+**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-mechanical`, COMPLEX routes it to `squad-executor-complex`, and STANDARD stays on `squad-executor`.
 
 **ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, and reads the Executor's account only after its own checks and refutations. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
 
 Decisions the PM is not allowed to make: anything product-level, irreversible, or cost-bearing, and anything that would change the locked goal. Those get logged as named blockers and go back to the human. Guessing past a blocker is a protocol violation, not initiative.
 
-### squad-executor (Sonnet), squad-executor-haiku (Haiku), and squad-executor-opus (Opus)
+### squad-executor, squad-executor-mechanical, and squad-executor-complex
 
 The builder. Reads the full log, then works the PM's task list in order. Exactly what the plan says. No more, no less.
 
@@ -209,13 +209,13 @@ If the plan is wrong or impossible, it stops and logs a blocker naming Plan as t
 
 It runs the project's own test and verify commands as it goes and will not log completion with failing tests.
 
-`squad-executor-haiku` and `squad-executor-opus` are the same agent definition on Haiku and Opus respectively. `squad-executor-haiku` runs when the PM classifies the work MECHANICAL — transcription-grade by the PM's own classification, so it carries one extra discipline line: any task that turns out to need more than transcribing an explicitly specified change is a blocker naming Plan, not something to push through. `squad-executor-opus` runs when the PM classifies the work COMPLEX, or when execution escalates after two FAILs. Three definitions instead of one flag, because an agent's model is fixed in its frontmatter.
+`squad-executor-mechanical` and `squad-executor-complex` are the same agent definition on the bottom and top rungs. `squad-executor-mechanical` runs when the PM classifies the work MECHANICAL, transcription-grade by the PM's own classification, so it carries one extra discipline line: any task that turns out to need more than transcribing an explicitly specified change is a blocker naming Plan, not something to push through. `squad-executor-complex` runs when the PM classifies the work COMPLEX, or when an Executor FAIL moves execution to the top rung. Three names instead of one flag, because Codex applies an agent's pinned model over a per-spawn model; in Claude Code the Agent tool's `model` parameter does override frontmatter, which is how Recon escalates.
 
-### squad-helper (Sonnet, the delegated worker)
+### squad-helper (the delegated worker)
 
 The execution-tier half of the DELEGATE protocol. When a stage delegates a subtask that is too specified to need judgment but too involved for the intern, `squad-helper` runs the exact procedure and returns the result in its final message. It never writes the log; the orchestrating session does. Handed anything that needs a design decision, it refuses with `REFUSED:` and the step, and the stage that asked for it does that step itself or ends its entry with a blocker.
 
-### squad-mech (Haiku, the intern)
+### squad-mech (bottom rung, the intern)
 
 Zero-judgment busywork, executed exactly. Log archival before every run (verified copy first, truncate second, never the reverse). File rotation. Formatting normalization. Inventories. Fixture generation from an exact template.
 
@@ -248,19 +248,19 @@ Compute-Squad-Agent-Delegation/
 ├── .agents/plugins/
 │   └── marketplace.json      # makes this repo discoverable in Codex
 ├── .github/workflows/
-│   └── ci.yml                # runs scripts/verify.sh on every push
+│   └── ci.yml                # runs scripts/verify.sh on every push; weekly Codex catalog check
 ├── skills/compute-squad/
 │   ├── SKILL.md              # the orchestration protocol
 │   └── references/
 │       └── audit-prompts.md  # finder and skeptic briefs for audit-grade runs
 ├── agents/
-│   ├── squad-recon.md        # Sonnet · read-only mapping
-│   ├── squad-pm.md           # Opus · PLAN + ACCEPT modes
-│   ├── squad-executor.md     # Sonnet · implementation
-│   ├── squad-executor-haiku.md # Haiku · implementation on MECHANICAL
-│   ├── squad-executor-opus.md # Opus · implementation on COMPLEX
-│   ├── squad-helper.md       # Sonnet · delegated execution-tier subtasks
-│   └── squad-mech.md         # Haiku · the intern
+│   ├── squad-recon.md        # mid rung · read-only mapping
+│   ├── squad-pm.md           # top rung · PLAN + ACCEPT modes
+│   ├── squad-executor.md     # mid rung · implementation
+│   ├── squad-executor-mechanical.md # bottom rung · implementation on MECHANICAL
+│   ├── squad-executor-complex.md # top rung · implementation on COMPLEX
+│   ├── squad-helper.md       # delegated execution-tier subtasks
+│   └── squad-mech.md         # bottom rung · the intern
 ├── commands/
 │   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
 ├── codex/
@@ -268,7 +268,7 @@ Compute-Squad-Agent-Delegation/
 │   ├── SKILL.md              # reading copy with Codex model names; no host loads it
 │   ├── agents/*.toml         # generated Codex agent definitions
 │   ├── build-agents.py       # writes model lines, TOMLs, profiles, routing blocks, and 01-05*.md
-│   ├── profiles.toml         # Sol/Terra/Luna profile reference
+│   ├── profiles.toml         # generated Codex V2 profile reference
 │   ├── update.sh             # installs/refreshes the native Codex plugin
 │   └── 01-05*.md             # manual-session fallback prompts (generated)
 ├── docs/example-log.md       # a complete worked run
@@ -292,10 +292,10 @@ Compute-Squad-Agent-Delegation/
 Subagents run headless. They cannot ask you anything, and clarifying gaps with the human is the entire point of Stage 0. So strategy lives in the skill and executes in your top-tier main session.
 
 **Do the models auto-upgrade?**
-Yes. Agents use tier aliases, which resolve to the newest model in each class at runtime. New generation ships, the squad picks it up, zero changes required. Agent frontmatter also accepts `inherit` and explicit model IDs. Pin an explicit ID only if a workflow regression-tests better on an older snapshot.
+Within a family, on Claude Code: each agent carries the alias `models.conf` assigns, and an alias resolves to its family's newest model. Everything else is one edit to `models.conf`, including every Codex change, because Codex agents pin exact model IDs. The procedure is under Changing models in CONTRIBUTING.md, and `codex/update.sh` refuses to install a Codex model your account's catalog does not list.
 
-**Why is Sonnet execution safe?**
-Three backstops. The plan is required to carry the intelligence. Acceptance is never below the work it reviews, and a tier above by default — on COMPLEX work, execution and acceptance both run on Opus. And the PM's COMPLEX classification escalates execution to Opus when a tight spec cannot fully de-risk the work.
+**Why is bottom-rung execution safe?**
+Only MECHANICAL, transcription-grade work runs there, and the plan carries the intelligence. Acceptance runs on the top rung, never below the work and a rung above it by default. When execution reaches the top rung (COMPLEX work, or escalation), execution and acceptance share it, and Stage 5 of the skill names the controls that replace the missing rung.
 
 **Why a shared log instead of passing context directly?**
 Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. The append-only file protocol is portable across the Claude and Codex plugin implementations.

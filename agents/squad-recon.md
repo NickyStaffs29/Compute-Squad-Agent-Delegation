@@ -7,7 +7,7 @@ description: |
   user: "Run the squad: add rate limiting to the quote endpoint"
   assistant: "Goal locked and prior log archived; spawning squad-recon."
   </example>
-model: sonnet
+model: opus
 color: cyan
 tools: ["Read", "Grep", "Glob", "Bash"]
 ---

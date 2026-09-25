@@ -1,6 +1,6 @@
 # Compute Squad: Codex reading copy
 
-Version: 3.12.0
+Version: 4.0.0
 No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
@@ -15,20 +15,18 @@ Generated from `models.conf` (reviewed 2026-09-24); edit that file, never this t
 |---|---|---|---|---|
 | Strategy and final judgment | main session | top | `gpt-5.6-sol` | `high` |
 | Plan and acceptance | `squad-pm` | top | `gpt-5.6-sol` | `max` |
-| COMPLEX execution | `squad-executor-opus` | top | `gpt-5.6-sol` | `max` |
+| COMPLEX execution | `squad-executor-complex` | top | `gpt-5.6-sol` | `max` |
 | Audit skeptic | none | top | `gpt-5.6-sol` | `max` |
 | Recon | `squad-recon` | mid | `gpt-5.6-terra` | `max` |
 | STANDARD execution | `squad-executor` | mid | `gpt-5.6-terra` | `max` |
 | Delegated execution | `squad-helper` | mid | `gpt-5.6-terra` | `max` |
 | Audit finders | none | mid | `gpt-5.6-terra` | `max` |
-| MECHANICAL execution | `squad-executor-haiku` | bottom | `gpt-5.6-luna` | `max` |
+| MECHANICAL execution | `squad-executor-mechanical` | bottom | `gpt-5.6-luna` | `max` |
 | Intern work | `squad-mech` | bottom | `gpt-5.6-luna` | `max` |
 <!-- routing:end -->
 
-The `opus`, `sonnet`, and `haiku` suffixes are retained in agent names for
-compatibility with the Claude package. Stage headings below use Sol, Terra, and
-Luna as shorthand for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`
-respectively.
+Stage headings below name each stage's rung; the table above names each rung's
+Codex model and effort.
 
 Before starting, ensure the seven files in `~/.codex/agents/` are installed as
 described in `codex/README.md`. If the named roles or their models are
@@ -63,7 +61,7 @@ If the active log already contains a locked entry for this same goal, offer a
 resume from the last logged stage. Archive only when the user chooses a fresh
 run.
 
-## Stage 1 — Archive (`squad-mech`, Luna MAX)
+## Stage 1 — Archive (`squad-mech`, bottom rung)
 
 Spawn `squad-mech` to archive a non-empty `COMPUTE_SQUAD_LOG.md` with the
 archive command in the shared skill's Hard rules: it names the copy under
@@ -78,14 +76,14 @@ stop.
 Never discard a prior or failed run. The only clear before a PASS is the
 verified archive procedure here.
 
-## Stage 2 — Recon (`squad-recon`, Terra MAX)
+## Stage 2 — Recon (`squad-recon`, mid rung)
 
 Spawn `squad-recon` with the locked goal and criteria. It is read-only except
 for its one append to the log. It maps exact files, functions, line ranges,
 call sites, tests, migrations, config, invariants, risks, and unresolved
 ambiguities for the PM.
 
-## Stage 3 — Plan (`squad-pm`, Sol MAX, PLAN mode)
+## Stage 3 — Plan (`squad-pm`, top rung, PLAN mode)
 
 Spawn `squad-pm` in PLAN mode after Recon logs. It reads the locked goal and
 Recon entry, produces the exact implementation spec and ordered task list, and
@@ -97,21 +95,27 @@ product code. Product-level, irreversible, or cost-bearing decisions become a
 
 Route exactly by the PM classification:
 
-- MECHANICAL -> spawn `squad-executor-haiku` (Luna MAX).
-- STANDARD -> spawn `squad-executor` (Terra MAX).
-- COMPLEX -> spawn `squad-executor-opus` (Sol MAX).
+- MECHANICAL -> spawn `squad-executor-mechanical` (bottom rung).
+- STANDARD -> spawn `squad-executor` (mid rung).
+- COMPLEX -> spawn `squad-executor-complex` (top rung).
 
 Each executor reads the complete log and implements exactly the PM plan. It
 does not improvise around an incomplete plan; it appends a `BLOCKER:` naming
 Plan when the plan is wrong or under-classified. The executor never accepts its
 own work.
 
-## Stage 5 — Accept (`squad-pm`, Sol MAX, ACCEPT mode)
+## Stage 5 — Accept (`squad-pm`, top rung, ACCEPT mode)
 
 Spawn `squad-pm` in ACCEPT mode after execution. It reads the goal alone first
 and the Executor's entries last, reruns the project's verification commands,
 checks every invariant and must-not-change item, and attempts a refutation for
-every acceptance criterion.
+every acceptance criterion. When execution ran on the top rung (COMPLEX work, or
+after escalation), acceptance shares that rung, and four controls stand in for
+the missing one: ACCEPT is a fresh spawn that never saw the Executor's working
+context, it derives its expectations from the locked criteria before it reads
+the Executor's entry, every criterion it marks met is reproduced rather than
+inspected, and a high-stakes change still gets the main-session review before
+archive.
 
 - **PASS:** append the PASS entry, archive the full log with the archive
   command, which verifies the copy with `cmp`, then clear the active log only
@@ -155,15 +159,30 @@ BLOCKER:
 - why: <one sentence, with evidence refs>
 ```
 
-- The same stage failing twice escalates one model tier on the third attempt.
-  Three total FAILs stop the run and return the full history to the user.
+- A FAIL is charged to the stage its `## PM — FAIL` entry or `- rerun:` line
+  names, not to the stage that wrote it, and counts once toward the three-FAIL
+  stop.
+- The named stage's next attempt runs one rung above its previous attempt:
+  bottom to mid, mid to top. A stage already on the top rung re-runs there.
+  Stages that re-run only because they follow the named stage keep their rung.
+- Execution runs on the higher of the latest plan's classification rung and the
+  rung escalation has reached: `squad-executor-mechanical` (bottom),
+  `squad-executor` (mid), `squad-executor-complex` (top). Within the three-FAIL
+  stop, execution reaches the top rung from any classification.
+- Recon escalates by model, not by agent. In Claude Code, spawn `squad-recon`
+  with the Agent tool's `model` parameter set to the next rung's alias from the
+  routing block. In Codex an agent's pinned model takes precedence over a spawn
+  argument, so Recon re-runs on its own rung. Plan runs on the top rung and
+  re-runs there.
+- Three total FAILs on one run → stop, summarize the log history, and hand back
+  to the user.
 - Anything that changes the locked goal or criteria returns to Stage 0.
 
 ## Audit-grade runs
 
 When the user asks for an audit or says `be thorough`, after execution fan out
-parallel Terra finders across runtime integrity, security/privacy, dead code,
-accessibility, and docs drift. Use a fresh Sol pass to refute each finding;
+parallel mid-rung finders across runtime integrity, security/privacy, dead code,
+accessibility, and docs drift. Use a fresh top-rung pass to refute each finding;
 only findings that survive refutation count as acceptance failures.
 
 ## Hard rules

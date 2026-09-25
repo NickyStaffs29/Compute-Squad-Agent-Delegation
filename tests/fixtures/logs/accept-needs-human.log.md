@@ -27,7 +27,7 @@ Classification: MECHANICAL. Tasks, in order: 1. in src/avatar/image.js, pass
 
 ## Executor
 Timestamp: 2026-09-01T11:14:50Z
-Agent: squad-executor-haiku (claude-haiku-5)
+Agent: squad-executor-mechanical (claude-sonnet-5)
 
 Implemented tasks 1 and 2 in src/avatar/image.js and test/avatar.test.js.
 `npm test` -> exit 0; 6 passed.

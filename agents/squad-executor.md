@@ -8,7 +8,7 @@ description: |
   assistant: "Spawning squad-executor."
   </example>
 
-model: sonnet
+model: opus
 color: magenta
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 ---

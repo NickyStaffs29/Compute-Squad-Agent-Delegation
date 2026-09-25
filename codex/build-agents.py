@@ -13,6 +13,14 @@ Claude agent markdown in agents/, this script writes:
 --check compares every one of them with what this script would write and
 exits 1 on any difference. --parse-manifest PATH parses a manifest, prints it
 as JSON, and exits 1 on the first line the grammar does not allow.
+
+--validate-catalog PATH [--strict] reads a Codex model catalog (the JSON that
+`codex debug models` prints) and checks every model and reasoning effort that
+codex/agents/*.toml and codex/profiles.toml pin against it. It exits 1 when a
+model is missing or retired or lacks the pinned effort, and warns when a model
+is superseded or retires within 30 days (a failure with --strict). A catalog
+it cannot read as that format is reported as not validated, never as a pass,
+and exits 0 (1 with --strict). codex/update.sh runs it before installing.
 """
 
 from __future__ import annotations
@@ -56,9 +64,9 @@ ROLE_LABELS = (
     ("squad-pm", None, "Plan and acceptance", None, "PM", "The plan and the acceptance decision"),
     ("squad-recon", None, "Recon", None, "Recon", "Mapping the codebase"),
     ("squad-executor", None, "STANDARD execution", None, "Execution", "Implementing the plan"),
-    ("squad-executor-haiku", None, "MECHANICAL execution", None,
+    ("squad-executor-mechanical", None, "MECHANICAL execution", None,
      "Execution on MECHANICAL", "The same executor protocol, {rung} rung"),
-    ("squad-executor-opus", None, "COMPLEX execution", None,
+    ("squad-executor-complex", None, "COMPLEX execution", None,
      "Execution on COMPLEX", "The same executor protocol, {rung} rung"),
     ("squad-helper", None, "Delegated execution", None, "Delegated execution", "Tightly-specced subtasks"),
     ("squad-mech", None, "Intern work", None, "Intern", "Busywork. Nothing that requires judgment"),
@@ -85,7 +93,7 @@ PROFILES = (
     ("compute-squad", "strategy"),
     ("compute-squad-pm", "squad-pm"),
     ("compute-squad-execution", "squad-executor"),
-    ("compute-squad-mechanical", "squad-executor-haiku"),
+    ("compute-squad-mechanical", "squad-executor-mechanical"),
 )
 
 # The manual Codex prompts, one per stage: (file, stage number, stage name,
@@ -114,13 +122,27 @@ MANUAL_STAGES = {
     "03-pm-plan.md": ("Spec + task breakdown, no code", (("", "squad-pm"),)),
     "04-execute.md": (
         "Implementation, exactly per plan",
-        (("STANDARD ", "squad-executor"), ("MECHANICAL ", "squad-executor-haiku"), ("COMPLEX ", "squad-executor-opus")),
+        (
+            ("STANDARD ", "squad-executor"),
+            ("MECHANICAL ", "squad-executor-mechanical"),
+            ("COMPLEX ", "squad-executor-complex"),
+        ),
     ),
     "05-pm-accept.md": ("Adversarial acceptance, PASS/FAIL", (("", "squad-pm"),)),
 }
 
 ROUTING_BEGIN = "<!-- routing:begin -->"
 ROUTING_END = "<!-- routing:end -->"
+
+# --validate-catalog: the pinned (model, effort) pairs come from the files
+# codex/update.sh installs. A key = "value" line before an agent TOML's
+# developer_instructions, or inside a [profiles.<name>] table.
+PINNED_KEY = re.compile(r'^(model|model_reasoning_effort)\s*=\s*"([^"\\]*)"\s*$')
+RETIREMENT_WARNING_DAYS = 30
+SUPERSEDED = (
+    "{model} is superseded by {target}; see Changing models in CONTRIBUTING.md. "
+    "Do not apply the upgrade target as is: it can put two rungs on one model."
+)
 
 
 class BuildError(ValueError):
@@ -537,10 +559,176 @@ def check(generated: dict[str, tuple[str, str]]) -> bool:
     return False
 
 
-USAGE = "usage: build-agents.py [--check | --parse-manifest PATH]"
+class CatalogFormatError(ValueError):
+    """The catalog is not the JSON --validate-catalog knows how to read."""
+
+
+def pinned_pairs() -> dict:
+    """Return {(model, effort): [where]} for every model and reasoning effort
+    pinned by codex/agents/*.toml and the tables of codex/profiles.toml."""
+    sources = sorted(OUTPUT.glob("*.toml"))
+    if not sources:
+        raise BuildError("codex/agents/ holds no *.toml; run python3 codex/build-agents.py")
+    sources.append(ROOT / "codex" / "profiles.toml")
+    pairs: dict = {}
+    for path in sources:
+        relpath = path.relative_to(ROOT).as_posix()
+        tables: dict = {}
+        table = ""
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("developer_instructions"):
+                break
+            if line.startswith("["):
+                table = line
+                continue
+            match = PINNED_KEY.match(line)
+            if match:
+                tables.setdefault(table, {})[match.group(1)] = match.group(2)
+        if not tables:
+            raise BuildError(f"{relpath}: pins no model")
+        for table, keys in tables.items():
+            where = f"{relpath} {table}" if table else relpath
+            if set(keys) != {"model", "model_reasoning_effort"}:
+                raise BuildError(f"{where}: needs both a model and a model_reasoning_effort line")
+            pairs.setdefault((keys["model"], keys["model_reasoning_effort"]), []).append(where)
+    return pairs
+
+
+def parse_catalog_time(value: object) -> datetime.datetime:
+    """Parse a catalog timestamp such as 2026-08-31T19:00:00Z as UTC."""
+    if not isinstance(value, str):
+        raise CatalogFormatError(f"retirement_at {value!r} is not a timestamp")
+    text = value.strip()
+    if text[-1:] in ("Z", "z"):
+        text = text[:-1] + "+00:00"
+    # Python 3.9's fromisoformat takes exactly 3 or 6 fractional digits.
+    text = re.sub(r"\.([0-9]+)", lambda m: "." + (m.group(1) + "000000")[:6], text, count=1)
+    try:
+        moment = datetime.datetime.fromisoformat(text)
+    except ValueError:
+        raise CatalogFormatError(f"retirement_at {value!r} is not an ISO 8601 timestamp") from None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=datetime.timezone.utc)
+    return moment
+
+
+def load_catalog(text: str, pinned: list) -> dict:
+    """Return {slug: entry} from the JSON `codex debug models` prints. Every
+    key the validation reads must be there; a missing one is a format error,
+    never a default."""
+    try:
+        data = json.loads(text)
+    except ValueError as error:
+        raise CatalogFormatError(f"not JSON: {error}") from None
+    models = data.get("models") if isinstance(data, dict) else None
+    if not isinstance(models, list) or not models:
+        raise CatalogFormatError("no 'models' list")
+    catalog = {}
+    for index, entry in enumerate(models):
+        if not isinstance(entry, dict) or not isinstance(entry.get("slug"), str) or "visibility" not in entry:
+            raise CatalogFormatError(f"models[{index}] has no 'slug' or no 'visibility'")
+        catalog[entry["slug"]] = entry
+    for model in pinned:
+        entry = catalog.get(model)
+        if entry is None:
+            continue
+        levels = entry.get("supported_reasoning_levels")
+        if not isinstance(levels, list) or not all(
+            isinstance(level, dict) and isinstance(level.get("effort"), str) for level in levels
+        ):
+            raise CatalogFormatError(f"{model} has no 'supported_reasoning_levels' list with an 'effort' in each")
+        if "upgrade" not in entry:
+            raise CatalogFormatError(f"{model} has no 'upgrade' key")
+        upgrade = entry["upgrade"]
+        if upgrade is None:
+            continue
+        # Codex 0.156.1 always writes upgrade.model and writes retirement_at
+        # only when a retirement is scheduled.
+        if not isinstance(upgrade, dict) or "model" not in upgrade:
+            raise CatalogFormatError(f"{model}'s 'upgrade' is not an object with a 'model'")
+        if upgrade["model"] is not None and not isinstance(upgrade["model"], str):
+            raise CatalogFormatError(f"{model}'s upgrade model {upgrade['model']!r} is not a model ID")
+        if upgrade.get("retirement_at") is not None:
+            parse_catalog_time(upgrade["retirement_at"])
+    return catalog
+
+
+def validate_catalog(path: str, strict: bool) -> int:
+    """Check every pinned model and effort against a Codex model catalog."""
+    prefix = "--validate-catalog:"
+    pairs = pinned_pairs()
+    pinned = sorted({model for model, _effort in pairs})
+    try:
+        text = pathlib.Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        print(f"{prefix} FAIL: cannot read the catalog {path}: {error}", file=sys.stderr)
+        return 1
+    try:
+        catalog = load_catalog(text, pinned)
+    except CatalogFormatError as error:
+        level = "FAIL" if strict else "WARN"
+        print(f"{prefix} {level}: catalog format not recognized; models were not validated ({error})", file=sys.stderr)
+        return 1 if strict else 0
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    failures, warnings = [], []
+    for model in pinned:
+        where = sorted({w for (m, _effort), ws in pairs.items() if m == model for w in ws})
+        pinned_in = f"pinned in {', '.join(where)}"
+        entry = catalog.get(model)
+        if entry is None:
+            failures.append(f"{model} is not in the model catalog; {pinned_in}")
+            continue
+        supported = [level["effort"] for level in entry["supported_reasoning_levels"]]
+        for (m, effort), effort_where in sorted(pairs.items()):
+            if m == model and effort not in supported:
+                failures.append(
+                    f"{model} does not support reasoning effort {effort!r} (it supports "
+                    f"{', '.join(supported) or 'none'}); pinned in {', '.join(effort_where)}"
+                )
+        upgrade = entry["upgrade"]
+        if upgrade is None:
+            continue
+        if upgrade.get("retirement_at") is not None:
+            retires = parse_catalog_time(upgrade["retirement_at"])
+            if retires <= now:
+                failures.append(f"{model} was retired at {upgrade['retirement_at']}; {pinned_in}")
+            elif retires - now <= datetime.timedelta(days=RETIREMENT_WARNING_DAYS):
+                soon = f"{model} retires at {upgrade['retirement_at']}, within {RETIREMENT_WARNING_DAYS} days; {pinned_in}"
+                (failures if strict else warnings).append(soon)
+        if upgrade["model"]:
+            warnings.append(SUPERSEDED.format(model=model, target=upgrade["model"]))
+
+    for message in warnings:
+        print(f"{prefix} WARN: {message}", file=sys.stderr)
+    for message in failures:
+        print(f"{prefix} FAIL: {message}", file=sys.stderr)
+    if failures:
+        listed = sorted(slug for slug, entry in catalog.items() if entry["visibility"] == "list")
+        print(f"{prefix} the catalog lists: {', '.join(listed) or 'no models'}", file=sys.stderr)
+        return 1
+    pins = sum(len(ws) for ws in pairs.values())
+    print(
+        f"{prefix} {pins} pins name {len(pinned)} models; each is in the catalog, is not retired, and supports "
+        f"its pinned reasoning effort ({len(warnings)} warnings)"
+    )
+    return 0
+
+
+USAGE = "usage: build-agents.py [--check | --parse-manifest PATH | --validate-catalog PATH [--strict]]"
 
 
 def main(args: list) -> int:
+    if args[:1] == ["--validate-catalog"]:
+        if len(args) not in (2, 3) or args[2:] not in ([], ["--strict"]):
+            print(USAGE, file=sys.stderr)
+            return 2
+        try:
+            return validate_catalog(args[1], strict=args[2:] == ["--strict"])
+        except BuildError as error:
+            print(f"FAIL: {error}", file=sys.stderr)
+            return 1
     if args[:1] == ["--parse-manifest"]:
         if len(args) != 2:
             print(USAGE, file=sys.stderr)

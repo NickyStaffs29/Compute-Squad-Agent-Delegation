@@ -35,7 +35,7 @@ model.
 
 - `bash scripts/verify.sh` passes locally.
 - Agent and skill frontmatter parses as valid YAML, with `model` written by `codex/build-agents.py`
-  from `models.conf` and set to `sonnet`, `opus`, or `haiku`, and one short `<example>` block in each
+  from `models.conf` and set to `sonnet`, `opus`, or `fable`, and one short `<example>` block in each
   agent description of at most 500 bytes.
 - `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` parse as valid JSON.
 - `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` parse as valid JSON.
@@ -46,3 +46,16 @@ model.
   `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `skills/compute-squad/SKILL.md`
   (`metadata.version`), `codex/SKILL.md` (its `Version:` line), and the new `CHANGELOG.md` heading — then
   rebuild `dist/compute-squad.plugin` with `scripts/build-plugin.sh` and regenerate `codex/agents/*.toml` and `codex/01-archive.md` to `codex/05-pm-accept.md` with `python3 codex/build-agents.py`, which writes the version into each.
+
+## Changing models
+
+Routing names models in one file, `models.conf`. Protocol text names rungs (top, mid, bottom) and never a model; `scripts/verify.sh` check 7l enforces that.
+
+1. On an account that will run the squad, list what resolves. Codex: `codex debug models`, reading each model's slug, visibility, upgrade and retirement fields. Claude Code: `claude -p --model <alias> --output-format json "Reply ok"`, reading the model ID under `modelUsage`.
+2. Assign rungs by capability, not by name. A family name can change rungs between generations: Sol was the top Codex rung in generation 5.6 and is the mid rung in generation 6. Never apply a catalog upgrade target as is; it can put two rungs on one model.
+3. Edit the `[rung]` lines in `models.conf`, confirm each Codex effort is in the model's supported levels, and set `reviewed` to today.
+4. If a Codex model is new, raise the CLI floor in `README.md` and `codex/README.md` to the first release whose `codex debug models --bundled` lists it.
+5. Run `python3 codex/build-agents.py`, `bash scripts/build-plugin.sh`, then `bash scripts/verify.sh`.
+6. Run `codex/update.sh` on a logged-in machine, then one `codex exec -m <id> -c model_reasoning_effort=<effort> "Reply ok"` per distinct model and effort pair.
+7. Run one live squad run per host and compare the model ID on each stage entry's `Agent:` line with `models.conf`.
+8. Bump the version and name the old and new models in `CHANGELOG.md`.

@@ -1,5 +1,155 @@
 # Changelog
 
+## 4.0.0 — 2026-09-24
+
+Lands work order WO-3b of the 3.9.2 analysis: the locked Claude ladder and Codex model currency.
+This is a major version because two agents are renamed: `squad-executor-haiku` is now
+`squad-executor-mechanical` and `squad-executor-opus` is now `squad-executor-complex`. Anything
+that spawns either by its old name (a script, a saved prompt, a custom command) must use the new
+name. To update an existing install, update the Claude Code plugin, which picks up the new agent
+files, and run `codex/update.sh`, which removes `squad-executor-haiku.toml` and
+`squad-executor-opus.toml` from `$CODEX_HOME/agents/` and installs the renamed TOMLs. The Codex
+column of `models.conf` does not change: WO-0 has not been run, so every Codex ID stays
+`gpt-5.6-*`. This release closes leftover findings N2 (the top executor was unreachable by
+escalation) and N3 (the escalation rule implied a Recon agent on a higher tier that did not exist).
+
+- **The locked Claude ladder (finding 7).** `models.conf`'s Claude column is now bottom `sonnet`,
+  mid `opus`, top `fable`, and `squad-helper` moves to the Claude bottom rung while staying on the
+  Codex mid rung. The file matches the report's locked manifest byte for byte, and `reviewed`
+  stays 2026-09-24, the date of the appendix A alias measurements. The generator rewrote the
+  agents' `model:` lines: `fable` for `squad-pm` and `squad-executor-complex`, `opus` for
+  `squad-recon` and `squad-executor`, `sonnet` for `squad-executor-mechanical`, `squad-helper`,
+  and `squad-mech`. The four generated routing blocks (`skills/compute-squad/SKILL.md`,
+  `codex/SKILL.md`, `README.md`, `codex/README.md`) match the report's locked blocks byte for
+  byte; SKILL.md's block now lists `squad-helper` on the mid rung in Codex and the bottom rung in
+  Claude Code. `codex/profiles.toml` and every Codex model and effort are unchanged.
+- **Executors named by classification, not by model (finding 7).** `agents/squad-executor-haiku.md`
+  and `agents/squad-executor-opus.md`, and their `codex/agents/*.toml`, were renamed with `git mv`
+  to `squad-executor-mechanical` and `squad-executor-complex`; each file's `name:`, example, and
+  `Agent:` lines follow. Every tracked file that named them now uses the new names:
+  `agents/squad-pm.md` (COMPLEX routes to `squad-executor-complex`), `README.md`,
+  `codex/README.md`, `codex/SKILL.md`, `skills/compute-squad/SKILL.md`, the generated
+  `codex/03-pm-plan.md` and `codex/agents/squad-pm.toml`, and the executor `Agent:` lines of
+  `tests/fixtures/logs/accept-delegation.log.md` and `accept-needs-human.log.md`, which now name
+  the bottom-rung model, `claude-sonnet-5`, instead of `claude-haiku-5`. In
+  `codex/build-agents.py`, `ROLE_LABELS`, `PROFILES`, and `MANUAL_STAGES` follow (the
+  `compute-squad-mechanical` profile keeps its name); in `scripts/verify.sh`, check 6's
+  `MECHANICAL` and `COMPLEX` constants and the 7c and 7p path lists follow. The agent
+  descriptions keep finding 17's one-example form from 3.10.0 rather than finding 7's longer
+  3.9.2-layout text, because finding 17 says phase 3 changes only the example lines.
+- **Escalation moves a stage one rung per FAIL (finding 7).** In `skills/compute-squad/SKILL.md`
+  and `codex/SKILL.md`, the rule that a stage failing twice escalates one tier is replaced by
+  finding 7's bullets: a FAIL is charged to the stage it names and counts once toward the
+  three-FAIL stop; the named stage's next attempt runs one rung up, and a top-rung stage re-runs
+  there; execution runs on the higher of the plan's classification rung and the rung escalation
+  has reached, so it reaches the top rung from any classification within the three-FAIL stop;
+  Recon escalates by passing the next rung's alias as the Agent tool's `model` in Claude Code
+  and re-runs on its own rung in Codex. The three-FAIL stop is unchanged. One adaptation: the
+  charge rule names the stage "its `## PM — FAIL` entry or `- rerun:` line names" where the
+  report says a `Rerun:` line, because today's FAIL template has no such line until finding 9
+  lands in WO-3d. `codex/README.md`'s On FAIL paragraph states the same rule in finding 7's text.
+- **Stage 4 and Stage 5 (finding 7).** SKILL.md's Stage 4 lines spawn the renamed executors with
+  finding 7's rung words; finding 8's version of those lines omits the rung words, neither
+  finding says it supersedes the other, and finding 7's text stays. Stage 5 gains finding 7's
+  parity text in both SKILL.md files: when execution ran on the top rung, acceptance shares it,
+  and four named controls stand in for the missing rung. One of them, that every criterion
+  ACCEPT marks met is reproduced rather than inspected, anticipates the criterion table in WO-3e.
+- **README and CONTRIBUTING (finding 7).** `README.md` gains finding 7's two sentences on where
+  the ladder is placed and what it buys, before finding 8's prices sentence from 3.10.0, which
+  stays; the executor heading and paragraph, the PLAN-mode paragraph, and the repo tree use the
+  new names; the FAQ "Why is Sonnet execution safe?" becomes "Why is bottom-rung execution
+  safe?" with finding 7's answer. `CONTRIBUTING.md`'s allowed-model list reads `sonnet`, `opus`,
+  or `fable` and keeps finding 17's example-size wording.
+- **Check 2 allows the new ladder; new checks 7m and 7t (finding 7).** `ALLOWED_MODELS` in
+  `scripts/verify.sh` is `sonnet`, `opus`, `fable`, so a `haiku` rung now fails check 2. New 7m
+  requires exactly three tracked `agents/squad-executor*.md` files whose bodies are identical
+  once each file's own name is masked, and requires the MECHANICAL under-classification stop
+  line exactly once in the mechanical body; that last test goes beyond the report so the line
+  (section 3 item 23) cannot be deleted silently. New 7t is the report's ladder-text check
+  (labelled 7x there): no tracked file outside `CHANGELOG.md`, `LEFTOVER_FINDINGS.md`,
+  `codex/update.sh`, `scripts/verify.sh`, and `dist/` names an old executor, "two FAILs at a
+  tier", or "top-tier main-session pass", compared with whitespace collapsed, and both SKILL.md
+  files carry the FAIL charge rule and the setup-gap stop.
+- **Codex catalog validation (finding 8; finding 6 item 9).** `codex/build-agents.py
+  --validate-catalog PATH [--strict]` reads the JSON `codex debug models` prints and checks
+  every model and reasoning effort pinned in `codex/agents/*.toml` and `codex/profiles.toml` (11
+  pins over 3 models today). It fails, listing the catalog's visible slugs, when a pinned model
+  is missing, lacks the pinned effort, or has a past retirement date. It warns when a model is
+  superseded, with the report's text, or retires within 30 days, which fails under `--strict`. A
+  catalog it cannot read as that format is reported as not validated, never as a pass, and exits
+  0, or 1 under `--strict`. One deviation, from measurement: `upgrade.retirement_at` is optional,
+  because Codex CLI 0.156.1's `codex debug models` omits it when no retirement is scheduled. On
+  that real catalog the validator prints three superseded warnings and no failure, and exits 0
+  under `--strict`.
+- **The updater checks the catalog before installing (findings 7 and 8).** `codex/update.sh` runs
+  `codex debug models` and the validator after `git pull` and before any `codex plugin` command,
+  and on a refusal stops with `$CODEX_HOME` unchanged. Without `python3`, an awk and grep fallback
+  checks model slugs only and warns that efforts were not validated; if `codex debug models`
+  itself fails, the updater warns and proceeds. Its retired list gains
+  `squad-executor-haiku.toml` and `squad-executor-opus.toml`.
+- **Check 8e covers the catalog and the new prune (findings 7 and 8).** New POSIX sh stub
+  `tests/stubs/codex` prints `$STUB_CATALOG` for `debug models`. 8e first runs the updater with a
+  stub catalog that lacks one pinned model: it must exit 1, name the model, make no call after
+  `codex debug models`, and leave `CODEX_HOME` byte for byte as it was. It then runs with every
+  pinned model listed and asserts the prune of all five retired TOMLs, the install, the profiles,
+  and the user's files. Last, it runs `--validate-catalog` directly, with and without `--strict`,
+  on five stub catalogs that each change one entry: an effort the model lacks, a past retirement,
+  a retirement within 30 days, an upgrade target, and an entry with no `upgrade` key. The report
+  asks 8e only for the missing model; the other cases pin the validator's remaining rules.
+- **Check 9 warns on stale dates (finding 8).** `scripts/verify.sh` check 9 reads `models.conf`'s
+  `reviewed` date through `build-agents.py --parse-manifest` and every `Snapshot YYYY-MM-DD` in
+  `README.md` and `codex/README.md`. A date over 90 days old prints a warning and never fails;
+  the check fails only on a date that is not a calendar date or a manifest that does not parse.
+- **Weekly model-currency job (finding 8).** `.github/workflows/ci.yml` gains a Monday 06:00 UTC
+  schedule and a `model-currency` job that runs only on it: `verify.sh`, then `npm install -g
+  @openai/codex`, `codex debug models --bundled`, and `--validate-catalog --strict`. Section 4
+  does not list `ci.yml` for WO-3b; it lands here because it is the only caller of `--strict` and
+  check 9's warn-only design relies on it.
+- **Hand-written model names become pointers; Codex floor 0.144 (finding 8).** `README.md`'s Codex
+  prerequisites (0.144 floor, a pointer to the routing table, the updater's refusal), its FAQ
+  "Do the models auto-upgrade?", and its `codex/profiles.toml` tree comment use the report's
+  text. `codex/README.md`'s install requirements (0.144 floor), its updater paragraph (the
+  catalog check), and its routing sentence use the report's text. The two step-by-step lists of
+  what the updater runs, in `README.md`'s update section and `codex/README.md`'s Updating
+  section, now include the catalog check between the pull and the plugin commands, and
+  `codex/README.md`'s scheduler notes say the check needs `python3` on the scheduler's `PATH`
+  to validate efforts. The report gives no text for
+  the rest, which now name rungs: `README.md`'s agent headings and tree comments
+  (`squad-helper` gets no rung, since its rung differs by host) and its `ci.yml` tree comment;
+  `codex/README.md`'s Luna section, renamed "Bottom-rung subagent fallback" and pointing to the
+  generated table; and `codex/SKILL.md`, whose suffix and Sol/Terra/Luna shorthand sentences
+  become one pointer sentence and whose stage headings, Stage 4 spawn lines, and audit paragraph
+  say bottom, mid, or top rung. SKILL.md's intro says "the generated routing block".
+- **Changing models (finding 8).** `CONTRIBUTING.md` gains the report's "Changing models"
+  procedure, which the validator's superseded warning and the README FAQ point to. Section 4
+  does not name it for WO-3b. Two steps are adapted: step 5 rebuilds `dist/` before running
+  `verify.sh`, since the report's order fails check 5 whenever an agent's `model:` line changes,
+  and step 7 compares each stage's `Agent:` line with `models.conf`, since the live regression
+  scenarios and usage ledger it names do not exist until WO-3c.
+- **Not landed in this release.**
+  - The Codex column and the move to generation 6 wait on WO-0; `codex/profiles.toml`'s
+    `0.134+` header stays, as the report says it is still correct.
+  - `README.md`'s dated snapshot needed no edit: 3.10.0 already dated the cost FAQ
+    `Snapshot 2026-09-24`, and check 9 now watches it.
+  - `docs/example-log.md` and the log fixtures under `tests/fixtures/logs/` still show
+    old-ladder model IDs on their other `Agent:` lines, such as `claude-sonnet-5` for
+    `squad-recon` and `claude-opus-5-5` for `squad-pm`. They are synthetic and the linter does
+    not read the ID; finding 21 owns the example log's `Agent:` lines.
+- **Acceptance.** The gate passes under the default Python and Python 3.9. In scratch copies, a
+  `haiku` rung failed check 2; 7m failed on a deleted MECHANICAL stop line, a one-word change in
+  the complex body, and the stop line added to the standard body; 7t failed on an old name in
+  docs, a wrapped old phrase, an old name in a fixture, and a missing charge rule; 8e failed when
+  the validator call was dropped, moved after `plugin add`, or ignored a missing model, and when
+  the validator's effort, past-retirement, near-retirement, upgrade-target, or `--strict` format
+  rule was disabled; check 9
+  printed warnings for old dates and still passed. Sixteen mutated catalogs behaved as specified
+  under Python 3.9. The real-catalog run installed Codex CLI 0.156.1 in a temp prefix and ran
+  only `codex debug models`, with no login and no model call. Not run, because each needs a live
+  squad run with top- or mid-rung spawns or a logged-in Codex account: regression scenarios S7a
+  (its updater refusal is covered statically by 8e) and S7b, the two-FAIL ladder-reach run from
+  MECHANICAL, the per-stage model check against the manifest, the unavailable-model stop, and
+  the `codex exec` probes. No `claude` CLI call was made.
+
 ## 3.12.0 — 2026-09-24
 
 Lands work order WO-3a of the 3.9.2 analysis: the model manifest. It moves where models are named,

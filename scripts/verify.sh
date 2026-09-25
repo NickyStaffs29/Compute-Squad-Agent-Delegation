@@ -6,7 +6,7 @@
 #   1. Claude and Codex plugin/marketplace manifests parse as JSON.
 #   2. Every agents/*.md has YAML frontmatter that parses, only the keys name,
 #      description, model, color, tools, and omitClaudeMd (placed after model),
-#      model in {sonnet, opus, haiku} and equal to the Claude alias models.conf
+#      model in {sonnet, opus, fable} and equal to the Claude alias models.conf
 #      assigns that agent's rung, and at least one <example> block in the
 #      description. Every Claude rung alias in models.conf is in that set.
 #   3. skills/compute-squad/SKILL.md frontmatter parses and its metadata.version
@@ -34,14 +34,23 @@
 #      routing block has one begin and one end marker; 7e the product
 #      description; 7i log headings stay on SKILL.md's closed list; 7j the
 #      archive command; 7l protocol text names rungs, not
-#      models, outside the routing block; 7o no file names the deleted routing
+#      models, outside the routing block; 7m the three executor bodies are one
+#      protocol apart from each agent's own name and the MECHANICAL stop line;
+#      7o no file names the deleted routing
 #      reference; 7p the shared-span table, whose rows include the blocker
 #      grammar span (7k) and the command output forms (7n); 7q the agent
 #      description budget; 7r no agent has a tool to spawn agents; 7s
 #      codex/SKILL.md stays a reading copy and both SKILL.md files carry the
-#      no-absorption rule.
+#      no-absorption rule; 7t no file names a renamed executor or the old
+#      escalation wording, and both SKILL.md files carry the FAIL charge rule
+#      and the setup-gap stop.
 #   8. Behavior without a model, on fixtures under tests/: log grammar (8a)
-#      and codex/update.sh with stubs (8e).
+#      and codex/update.sh with stubs (8e), which must refuse a model the
+#      stub catalog lacks and leave CODEX_HOME unchanged, and whose catalog
+#      validator must apply its effort, retirement, upgrade, and format rules.
+#   9. Staleness: models.conf's reviewed date, or a Snapshot date in README.md
+#      or codex/README.md, older than 90 days prints a warning, never a
+#      failure.
 #
 # Frontmatter is parsed with a small stdlib-only parser (no PyYAML dependency),
 # so failures are about the repo, not about whether a YAML library happens to
@@ -216,7 +225,7 @@ agent_paths = sorted(
 if not agent_paths:
     fail(2, "git ls-files found no tracked agents/*.md")
 
-ALLOWED_MODELS = {"sonnet", "opus", "haiku"}
+ALLOWED_MODELS = {"sonnet", "opus", "fable"}
 EXAMPLE_RE = re.compile(r"<example>.*?</example>", re.DOTALL)
 
 # Every other frontmatter field is a reviewed decision, not a default. The
@@ -436,7 +445,7 @@ RUNG_ORDER = ("bottom", "mid", "top")
 HOSTS = ("claude", "codex")
 EXTRA_ROLES = ("strategy", "finder", "skeptic")
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
-MECHANICAL, STANDARD, COMPLEX = "squad-executor-haiku", "squad-executor", "squad-executor-opus"
+MECHANICAL, STANDARD, COMPLEX = "squad-executor-mechanical", "squad-executor", "squad-executor-complex"
 # The roles that need no judgment beyond a tight spec; every other role runs
 # on the mid rung or above in Claude Code.
 BOTTOM_ALLOWED = (MECHANICAL, "squad-helper", "squad-mech")
@@ -694,8 +703,8 @@ cap_paths = [
     "agents/squad-recon.md",
     "agents/squad-pm.md",
     "agents/squad-executor.md",
-    "agents/squad-executor-haiku.md",
-    "agents/squad-executor-opus.md",
+    "agents/squad-executor-mechanical.md",
+    "agents/squad-executor-complex.md",
 ]
 cap_re = re.compile(r"5[^0-9]{0,20}per\s+stage\s+per\s+run")
 for path in cap_paths:
@@ -978,8 +987,8 @@ print(
 # agent bodies, the shared skill and its references, commands/squad.md, the
 # Codex prompts, and the example log must not contain a capitalized model
 # family name, a gpt- model ID, a price pair such as $4/$20, or a price ratio
-# such as 1.67x, except inside the routing block that 7d checks. Agent names
-# such as squad-executor-haiku are lowercase, so they pass.
+# such as 1.67x, except inside the routing block that 7d checks. The match is
+# case-sensitive, so the lowercase aliases in frontmatter model: lines pass.
 MODEL_NAME_PATTERNS = (
     ("a model name", re.compile(r"\b(?:Opus|Sonnet|Haiku|Fable|Astra|Sol|Terra|Luna)\b")),
     ("a model ID", re.compile(r"gpt-[0-9]")),
@@ -1021,6 +1030,57 @@ if model_mentions:
 
 print(f"PASS: check 7: protocol text names rungs, not models, outside the routing block ({len(protocol_paths)} files)")
 
+# ---- 7m: one executor protocol under three names, one per rung. The three
+# executor bodies must be byte-identical once each file's own agent name is
+# replaced by a placeholder and the MECHANICAL executor's under-classification
+# stop line is dropped. That line must stay, exactly once, in the MECHANICAL
+# body: bottom-rung execution stops on work that needs more than
+# transcription instead of pushing it through to acceptance.
+EXECUTOR_NAMES = {
+    "agents/squad-executor.md": "squad-executor",
+    "agents/squad-executor-mechanical.md": "squad-executor-mechanical",
+    "agents/squad-executor-complex.md": "squad-executor-complex",
+}
+MECHANICAL_BODY = "agents/squad-executor-mechanical.md"
+MECHANICAL_STOP = (
+    "- If any task in the plan requires more than transcription of an explicitly specified change, "
+    "stop and log a `BLOCKER:` with `rerun: Plan` stating the plan under-classified the work."
+)
+tracked_executors = sorted(tracked_files("agents/squad-executor*.md"))
+if tracked_executors != sorted(EXECUTOR_NAMES):
+    fail(f"the tracked executor files are {tracked_executors!r}; expected {sorted(EXECUTOR_NAMES)!r}")
+executor_bodies = {}
+for path, name in EXECUTOR_NAMES.items():
+    text = read(path)
+    if not text.startswith("---\n") or "\n---\n" not in text[4:]:
+        fail(f"{path}: no frontmatter")
+    body = text[text.index("\n---\n", 4) + len("\n---\n"):]
+    lines = re.sub(re.escape(name) + r"(?![\w-])", "<agent>", body).split("\n")
+    stops = [i for i, line in enumerate(lines) if line == MECHANICAL_STOP]
+    if path == MECHANICAL_BODY:
+        if len(stops) != 1:
+            fail(f"{path}: needs the MECHANICAL stop line exactly once; found {len(stops)}: {MECHANICAL_STOP!r}")
+        del lines[stops[0]]
+    executor_bodies[path] = lines
+ref_path = "agents/squad-executor.md"
+for path, lines in executor_bodies.items():
+    if lines != executor_bodies[ref_path]:
+        at = next(
+            (i for i, pair in enumerate(zip(lines, executor_bodies[ref_path])) if pair[0] != pair[1]),
+            min(len(lines), len(executor_bodies[ref_path])),
+        )
+        expected = executor_bodies[ref_path][at] if at < len(executor_bodies[ref_path]) else "<end of body>"
+        found = lines[at] if at < len(lines) else "<end of body>"
+        fail(
+            f"{path}: the executor body differs from {ref_path} at body line {at + 1} (agent names shown as "
+            f"<agent>): expected {expected!r}, found {found!r}"
+        )
+
+print(
+    f"PASS: check 7: {', '.join(EXECUTOR_NAMES)} share one body apart from each agent's own name and the "
+    f"MECHANICAL stop line, which {MECHANICAL_BODY} keeps"
+)
+
 # ---- 7o: the routing-rules reference file under skills/compute-squad/
 # references/ was deleted in 3.11.0, and its one unique rule moved into
 # SKILL.md. No tracked file names it except the history files. The name is
@@ -1054,8 +1114,8 @@ BODIES = [
     "agents/squad-recon.md",
     "agents/squad-pm.md",
     "agents/squad-executor.md",
-    "agents/squad-executor-haiku.md",
-    "agents/squad-executor-opus.md",
+    "agents/squad-executor-mechanical.md",
+    "agents/squad-executor-complex.md",
 ]
 EXECUTOR_BODIES = BODIES[2:]
 PM_FILES = ["agents/squad-pm.md", "codex/05-pm-accept.md"]
@@ -1293,6 +1353,45 @@ for path in (SKILL, "codex/SKILL.md"):
         fail(f"{path}: missing the no-absorption rule ({NO_ABSORPTION!r})")
 
 print(f"PASS: check 7: no SKILL.md outside skills/ has frontmatter, and both SKILL.md files say the orchestrating session {NO_ABSORPTION}")
+
+# ---- 7t: the ladder text. The executors are named by classification
+# (squad-executor-mechanical, squad-executor-complex), not by model, and a
+# FAIL moves its stage one rung, not two FAILs per tier. No tracked file
+# outside the history files, the updater (whose retired list prunes the old
+# TOMLs), this script, and dist/ names an old executor or the old escalation
+# wording; both SKILL.md files carry the FAIL charge rule and the setup-gap
+# stop. Text is compared with whitespace collapsed, so a wrapped line still
+# counts.
+RETIRED_LADDER_TEXT = (
+    "squad-executor-haiku",
+    "squad-executor-opus",
+    "two FAILs at a tier",
+    "top-tier main-session pass",
+)
+LADDER_EXEMPT = ("CHANGELOG.md", "LEFTOVER_FINDINGS.md", "codex/update.sh", "scripts/verify.sh")
+LADDER_RULES = ("charged to the stage its", "report the setup gap")
+stale_ladder = []
+for path in tracked_files():
+    if path in LADDER_EXEMPT or path.startswith("dist/"):
+        continue
+    try:
+        with open(path, "rb") as handle:
+            flat = " ".join(handle.read().decode("utf-8", errors="replace").split())
+    except (FileNotFoundError, IsADirectoryError):
+        continue
+    stale_ladder.extend(f"{path}: {phrase!r}" for phrase in RETIRED_LADDER_TEXT if phrase in flat)
+if stale_ladder:
+    fail("retired executor names or escalation wording: " + "; ".join(stale_ladder))
+for path in (SKILL, "codex/SKILL.md"):
+    flat = " ".join(read(path).split())
+    missing = [rule for rule in LADDER_RULES if rule not in flat]
+    if missing:
+        fail(f"{path}: missing the ladder rules {missing!r}")
+
+print(
+    f"PASS: check 7: no tracked file outside {', '.join(LADDER_EXEMPT)} and dist/ names a retired executor or "
+    f"the old escalation wording, and both SKILL.md files carry {' and '.join(repr(r) for r in LADDER_RULES)}"
+)
 PYEOF
 
 # ---------------------------------------------------------------------------
@@ -1302,6 +1401,7 @@ PYEOF
 # runs in temp dirs; nothing here writes into the repo.
 # ---------------------------------------------------------------------------
 python3 <<'PYEOF'
+import datetime
 import json
 import os
 import re
@@ -1422,14 +1522,28 @@ print(
     f"with exactly their expected rules; every linter rule has a failing fixture ({', '.join(linter_rules)})"
 )
 
-# ---- 8e: codex/update.sh with stubs. The updater runs with stub git and
-# codex (tests/stubs/ok, which records its calls) against a temp CODEX_HOME
-# seeded with the three retired agents, a stale squad-pm.toml, a stale
-# profile, and files that belong to the user. It must exit 0, call git pull
-# and the two codex plugin commands, remove the retired agents, install the
-# tracked codex/agents/*.toml byte for byte, write each profile in
-# codex/profiles.toml, and leave the user's files untouched.
-RETIRED = ("squad-design.toml", "squad-manager.toml", "squad-verifier.toml")
+# ---- 8e: codex/update.sh with stubs. The updater runs with stub git
+# (tests/stubs/ok) and a stub codex (tests/stubs/codex, whose `debug models`
+# prints a stub catalog), both recording their calls, against a temp
+# CODEX_HOME seeded with the five retired agents, a stale squad-pm.toml, a
+# stale profile, and files that belong to the user. First the stub catalog
+# lacks one pinned model: the updater must exit 1 after git pull and
+# `codex debug models`, name that model, and leave CODEX_HOME byte for byte
+# as it was. Then the catalog lists every pinned model and effort: it must
+# exit 0, call git pull, `codex debug models`, and the two codex plugin
+# commands, remove the retired agents, install the tracked
+# codex/agents/*.toml byte for byte, write each profile in
+# codex/profiles.toml, and leave the user's files untouched. Last,
+# codex/build-agents.py --validate-catalog runs on its own against stub
+# catalogs, one per remaining rule: a missing effort, a past or near
+# retirement, an upgrade target, and a format it cannot read.
+RETIRED = (
+    "squad-design.toml",
+    "squad-manager.toml",
+    "squad-verifier.toml",
+    "squad-executor-haiku.toml",
+    "squad-executor-opus.toml",
+)
 agent_tomls = sorted(tracked_files("codex/agents/*.toml"))
 if not agent_tomls:
     fail("git ls-files found no codex/agents/*.toml")
@@ -1442,15 +1556,52 @@ for name, body in re.findall(r"^\[profiles\.([^\]]+)\]\n(.*?)(?=^\[|\Z)", profil
 if not profiles:
     fail("codex/profiles.toml has no [profiles.*] section")
 
+# The stub catalog, in the shape `codex debug models` prints: every pinned
+# model with its pinned efforts, plus one listed model nothing pins.
+pinned = {}
+for text in [read(p).split("developer_instructions", 1)[0] for p in agent_tomls] + list(profiles.values()):
+    model = re.search(r'^model\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    effort = re.search(r'^model_reasoning_effort\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    if not model or not effort:
+        fail(f"a codex/agents TOML or codex/profiles.toml table has no model or effort line:\n{text}")
+    pinned.setdefault(model.group(1), set()).add(effort.group(1))
+
+
+def stub_catalog(models):
+    entries = [
+        {
+            "slug": model,
+            "visibility": "list",
+            "supported_reasoning_levels": [{"effort": e} for e in sorted(pinned.get(model, {"medium"}))],
+            "upgrade": None,
+        }
+        for model in models
+    ]
+    return json.dumps({"models": entries}, indent=2) + "\n"
+
+
+def snapshot(root):
+    state = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        for name in dirnames:
+            state[os.path.relpath(os.path.join(dirpath, name), root) + "/"] = None
+        for name in filenames:
+            with open(os.path.join(dirpath, name), "rb") as f:
+                state[os.path.relpath(os.path.join(dirpath, name), root)] = f.read()
+    return state
+
+
+absent = sorted(pinned)[0]
 with tempfile.TemporaryDirectory() as tmp:
     bin_dir = os.path.join(tmp, "bin")
     codex_home = os.path.join(tmp, "codex-home")
     agents_dir = os.path.join(codex_home, "agents")
     stub_log = os.path.join(tmp, "stub-calls.txt")
+    catalog_path = os.path.join(tmp, "catalog.json")
     for d in (bin_dir, agents_dir, os.path.join(tmp, "home")):
         os.makedirs(d)
-    for tool in ("git", "codex"):
-        shutil.copyfile("tests/stubs/ok", os.path.join(bin_dir, tool))
+    for tool, stub in (("git", "tests/stubs/ok"), ("codex", "tests/stubs/codex")):
+        shutil.copyfile(stub, os.path.join(bin_dir, tool))
         os.chmod(os.path.join(bin_dir, tool), 0o755)
     seeded = {name: f"# retired agent {name}\n" for name in RETIRED}
     seeded["squad-pm.toml"] = 'name = "squad-pm"\nmodel = "stale"\n'
@@ -1474,21 +1625,45 @@ with tempfile.TemporaryDirectory() as tmp:
         GIT_BIN=os.path.join(bin_dir, "git"),
         CODEX_BIN=os.path.join(bin_dir, "codex"),
         STUB_LOG=stub_log,
+        STUB_CATALOG=catalog_path,
     )
-    run = subprocess.run(["bash", "codex/update.sh"], env=env, capture_output=True, text=True)
+
+    def run_update(models):
+        with open(catalog_path, "w", encoding="utf-8") as f:
+            f.write(stub_catalog(models))
+        if os.path.exists(stub_log):
+            os.remove(stub_log)
+        run = subprocess.run(["bash", "codex/update.sh"], env=env, capture_output=True, text=True)
+        calls = read(stub_log).splitlines() if os.path.exists(stub_log) else []
+        git_call = re.fullmatch(r"git -C (.+) pull --ff-only", calls[0]) if calls else None
+        if not git_call or os.path.realpath(git_call.group(1)) != os.path.realpath(os.getcwd()):
+            fail(f"codex/update.sh should first call git pull on this repo; calls were {calls!r}")
+        return run, calls[1:]
+
+    before = snapshot(codex_home)
+    run, calls = run_update(sorted(set(pinned) - {absent}) + ["stub-model-not-pinned"])
+    if run.returncode != 1 or absent not in run.stderr:
+        fail(
+            f"codex/update.sh should exit 1 and name {absent}, which the stub catalog lacks; it exited "
+            f"{run.returncode}:\n{run.stdout}{run.stderr}"
+        )
+    if calls != ["codex debug models"]:
+        fail(f"codex/update.sh should stop after `codex debug models` when the catalog lacks a model; calls were {calls!r}")
+    after = snapshot(codex_home)
+    if after != before:
+        changed = sorted(p for p in set(before) | set(after) if before.get(p, 0) != after.get(p, 0))
+        fail(f"codex/update.sh refused {absent} but changed CODEX_HOME: {changed!r}")
+
+    run, calls = run_update(sorted(pinned) + ["stub-model-not-pinned"])
     if run.returncode != 0:
         fail(f"codex/update.sh with stub git and codex exited {run.returncode}:\n{run.stdout}{run.stderr}")
-
-    calls = read(stub_log).splitlines() if os.path.exists(stub_log) else []
-    expected_tail = ["codex plugin marketplace upgrade compute-squad", "codex plugin add compute-squad@compute-squad"]
-    git_call = re.fullmatch(r"git -C (.+) pull --ff-only", calls[0]) if calls else None
-    if (
-        len(calls) != 3
-        or not git_call
-        or os.path.realpath(git_call.group(1)) != os.path.realpath(os.getcwd())
-        or calls[1:] != expected_tail
-    ):
-        fail(f"codex/update.sh should call git pull on this repo, then the two codex plugin commands; calls were {calls!r}")
+    expected_calls = [
+        "codex debug models",
+        "codex plugin marketplace upgrade compute-squad",
+        "codex plugin add compute-squad@compute-squad",
+    ]
+    if calls != expected_calls:
+        fail(f"codex/update.sh should call git pull, then {expected_calls!r}; after git pull the calls were {calls!r}")
 
     left = [name for name in RETIRED if os.path.exists(os.path.join(agents_dir, name))]
     if left:
@@ -1509,11 +1684,108 @@ with tempfile.TemporaryDirectory() as tmp:
         if read(path) != content:
             fail(f"codex/update.sh changed the user's file {os.path.relpath(path, codex_home)}")
 
-print(
-    f"PASS: check 8: codex/update.sh with stub git and codex prunes the retired agents ({', '.join(RETIRED)}), "
-    f"installs the {len(agent_tomls)} codex/agents TOMLs byte for byte, writes {len(profiles)} profiles, "
-    f"and leaves the user's files in CODEX_HOME untouched"
+# The validator's other rules, run directly on a stub catalog that lists
+# every pinned model. Each case changes one key of one entry (DROP removes
+# it) and gives the exit code without and with --strict, the text stderr
+# must hold, and whether stdout prints the validated line.
+DROP = object()
+target = sorted(pinned)[0]
+soon = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+validator_cases = (
+    ("an effort the model lacks", "supported_reasoning_levels", [{"effort": "stub-effort"}], 1, 1,
+     f"{target} does not support reasoning effort", False),
+    ("a past retirement", "upgrade", {"model": None, "retirement_at": "2000-01-01T00:00:00Z"}, 1, 1,
+     f"{target} was retired at", False),
+    ("a retirement within 30 days", "upgrade", {"model": None, "retirement_at": soon}, 0, 1,
+     f"{target} retires at", True),
+    ("an upgrade target", "upgrade", {"model": "stub-successor"}, 0, 0,
+     f"{target} is superseded by stub-successor", True),
+    ("no upgrade key", "upgrade", DROP, 0, 1,
+     "catalog format not recognized; models were not validated", False),
 )
+with tempfile.TemporaryDirectory() as tmp:
+    catalog_path = os.path.join(tmp, "catalog.json")
+    for label, key, value, plain_rc, strict_rc, needle, validated in validator_cases:
+        catalog = json.loads(stub_catalog(sorted(pinned)))
+        entry = next(e for e in catalog["models"] if e["slug"] == target)
+        if value is DROP:
+            del entry[key]
+        else:
+            entry[key] = value
+        with open(catalog_path, "w", encoding="utf-8") as f:
+            json.dump(catalog, f)
+        for strict, want in ((False, plain_rc), (True, strict_rc)):
+            args = [sys.executable, "codex/build-agents.py", "--validate-catalog", catalog_path] + ["--strict"] * strict
+            run = subprocess.run(args, capture_output=True, text=True)
+            says_validated = "each is in the catalog" in run.stdout
+            if run.returncode != want or needle not in run.stderr or says_validated != (validated and want == 0):
+                fail(
+                    f"codex/build-agents.py --validate-catalog{' --strict' * strict} on a catalog with {label} for "
+                    f"{target} should exit {want}, print {needle!r}, and "
+                    f"{'print' if validated and want == 0 else 'not print'} its validated line; it exited "
+                    f"{run.returncode}:\n{run.stdout}{run.stderr}"
+                )
+
+print(
+    f"PASS: check 8: codex/update.sh with stub git and codex refuses a catalog that lacks {absent} and leaves "
+    f"CODEX_HOME unchanged; with every pinned model listed it prunes the retired agents ({', '.join(RETIRED)}), "
+    f"installs the {len(agent_tomls)} codex/agents TOMLs byte for byte, writes {len(profiles)} profiles, "
+    f"and leaves the user's files in CODEX_HOME untouched; --validate-catalog handles {len(validator_cases)} "
+    f"more stub catalogs ({', '.join(case[0] for case in validator_cases)}) as specified, with and without --strict"
+)
+PYEOF
+
+# ---------------------------------------------------------------------------
+# Check 9: staleness. A dated claim about models or prices goes stale with no
+# file changing. models.conf's reviewed date, and each "Snapshot YYYY-MM-DD"
+# in README.md and codex/README.md, older than 90 days prints a warning and
+# never fails: a new model is not a defect in this repo. The weekly
+# model-currency job in .github/workflows/ci.yml fails instead, through
+# codex/build-agents.py --validate-catalog --strict.
+# ---------------------------------------------------------------------------
+python3 <<'PYEOF'
+import datetime
+import json
+import re
+import subprocess
+import sys
+
+LIMIT_DAYS = 90
+SNAPSHOT_FILES = ("README.md", "codex/README.md")
+
+parsed = subprocess.run(
+    [sys.executable, "codex/build-agents.py", "--parse-manifest", "models.conf"],
+    capture_output=True, text=True,
+)
+if parsed.returncode != 0:
+    print(f"FAIL: check 9: models.conf does not parse:\n{parsed.stderr}", file=sys.stderr)
+    sys.exit(1)
+dated = [("models.conf reviewed", json.loads(parsed.stdout)["reviewed"])]
+for path in SNAPSHOT_FILES:
+    with open(path, encoding="utf-8") as f:
+        for number, line in enumerate(f, 1):
+            for date in re.findall(r"\bSnapshot ([0-9]{4}-[0-9]{2}-[0-9]{2})\b", line):
+                dated.append((f"{path}:{number} Snapshot", date))
+
+today = datetime.datetime.now(datetime.timezone.utc).date()
+stale = []
+for what, date in dated:
+    try:
+        age = (today - datetime.date.fromisoformat(date)).days
+    except ValueError:
+        print(f"FAIL: check 9: {what} {date} is not a calendar date", file=sys.stderr)
+        sys.exit(1)
+    if age > LIMIT_DAYS:
+        stale.append(what)
+        print(
+            f"WARN: check 9: {what} {date} is {age} days old, over {LIMIT_DAYS}; re-check what it claims "
+            "(Changing models in CONTRIBUTING.md) and update the date",
+            file=sys.stderr,
+        )
+if stale:
+    print(f"PASS: check 9: {len(stale)} of {len(dated)} dated claims are over {LIMIT_DAYS} days old (warning only)")
+else:
+    print(f"PASS: check 9: {len(dated)} dated claims ({', '.join(w for w, _d in dated)}) are at most {LIMIT_DAYS} days old")
 PYEOF
 
 echo "verify.sh: all checks passed"

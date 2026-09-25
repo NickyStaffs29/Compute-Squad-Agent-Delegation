@@ -7,7 +7,7 @@ description: |
   user: "Run the squad: fix the flaky calendar test"
   assistant: "Goal locked; spawning squad-mech to archive the prior log."
   </example>
-model: haiku
+model: sonnet
 omitClaudeMd: true
 color: green
 tools: ["Read", "Write", "Bash", "Glob"]
