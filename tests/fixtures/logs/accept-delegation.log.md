@@ -79,7 +79,8 @@ the notes; that listing is zero-judgment work.
 
 DELEGATE:
 - [intern] For each name exported from src/index.js, print the name when
-  `git diff --quiet v2.3.0 -- <its file>` exits 1. BLOCKING.
+  `git diff --quiet v2.3.0 -- <its file>` exits 1; return at most 10 lines.
+  BLOCKING.
 
 ## Delegated — Accept
 Timestamp: 2026-09-01T12:20:37Z

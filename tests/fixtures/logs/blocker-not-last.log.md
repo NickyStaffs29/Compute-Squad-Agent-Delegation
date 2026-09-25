@@ -74,4 +74,5 @@ BLOCKER:
 
 DELEGATE:
 - [intern] List every call to fs.writeFileSync under src/cli/ with file and
-  line (procedure: grep -n "writeFileSync" -r src/cli). Non-blocking.
+  line (procedure: grep -n "writeFileSync" -r src/cli); return at most 20
+  lines. Non-blocking.

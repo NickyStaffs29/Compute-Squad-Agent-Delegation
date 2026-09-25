@@ -71,7 +71,8 @@ Commit: 1a2b3c4d5e6f, working tree 2 changed files
 
 DELEGATE:
 - [intern] Regenerate the 40 fixtures under test/fixtures/importer/ from the
-  template in its README.md, writing sourceId in place of legacyId. BLOCKING.
+  template in its README.md, writing sourceId in place of legacyId; return at
+  most 5 lines. BLOCKING.
 
 ## Delegated — Executor
 Timestamp: 2026-09-01T09:18:51Z

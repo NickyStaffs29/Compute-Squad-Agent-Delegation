@@ -11,12 +11,13 @@ Read this before any spawn when `COMPUTE_SQUAD_LOG.md` is non-empty at invocatio
 | Last entry | Next action |
 |---|---|
 | Ends in a `BLOCKER:` block | `needs-human:` goes to the user as in Escalation rules; an unattended run stops. `rerun:` re-runs the named stage, then every later stage. |
-| Ends in a `DELEGATE:` block | If no `## Delegated — <stage>` entry follows it, run the helpers and append their results. Then, if the block is `BLOCKING`, re-spawn that stage to finish (a `(cont.)` entry, or the verdict after a pending entry). If it is not, but a result reports a step `REFUSED:` or `not run:`, re-spawn that stage for a new, complete entry (DELEGATE steps 2 and 4). Otherwise use its heading's row. |
+| Ends in a `DELEGATE:` block | If no `## Delegated — <stage>` entry follows it, run the helpers and append their results. Then, if the block is `BLOCKING`, continue or re-spawn that stage to finish (a `(cont.)` entry, or the verdict after a pending entry), as DELEGATE step 2 says; only the session that spawned the stage's agent can continue it, so any other session re-spawns it. If it is not, but a result reports a step `REFUSED:` or `not run:`, re-spawn that stage for a new, complete entry (DELEGATE steps 2 and 4). Otherwise use its heading's row. |
 | `## Decision` | Append the `## Status` it implies, then perform that `Next:`. |
 | `## Goal — Locked` | Spawn `squad-recon`. After a re-lock that answers a `needs-human:` blocker, re-spawn the stage that raised it instead. |
 | `## Recon` | Spawn `squad-pm` in PLAN mode. |
 | `## PM — Plan` | In `plan` mode, append a `## Status` whose `Next:` awaits a grant, and stop. Otherwise apply the grant rule and spawn the executor on the higher of the latest `Classification:` line's rung and the rung escalation has reached. |
-| `## Executor` | In an audit-grade run, run the audit first. Then spawn `squad-pm` in ACCEPT mode. |
+| `## Executor` | In an audit-grade run, run the audit. Otherwise spawn `squad-pm` in ACCEPT mode. |
+| `## Audit Findings` | Spawn `squad-pm` in ACCEPT mode. |
 | `## PM — Accept (pending)` | Resolve its `DELEGATE:` block or `needs-human:` question, then spawn `squad-pm` in ACCEPT mode for the verdict. |
 | `## PM — FAIL` | Re-run the stage on its `Rerun:` line at the rung the escalation rules give, then every later stage. |
 | `## PM — PASS` in a high-stakes run | Run the high-stakes review procedure (Stage 5) before anything else. Never spawn ACCEPT again for this verdict. |

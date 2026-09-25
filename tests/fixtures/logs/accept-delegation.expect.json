@@ -15,7 +15,7 @@
     },
     {
       "file": "agents/squad-pm.md",
-      "text": "A PM re-spawned after a `## PM — Accept (pending)` delegation does not continue that entry: it issues the verdict as a normal `## PM — PASS` or `## PM — FAIL` entry."
+      "text": "A PM continued or re-spawned after a `## PM — Accept (pending)` delegation does not extend that entry: it issues the verdict as a normal `## PM — PASS` or `## PM — FAIL` entry."
     }
   ],
   "lint": {

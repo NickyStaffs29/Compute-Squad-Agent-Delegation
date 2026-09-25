@@ -44,7 +44,7 @@ Checks:
 - goal facts: all confirmed
 - `npm test` -> exit 0; 2,751 passed / 12 skipped; tree changed: no
 - `node --version` -> exit 0; v22
-- `grep -c "it(" src/server/auth/__tests__/reset.routes.test.ts` -> exit 0; 14
+- `grep -c "it(" src/server/auth/__tests__/*.test.ts` -> exit 0; reset 14, login 22, session 11, mfa 19
 Map:
 - src/server/auth/auth.routes.ts:141-168 POST /api/auth/reset-request: the route; returns requestPasswordReset()'s result
 - src/server/auth/reset.service.ts:22-74 requestPasswordReset: "export async function requestPasswordReset(email: string): Promise<ResetResult> {"; creates the hashed token row and sends the mail
@@ -55,24 +55,13 @@ Callers:
 - requestPasswordReset <- src/server/auth/auth.routes.ts:152
 Tests:
 - src/server/auth/__tests__/reset.routes.test.ts: 14 cases on the reset route
+- Test files under src/server/auth/__tests__/: reset 14, login 22, session 11, mfa 19 (grep -c "it(" per file)
 Invariants:
 - CLAUDE.md:3 "Auth responses are generic: no response may reveal whether an account exists.": at risk: a cooldown hit must return the same body as a normal request
 - CLAUDE.md:4 "Logs carry codes only, never addresses.": at risk: any new log event carries a code only
 Open for the PM:
 - where the cooldown state lives: the newest password_reset_tokens row avoids a schema change
 - whether a cooldown hit returns 429 or the endpoint's generic 200; the account-existence invariant suggests the generic response
-
-DELEGATE:
-- [intern] List every test file under src/server/auth/__tests__/ with test-case
-  counts (procedure: grep -c "it(" per file). Non-blocking; context for the PM.
-```
-
-```markdown
-## Delegated — Recon
-Timestamp: 2026-07-25T14:04:09Z
-
-reset.routes.test.ts: 14 · login.routes.test.ts: 22 · session.service.test.ts: 11 ·
-mfa.service.test.ts: 19 (procedure ran as specified; no judgment applied).
 ```
 
 ```markdown
@@ -212,4 +201,4 @@ Stop: after the closing archive
 
 ---
 
-The PASS entry reads `High-stakes: yes`, so the PM archives nothing, clears nothing, and says in its final summary that the log awaits the main session's high-stakes review. The main session lists the auth and privacy risks from the Goal entry before reading the PASS, reads the diff, re-runs the auth suite and the address grep, finds no decision after the lock that lacks a `## Decision`, and appends the `## High-stakes review` entry above and a `## Status`. Because the result is `upheld`, it spawns `squad-mech`, whose archive command copies the log to `compute-squad-archive/`, verifies it with `cmp`, and clears the active log; the main session then reports the outcome to the user. An `overturned` result would have counted as a FAIL and re-run the stage on its `Rerun:` line with the log intact; `held` would have left the log intact for the user. On an ordinary change the PASS entry reads `High-stakes: no` and names its archive target as intent, because it is written before the copy exists; the PM's archive command writes the copy, verifies it with `cmp`, and clears the log, and the PM reports the verification in its final summary, not in the append-only log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and a `Rerun:` line naming exactly one stage, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: task 1's row lock is not supported by the test database`, which re-runs Plan and everything after it without waiting for a PM verdict.
+The PASS entry reads `High-stakes: yes`, so the PM archives nothing, clears nothing, and says in its final message that the log awaits the main session's high-stakes review. The main session lists the auth and privacy risks from the Goal entry before reading the PASS, reads the diff, re-runs the auth suite and the address grep, finds no decision after the lock that lacks a `## Decision`, and appends the `## High-stakes review` entry above and a `## Status`. Because the result is `upheld`, it spawns `squad-mech`, whose archive command copies the log to `compute-squad-archive/`, verifies it with `cmp`, and clears the active log; the main session then reports the outcome to the user. An `overturned` result would have counted as a FAIL and re-run the stage on its `Rerun:` line with the log intact; `held` would have left the log intact for the user. On an ordinary change the PASS entry reads `High-stakes: no` and names its archive target as intent, because it is written before the copy exists; the PM's archive command writes the copy, verifies it with `cmp`, and clears the log, and the PM reports the verification in its final message, not in the append-only log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and a `Rerun:` line naming exactly one stage, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: task 1's row lock is not supported by the test database`, which re-runs Plan and everything after it without waiting for a PM verdict. A delegation worth its turns looks different: an Executor facing 40 fixture files to regenerate from an exact template ends its entry with `DELEGATE:` / `- [intern] <procedure>; return at most 5 lines. BLOCKING.`, and the main session continues the Executor once its `## Delegated — <stage>` entry is appended.

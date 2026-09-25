@@ -1,0 +1,32 @@
+{
+  "note": "Work order WO-3f's seeded audit: the five finders return 30 findings on the WO-1 cooldown change. The main session runs skeptics on the 10 most severe (high first, then by finder number) and logs the other 20 as UNREVIEWED in one ## Audit Findings entry. The session stopped before the Status after it, so resuming spawns the PM in ACCEPT mode.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Order the findings by severity, high first, then by finder number. In one message, spawn one skeptic per finding on the top rung, in parallel, for at most 10 findings. The rest are UNREVIEWED."
+    },
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Findings: <n>; skeptics run: <k> (cap 10)"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "CONFIRMED and UNREVIEWED findings are FAIL evidence, a NEEDS-HUMAN finding stops for the user, and a REFUTED finding is not evidence."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "| `## Audit Findings` | Spawn `squad-pm` in ACCEPT mode. |"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Audit Findings`"
+    }
+  ]
+}

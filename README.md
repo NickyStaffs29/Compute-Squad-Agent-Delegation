@@ -156,6 +156,8 @@ entries can be short, but the discipline can't.
 
 - **Stage 0 — Strategy**, your session, before any agent spawns: interrogates the goal, clarifies
   gaps with you, locks the goal and acceptance criteria into the log's `## Goal — Locked` entry.
+  It reads no product source beyond files you name, and runs no tests; mapping the code is Recon's
+  job.
 - **Stage 1 — Archive**, `squad-mech`: starts every run from a clean log. Failed runs are never
   discarded. They are evidence.
 - **Stage 2 — Recon**, `squad-recon`: maps the codebase and checks the evidence prerequisites.
@@ -163,7 +165,7 @@ entries can be short, but the discipline can't.
 - **Stage 4 — Execute**, the executor the classification routes to: implements exactly what the plan
   says.
 - **Stage 5 — Accept**, `squad-pm` (ACCEPT mode): tries to fail the work, then PASS or FAIL. Say "be
-  thorough" and it adds an audit fan-out.
+  thorough" and your session first runs an audit fan-out whose findings the PM must rule on.
 
 The full protocol for each stage (grammar, PASS/FAIL/BLOCKER handling, escalation, and the
 audit-grade fan-out) is canonical in [`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md),
@@ -177,7 +179,7 @@ A run creates two things in your project root:
 
 - `COMPUTE_SQUAD_LOG.md`, the active log every stage appends to.
 - `compute-squad-archive/`, copies of past runs named by UTC time and run ID. The log is archived before a new run starts and again on PASS, or, on a high-stakes change, after an upheld high-stakes review, and an existing archive is never overwritten, so a failed run is never lost.
-  - `compute-squad-archive/usage.jsonl` (Claude Code only): one line per stage with its model, elapsed time and tokens, written by a plugin hook and never cleared.
+  - `compute-squad-archive/usage.jsonl` (Claude Code only): one line each time a stage stops, with its model, elapsed time and tokens, written by a plugin hook and never cleared. A stage continued with SendMessage stops more than once, and its last line is its total.
 
 Both are run state, not source. Add them to your `.gitignore` unless you specifically want run history in version control:
 
@@ -229,10 +231,10 @@ Its one skill beyond following procedure is knowing what it is not: handed anyth
 ## The delegation structure
 
 Four rules generate the whole system: route by decision density, not task difficulty; review from a
-tier above the work by default; push busywork down a tier through the `DELEGATE:` protocol, downward
-only and capped at 5 helpers per stage per run; and escalate on evidence, never on vibes. A wrong
-answer that forces an upstream re-run costs more than running the stage one rung higher, which makes
-routing up on uncertainty the cheap option. The full rules, the
+tier above the work by default; push busywork too large to do in-stage down a tier through the
+`DELEGATE:` protocol, downward only and capped at 5 helpers per stage per run; and escalate on
+evidence, never on vibes. A wrong answer that forces an upstream re-run costs more than running the
+stage one rung higher, which makes routing up on uncertainty the cheap option. The full rules, the
 escalation ladder, and the blocker grammar are canonical in
 [`skills/compute-squad/SKILL.md`](skills/compute-squad/SKILL.md), which both hosts load.
 
@@ -260,7 +262,7 @@ Compute-Squad-Agent-Delegation/
 │   │   ├── grant-gate.sh     # Claude Code only: refuses an executor spawn without a logged grant, and any recon, PM, helper, or executor spawn while a needs-human blocker is open
 │   │   └── usage-ledger.sh   # Claude Code only: appends each stage's model, time, and tokens to compute-squad-archive/usage.jsonl
 │   └── references/
-│       ├── audit-prompts.md  # finder and skeptic briefs for audit-grade runs
+│       ├── audit-prompts.md  # audit procedure, finder and skeptic briefs
 │       └── resume.md         # next-action table, read only on resume or over a non-empty log
 ├── agents/
 │   ├── squad-recon.md        # mid rung · read-only mapping
@@ -307,7 +309,7 @@ Within a family, on Claude Code: each agent carries the alias `models.conf` assi
 Only MECHANICAL, transcription-grade work runs there, and the plan carries the intelligence. Acceptance runs on the top rung, never below the work and a rung above it by default. When execution reaches the top rung (COMPLEX work, or escalation), execution and acceptance share it, and Stage 5 of the skill names the controls that replace the missing rung.
 
 **Why a shared log instead of passing context directly?**
-Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. The append-only file protocol is portable across the Claude and Codex plugin implementations.
+Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. The append-only file protocol is portable across the Claude and Codex plugin implementations. Your session's spawn prompts only point at the log (stage, mode, repo root, run), and it routes from the log's fixed lines, never from a stage's closing message, so no stage acts on an instruction the log does not record.
 
 **Six stages for a one-line change?**
 The stages are mandatory. Their length is not. A one-line change gets a Recon map of a few lines and a four-line plan. The discipline is the constant; the overhead scales with the work.

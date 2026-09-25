@@ -18,7 +18,13 @@ session sees besides the log, as a JSON object whose keys are all optional:
               Status's Base:, so the base has not moved)
     moved     the paths git diff --name-only <Base> HEAD lists
     dirty     the paths git status --porcelain lists
-    audit     true for an audit-grade run (default false)
+    audit     true for an audit-grade run, whose Executor entry is followed
+              by the audit and its ## Audit Findings entry (default false)
+    continuable
+              true when this session spawned the agent that wrote the last
+              entry and can still message it, so a BLOCKING DELEGATE: block
+              continues that agent instead of re-spawning the stage (default
+              false: a new session cannot message an earlier session's agent)
 
 The model follows the steps and rows of resume.md in order. It reads the
 table from that file and stops with status 2 if a row's first column or the
@@ -56,6 +62,7 @@ PENDING = check_logs.PENDING_HEADING
 PASS = "## PM — PASS"
 FAIL = "## PM — FAIL"
 REVIEW = check_logs.REVIEW_HEADING
+AUDIT = check_logs.AUDIT_HEADING
 CONT = check_logs.CONT
 FAIL_LINE = re.compile(r"^(Rerun: |- rerun: )")
 # A helper result that refused a step or reports one not run (DELEGATE steps 2 and 4).
@@ -73,13 +80,14 @@ CLASS_RUNG = {"MECHANICAL": 0, "STANDARD": 1, "COMPLEX": 2}
 # action column must contain.
 ROWS = (
     ("Ends in a `BLOCKER:` block", "`rerun:` re-runs the named stage, then every later stage."),
-    ("Ends in a `DELEGATE:` block", "if the block is `BLOCKING`, re-spawn that stage to finish"),
+    ("Ends in a `DELEGATE:` block", "if the block is `BLOCKING`, continue or re-spawn that stage to finish"),
     ("`## Decision`", "Append the `## Status` it implies, then perform that `Next:`."),
     ("`## Goal — Locked`", "re-spawn the stage that raised it instead."),
     ("`## Recon`", "Spawn `squad-pm` in PLAN mode."),
     ("`## PM — Plan`", "apply the grant rule and spawn the executor on the higher of the latest `Classification:` line's "
                        "rung and the rung escalation has reached."),
-    ("`## Executor`", "Then spawn `squad-pm` in ACCEPT mode."),
+    ("`## Executor`", "In an audit-grade run, run the audit. Otherwise spawn `squad-pm` in ACCEPT mode."),
+    ("`## Audit Findings`", "Spawn `squad-pm` in ACCEPT mode."),
     ("`## PM — Accept (pending)`", "spawn `squad-pm` in ACCEPT mode for the verdict."),
     ("`## PM — FAIL`", "Re-run the stage on its `Rerun:` line at the rung the escalation rules give"),
     ("`## PM — PASS` in a high-stakes run", "Run the high-stakes review procedure (Stage 5) before anything else. "
@@ -101,6 +109,8 @@ STEPS = (
                "first row that matches"),
     ("step 4", "A heading's row also covers its `(cont.)` entry. If no row matches"),
     ("step 5", "Before any executor spawn, run the tree check and the base check below."),
+    ("DELEGATE row", "only the session that spawned the stage's agent can continue it, so any other session "
+                     "re-spawns it."),
     ("DELEGATE row", "If it is not, but a result reports a step `REFUSED:` or `not run:`, re-spawn that stage for a "
                      "new, complete entry (DELEGATE steps 2 and 4)."),
     ("tree check", "A listed path other than `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` that no "
@@ -371,6 +381,13 @@ def stage_spawn(heading):
     }.get(base_heading(heading), heading)
 
 
+def stage_agent(heading):
+    """The agent a continuation messages: the one that wrote heading."""
+    return {
+        RECON: "squad-recon", PLAN: "squad-pm", EXECUTOR: "the executor", PENDING: "squad-pm",
+    }.get(base_heading(heading), heading)
+
+
 def row_action(run, index):
     """Apply the first matching row to the entry at index. Returns
     (action, row first column, extra source or None)."""
@@ -393,6 +410,8 @@ def row_action(run, index):
         prefix = "" if results else "run the helpers and append their results, then "
         if delegate_blocking(entry):
             what = "the verdict" if base == PENDING else "a (cont.) entry"
+            if run.state.get("continuable"):
+                return f"{prefix}continue {stage_agent(heading)} with SendMessage for {what}", first, None
             return f"{prefix}re-spawn {stage_spawn(heading)} for {what}", first, None
         if any(REFUSAL.search(body_text(e)) for e in results):
             if base == EXECUTOR:
@@ -442,18 +461,21 @@ def heading_row(run, index):
             action = "append a Status that awaits " + action[len("await "):]
         return action, first, extra
     if base == EXECUTOR:
-        audit = "run the audit, then " if run.state.get("audit") else ""
-        return audit + "spawn squad-pm in ACCEPT mode", ROWS[6][0], None
+        if run.state.get("audit"):
+            return "run the audit procedure and append its ## Audit Findings entry", ROWS[6][0], None
+        return "spawn squad-pm in ACCEPT mode", ROWS[6][0], None
+    if base == AUDIT:
+        return "spawn squad-pm in ACCEPT mode", ROWS[7][0], None
     if base == PENDING:
-        return "spawn squad-pm in ACCEPT mode for the verdict", ROWS[7][0], None
+        return "spawn squad-pm in ACCEPT mode for the verdict", ROWS[8][0], None
     if base == FAIL:
         action, extra = run.rerun(field(entry, "Rerun") or "")
-        return action, ROWS[8][0], extra
+        return action, ROWS[9][0], extra
     if base == PASS:
         following = run.next_work_order()
         if run.high_stakes:
-            return "run the high-stakes review procedure", ROWS[9][0], None
-        first = ROWS[10][0]
+            return "run the high-stakes review procedure", ROWS[10][0], None
+        first = ROWS[11][0]
         if following is None:
             return "hand back to the user: the PM's archive or clear did not finish", first, None
         action, extra = run.grant_rule(following)
@@ -461,7 +483,7 @@ def heading_row(run, index):
     if base == REVIEW:
         result = field(entry, "Result")
         if result == "upheld":
-            first = ROWS[11][0]
+            first = ROWS[12][0]
             accepted = max((i for i in range(index) if run.entries[i]["heading"] == PASS), default=None)
             following = run.next_work_order(accepted) if accepted is not None else None
             if following is None:
@@ -469,7 +491,7 @@ def heading_row(run, index):
             action, extra = run.grant_rule(following)
             return f"append a Status naming {following}, then {action}", first, extra
         if result == "held":
-            first = ROWS[12][0]
+            first = ROWS[13][0]
             attended = (field(run.goal, "Attended") or "yes") if run.goal else "yes"
             if attended == "no":
                 return "stop: an unattended run leaves the review's open items to the user", first, None
@@ -477,7 +499,7 @@ def heading_row(run, index):
                     "high-stakes review"), first, None
         if result == "overturned":
             action, extra = run.rerun(field(entry, "Rerun") or "")
-            return action, ROWS[13][0], extra
+            return action, ROWS[14][0], extra
     return f"stop: no row for {heading!r}; show the entry to the user", "no row", None
 
 
@@ -494,7 +516,7 @@ def new_run(lines):
 def next_action(lines, state=None):
     """Return (action, source): the next action and the step or row that gave it."""
     state = dict(state or {})
-    unknown = set(state) - {"request", "host", "handed", "head", "moved", "dirty", "audit"}
+    unknown = set(state) - {"request", "host", "handed", "head", "moved", "dirty", "audit", "continuable"}
     if unknown:
         raise ProtocolError(f"unknown state keys {sorted(unknown)!r}")
     if state.get("request", "resume") == "new-goal":

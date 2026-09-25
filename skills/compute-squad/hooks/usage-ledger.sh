@@ -1,7 +1,9 @@
 #!/bin/sh
 # compute-squad usage ledger, Claude Code SubagentStop and Stop hooks.
-# Appends one JSON line per subagent of a squad run, and a cumulative line for
-# the main session, to compute-squad-archive/usage.jsonl. Prints nothing; exits 0.
+# Appends one JSON line at each stop of a squad run's subagent (one continued
+# with SendMessage stops more than once, each line a running total), and a
+# cumulative line for the main session, to compute-squad-archive/usage.jsonl.
+# Prints nothing; exits 0.
 input=$(cat)
 # field reads a key's first string value. SubagentStop lists running agents,
 # with their own agent_type, in background_tasks after the top-level fields

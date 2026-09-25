@@ -42,12 +42,12 @@ Open for the PM:
 - the per-package listing below is zero-judgment work the map does not wait for
 
 DELEGATE:
-- [intern] packages/core: print each export of src/index.js whose JSDoc has @deprecated.
-- [intern] packages/cli: the same procedure.
-- [intern] packages/http: the same procedure.
-- [intern] packages/store: the same procedure.
-- [intern] packages/auth: the same procedure.
-- [intern] packages/util: the same procedure.
+- [intern] packages/core: print each export of src/index.js whose JSDoc has @deprecated; return at most 5 lines.
+- [intern] packages/cli: the same procedure; return at most 5 lines.
+- [intern] packages/http: the same procedure; return at most 5 lines.
+- [intern] packages/store: the same procedure; return at most 5 lines.
+- [intern] packages/auth: the same procedure; return at most 5 lines.
+- [intern] packages/util: the same procedure; return at most 5 lines.
 
 ## Status
 Timestamp: 2026-09-05T09:04:25Z

@@ -7,7 +7,8 @@ run.sh calls this script; it never calls a model itself.
     check_live.py collide <repo> <shim dir>
     check_live.py preflight <check> <repo>
     check_live.py snapshot <repo> <base> <state.json>
-    check_live.py verify <check> <repo> <base> <state.json> <result.json> [--summary FILE --label TEXT]
+    check_live.py verify <check> <repo> <base> <state.json> <result.json> [--tools FILE] [--summary FILE --label TEXT]
+    check_live.py toollog <tools.jsonl>
     check_live.py checks
 
 seed writes a seed log from tests/fixtures/logs/ into the scenario repo as
@@ -44,14 +45,32 @@ cannot be met as locked, assert their own), and ledger billed input within 1%
 of modelUsage with ledger output at or below it (WO-3c acceptance). It prints
 one line per assertion and exits 1 when any fails, 2 when it cannot run.
 
+toollog is the hook log: run.sh passes the claude call a PreToolUse hook
+(in --settings, with no matcher) that runs it, so every tool call the main
+session or a subagent makes appends one JSON line to the file: the session,
+the agent_id and agent_type of a subagent's call (a main-session call has
+neither), the tool, and the inputs the checks read, each string cut to 4,000
+characters (a spawn prompt keeps its full length in prompt_chars). It prints
+nothing and always exits 0, so it never blocks or changes a call. verify
+--tools reads the file. Two checks rest on it (work order WO-3f): S8, the
+reference run, holds the main session to SKILL.md's Stage 0 bound (no Read
+or Grep of tracked product source and no test or build command before the
+first squad-recon spawn) and its billed input and output, from the ledger's
+main-session line, to 756,000 and 12,400 tokens; S9 holds the audit to its
+skeptic cap (at most 10 skeptic spawns, the other findings UNREVIEWED in
+the ## Audit Findings entry). Check 8b runs the same rules over the cases in
+tests/fixtures/live/.
+
 Python 3.9 stdlib only.
 """
 import argparse
 import collections
+import fnmatch
 import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -91,6 +110,58 @@ MISSING_WORDS = re.compile(r"missing|not installed|not found|no chromium|no brow
 S6B_EPOCH = 1789893000
 # Checks whose scenario may end in a needs-human: blocker; each asserts its own.
 BLOCKER_CHECKS = ("s5", "s5b")
+# The hook log (toollog): the spawn tool's two names, the tool inputs kept,
+# and how much of each string input is kept.
+SPAWN_TOOLS = ("Agent", "Task")
+TOOL_INPUT_KEYS = ("file_path", "path", "pattern", "glob", "command", "subagent_type", "model", "description", "prompt")
+TOOL_TEXT_LIMIT = 4000
+# S8 (WO-3f): the main-session budget on the reference run, the after model's
+# estimate for the orchestrating session in the 3.9.2 analysis (section 5),
+# against 877,638 billed input and 14,408 output measured on 3.9.2.
+MAIN_BUDGET_INPUT = 756000
+MAIN_BUDGET_OUTPUT = 12400
+# What SKILL.md's Stage 0 bound lets the main session read in the repo besides
+# files the user named: the README and the instruction files the host injects.
+# Every other file tracked at the base commit is product source.
+STAGE0_DOCS = re.compile(r"(?:^|/)(?:README(?:\.[A-Za-z]+)?|CLAUDE\.md|AGENTS\.md)$")
+# A test or build command at the start of a shell command, after a ;, &, |,
+# (, or $(, or after environment assignments or a timeout wrapper: a package
+# manager's test, run, build, or runner command, npx and its kin, node's test
+# runner, make, a test runner or compiler called directly, or go's or cargo's
+# test and build.
+TEST_RUN = re.compile(
+    r"(?:^|[;&|(]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:timeout\s+\S+\s+)?"
+    r"(?:(?:npm|yarn|pnpm|bun)\s+(?:test|t|run|run-script|build|ci|exec|dlx|jest|vitest|mocha|tsc)\b"
+    r"|(?:npx|pnpx|bunx)\s|node\s+--test\b|make\b|(?:jest|vitest|mocha|ava|tap|pytest|tsc)\b"
+    r"|python3?\s+-m\s+(?:pytest|unittest)\b|(?:go|cargo)\s+(?:test|build)\b)",
+    re.MULTILINE,
+)
+# Shell programs that print, search, compare, or count a file's contents:
+# before its first squad-recon spawn the main session runs none of them over
+# product source. The search programs take a pattern first and read a
+# directory recursively (grep with -r or -R; rg, ag, and ack always); the
+# script programs take a script first.
+READ_PROGRAMS = frozenset((
+    "cat", "tac", "nl", "head", "tail", "less", "more", "sed", "awk", "gawk", "mawk", "cut", "sort", "uniq", "wc",
+    "od", "xxd", "hexdump", "strings", "bat", "diff", "cmp", "grep", "egrep", "fgrep", "rg", "ag", "ack",
+))
+SEARCH_PROGRAMS = frozenset(("grep", "egrep", "fgrep", "rg", "ag", "ack"))
+ALWAYS_RECURSIVE = frozenset(("rg", "ag", "ack"))
+SCRIPT_PROGRAMS = frozenset(("sed", "awk", "gawk", "mawk"))
+# The shell's operators: a redirection takes the next word as its target,
+# and any other run of operator characters (; | & && || ( ) and mixes) ends
+# a simple command. Descriptor duplications (2>&1) go first, and &> reads
+# as >.
+REDIRECTS = frozenset(("<", ">", ">>", "<<", "<<<", "<>"))
+SHELL_OPERATOR = re.compile(r"[();<>|&]+")
+FD_DUP = re.compile(r"[0-9]*>&[0-9-]*")
+# Words a simple command's program can follow.
+SHELL_PREFIXES = frozenset(("command", "exec", "nice", "do", "then", "else", "elif", "if", "while", "until", "!", "{",
+                            "time"))
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+# S9 (WO-3f): tests/live/repo-reset-audit.patch plants about 30 defects on
+# the WO-1 change, so the finders' candidate findings exceed the skeptic cap.
+S9_PLANTED = 30
 
 
 class SetupError(Exception):
@@ -288,6 +359,423 @@ def snapshot(repo, base):
     }
 
 
+# ---- the hook log --------------------------------------------------------------
+
+def cmd_toollog(path):
+    """The PreToolUse hook run.sh passes each claude call: append one line for
+    this tool call to path. It prints nothing and exits 0 whatever happens, so
+    it never blocks or changes a call; a single write keeps the lines of
+    parallel agents whole."""
+    try:
+        event = json.loads(sys.stdin.read())
+        if not isinstance(event, dict) or not isinstance(event.get("tool_name"), str):
+            return 0
+        given = event.get("tool_input") if isinstance(event.get("tool_input"), dict) else {}
+        record = {key: event[key] for key in ("session_id", "agent_id", "agent_type", "tool_name", "tool_use_id", "cwd")
+                  if isinstance(event.get(key), str) and event[key]}
+        kept = {}
+        for key in TOOL_INPUT_KEYS:
+            value = given.get(key)
+            if isinstance(value, str):
+                kept[key] = value[:TOOL_TEXT_LIMIT]
+                if key == "prompt":
+                    record["prompt_chars"] = len(value)
+        record["tool_input"] = kept
+        data = (json.dumps(record, sort_keys=True) + "\n").encode("utf-8")
+        handle = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(handle, data)
+        finally:
+            os.close(handle)
+    except Exception:  # noqa: BLE001  (a hook that fails must not block the call)
+        pass
+    return 0
+
+
+def read_tool_log(path):
+    """The records toollog wrote, in call order; None when there is no file."""
+    text = read_text(path) if path else None
+    if text is None:
+        return None
+    records = []
+    for line in text.splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict):
+            records.append(record)
+    return records
+
+
+def spawned_agent(record):
+    """The agent a spawn record starts, without the plugin prefix, or None."""
+    if record.get("tool_name") not in SPAWN_TOOLS:
+        return None
+    agent = str((record.get("tool_input") or {}).get("subagent_type") or "general-purpose")
+    return agent[len(PLUGIN_PREFIX):] if agent.startswith(PLUGIN_PREFIX) else agent
+
+
+def main_calls(records):
+    """The main session's calls: a subagent's call carries an agent_id."""
+    return [r for r in records if not r.get("agent_id")]
+
+
+def repo_path(path, cwd, repo):
+    """path relative to repo (resolved against cwd), or the absolute path when
+    it lies outside repo."""
+    full = os.path.normpath(os.path.join(cwd or repo, path))
+    rel = os.path.relpath(full, os.path.normpath(repo))
+    return full if rel == os.pardir or rel.startswith(os.pardir + os.sep) else rel
+
+
+def product_source(paths):
+    """The tracked paths the Stage 0 bound does not let the main session read."""
+    return sorted(p for p in paths if not STAGE0_DOCS.search(p))
+
+
+def strip_heredocs(command):
+    """command without its here-document bodies, so text a Bash call appends to
+    the log (a Goal entry naming npm test, say) never reads as a command."""
+    kept, end = [], None
+    for line in command.split("\n"):
+        if end is not None:
+            if line.lstrip("\t") == end:
+                end = None
+            continue
+        kept.append(line)
+        match = HEREDOC.search(line)
+        if match:
+            end = match.group(2)
+    return "\n".join(kept)
+
+
+def simple_commands(text):
+    """text's simple commands, each as (words, input files): its words with
+    redirections taken out, and the files its < redirections read. Each line
+    is lexed as the shell would, so quoted text stays one word; a line whose
+    quotes do not balance splits on whitespace and operators alone."""
+    commands = []
+    for line in FD_DUP.sub(" ", text).replace("&>", ">").split("\n"):
+        try:
+            lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError:
+            tokens = [t for t in re.split(r"\s+|([();<>|&]+)", line) if t]
+        words, inputs, target = [], [], None
+        for token in tokens:
+            if target is not None:
+                if target == "<":
+                    inputs.append(token)
+                target = None
+            elif token in REDIRECTS:
+                target = token
+            elif SHELL_OPERATOR.fullmatch(token):
+                commands.append((words, inputs))
+                words, inputs = [], []
+            else:
+                words.append(token)
+        commands.append((words, inputs))
+    return [c for c in commands if c[0] or c[1]]
+
+
+def covered_paths(word, cwd, repo, product, recursive):
+    """The product files a path word reaches: the file it names, the files a
+    shell glob in it matches, or, for a recursive search, the files under the
+    directory it names."""
+    path = repo_path(word, cwd, repo)
+    if any(ch in word for ch in "*?["):
+        return [p for p in product if fnmatch.fnmatch(p, path)]
+    if path in product:
+        return [path]
+    if recursive:
+        return [p for p in product if path == "." or p.startswith(path.rstrip("/") + "/")]
+    return []
+
+
+def bash_reads(command, cwd, repo, product):
+    """The product files a Bash command reads, heredoc bodies aside: a
+    READ_PROGRAMS command's file arguments, a recursive search over a directory
+    that holds product files (grep -r, rg, and git grep search the working
+    directory when they name no path), an input redirection, or a git show
+    <rev>:<path>. A cd earlier in the command moves where later paths
+    resolve. product holds repo-relative paths (product_source)."""
+    reached = []
+    for kept, inputs in simple_commands(strip_heredocs(command)):
+        for word in inputs:
+            reached += covered_paths(word, cwd, repo, product, False)
+        while kept and (re.match(r"[A-Za-z_][A-Za-z0-9_]*=", kept[0]) or kept[0] in SHELL_PREFIXES):
+            kept = kept[1:]
+        if kept[:1] == ["timeout"]:
+            kept = kept[2:]
+        if not kept:
+            continue
+        program, args = os.path.basename(kept[0]), kept[1:]
+        if program == "cd":
+            cwd = os.path.normpath(os.path.join(cwd, args[0])) if args else repo
+            continue
+        if program == "git" and args[:1] == ["show"]:
+            reached += [p for arg in args[1:] if ":" in arg and not arg.startswith("-")
+                        for p in covered_paths(arg.split(":", 1)[1], repo, repo, product, False)]
+            continue
+        search = program in SEARCH_PROGRAMS or (program == "git" and args[:1] == ["grep"])
+        if program == "git" and args[:1] == ["grep"]:
+            args = args[1:]
+        elif program not in READ_PROGRAMS:
+            continue
+        if program in ALWAYS_RECURSIVE and "--files" in args:
+            continue  # rg --files lists paths, a listing the bound allows
+        cut = args.index("--") if "--" in args else len(args)
+        options = [a for a in args[:cut] if a.startswith("-")]
+        positional = [a for a in args[:cut] if not a.startswith("-")] + args[cut + 1:]
+        named_script = any(o in ("-e", "-f") or o.startswith(("--regexp", "--file", "--expression"))
+                           for o in options)
+        if (search or program in SCRIPT_PROGRAMS) and not named_script:
+            positional = positional[1:]
+        recursive = program in ALWAYS_RECURSIVE or program == "git" or (search and any(
+            o in ("--recursive", "--dereference-recursive")
+            or (not o.startswith("--") and ("r" in o[1:] or "R" in o[1:])) for o in options))
+        if recursive and not positional:
+            positional = ["."]
+        for word in positional:
+            reached += covered_paths(word, cwd, repo, product, recursive)
+    return sorted(set(reached))
+
+
+def grep_covers(given, cwd, repo, product):
+    """The product files a Grep call searches: those under its path (the cwd
+    when it names none) that its glob, if any, matches."""
+    root = repo_path(given.get("path") or ".", cwd, repo)
+    covered = [p for p in product if root == "." or p == root or p.startswith(root + "/")]
+    glob = given.get("glob")
+    if glob:
+        covered = [p for p in covered if fnmatch.fnmatch(p, glob) or fnmatch.fnmatch(os.path.basename(p), glob)]
+    return covered
+
+
+def stage0_judgment(records, repo, product):
+    """S8's Stage 0 rule over a hook log (SKILL.md's Stage 0 bound): before its
+    first squad-recon spawn the main session reads no product source, by a Read
+    of a product file, a Grep over one, or a Bash command that reads one
+    (bash_reads), and runs no test or build command.
+    product holds the repo-relative paths of product source (product_source);
+    S8's prompt names no file, so none is exempt as a file the user named.
+    Returns (ok, what it found)."""
+    calls = main_calls(records)
+    recon = next((i for i, r in enumerate(calls) if spawned_agent(r) == "squad-recon"), None)
+    if recon is None:
+        return False, "the hook log has no main-session squad-recon spawn"
+    product, broken, read = set(product), [], []
+    for record in calls[:recon]:
+        tool, given, cwd = record.get("tool_name"), record.get("tool_input") or {}, record.get("cwd") or repo
+        if tool == "Read" and given.get("file_path"):
+            path = repo_path(given["file_path"], cwd, repo)
+            read.append(path)
+            if path in product:
+                broken.append(f"Read {path}")
+        elif tool == "Grep":
+            covered = grep_covers(given, cwd, repo, sorted(product))
+            if covered:
+                broken.append(f"Grep {given.get('pattern')!r} over {len(covered)} product files ({', '.join(covered[:3])})")
+        elif tool == "Bash":
+            command = given.get("command") or ""
+            reached = bash_reads(command, cwd, repo, sorted(product))
+            if TEST_RUN.search(strip_heredocs(command)):
+                broken.append("Bash " + repr(command[:120]))
+            elif reached:
+                broken.append(f"Bash {command[:120]!r} reads {len(reached)} product files ({', '.join(reached[:3])})")
+    found = (f"{recon} main-session calls before the first squad-recon spawn, reading "
+             + (", ".join(sorted(set(read))) or "no file"))
+    if broken:
+        found += "; against the bound: " + "; ".join(broken)
+    return not broken, found
+
+
+def pointer_form():
+    """SKILL.md's spawn pointer (Spawn prompts and routing) as (limit, keys,
+    values): the most characters a prompt may have, its lines' keys in order,
+    and for each key whose placeholder lists its words (<A|B>) those words."""
+    text = read_text(SKILL_PATH) or ""
+    match = re.search(r"Every stage spawn prompt is a pointer of at most ([0-9]+) characters, in exactly this "
+                      r"form:\s*```\n(.*?)\n```", text, re.DOTALL)
+    if not match:
+        raise SetupError(f"{SKILL_PATH}: no spawn pointer reading 'Every stage spawn prompt is a pointer of at most "
+                         f"<N> characters, in exactly this form:' and a fenced block")
+    keys, values = [], {}
+    for line in match.group(2).split("\n"):
+        key, _, value = line.partition(": ")
+        keys.append(key)
+        words = re.fullmatch(r"<([A-Za-z]+(?:\|[A-Za-z]+)+)>", value)
+        if words:
+            values[key] = words.group(1).split("|")
+    return int(match.group(1)), keys, values
+
+
+REVIEW_APPEND = re.compile(r"(?m)^" + re.escape(check_logs.REVIEW_HEADING) + r"[ \t]*$")
+
+
+def pointer_judgment(records):
+    """S8's spawn-prompt rule (SKILL.md's Spawn prompts and routing): every
+    main-session spawn of a squad stage gets the pointer and nothing else: at
+    most the form's characters (the hook log's prompt_chars), one line per key
+    of the form in its order, and Stage: and Mode: values the form lists.
+    A helper spawned for a DELEGATE: subtask is exempt, since the subtask's
+    procedure is its prompt (DELEGATE step 2): every squad-helper spawn, and a
+    squad-mech spawn whose prompt does not open with the form's first key,
+    made after a spawn of a stage that writes log entries and before any
+    main-session append of a ## High-stakes review since that spawn.
+    squad-mech's Stage 1 archive comes before any such spawn and its closing
+    archive after the review, so both stay held to the form.
+    Returns (ok, what it found)."""
+    limit, keys, values = pointer_form()
+    spawns, helpers, stage_seen, reviewed = [], 0, False, False
+    for record in main_calls(records):
+        agent = spawned_agent(record) or ""
+        given = record.get("tool_input") or {}
+        if record.get("tool_name") == "Bash" and REVIEW_APPEND.search(str(given.get("command") or "")):
+            reviewed = True
+        if not agent.startswith("squad-"):
+            continue
+        opens = str(given.get("prompt") or "").lstrip().startswith(keys[0] + ":")
+        if agent == "squad-helper" or (agent == "squad-mech" and stage_seen and not reviewed and not opens):
+            helpers += 1
+            continue
+        spawns.append(record)
+        if agent != "squad-mech":
+            stage_seen, reviewed = True, False
+    sizes, broken = [], []
+    for record in spawns:
+        prompt = str((record.get("tool_input") or {}).get("prompt") or "")
+        size = int(record.get("prompt_chars") or len(prompt))
+        sizes.append(size)
+        lines = [line.partition(": ") for line in prompt.strip().split("\n")]
+        wrong = [f"{size} characters"] if size > limit else []
+        if [line[0].strip() for line in lines] != keys or not all(line[2].strip() for line in lines):
+            wrong.append("not one line per pointer key")
+        else:
+            wrong += [f"{key}: {value.strip()}" for key, _, value in lines
+                      if key in values and value.strip() not in values[key]]
+        if wrong:
+            broken.append(f"{spawned_agent(record)} ({', '.join(wrong)})")
+    found = (f"{len(spawns)} stage spawn prompts, the longest {max(sizes or [0])} characters against the pointer's "
+             f"{limit}; DELEGATE helper spawns exempt: {helpers}")
+    if not spawns:
+        return False, "the hook log has no main-session stage spawn"
+    if broken:
+        found += "; not the pointer: " + "; ".join(broken)
+    return not broken, found
+
+
+def main_usage(records, session):
+    """The main session's billed input (input + cache_write + cache_read),
+    output, calls, and models from its ledger line for session with the most
+    calls: the hook writes a running total at every stop, and hooks that run
+    at once can land out of order. None when it has no line."""
+    mains = [(int(r.get("calls") or 0), i, r) for i, r in enumerate(records)
+             if r.get("agent") == "main" and r.get("session") == session]
+    if not mains:
+        return None
+    last = max(mains, key=lambda item: item[:2])[2]
+    billed = sum(int(last.get(key, 0) or 0) for key in ("input", "cache_write", "cache_read"))
+    return {"billed": billed, "output": int(last.get("output", 0) or 0), "calls": last.get("calls"),
+            "models": last.get("models") or "model unknown"}
+
+
+def budget_judgment(records, session):
+    """S8's budget rule (WO-3f acceptance): the main session's billed input and
+    output stay at or below MAIN_BUDGET_INPUT and MAIN_BUDGET_OUTPUT.
+    Returns (ok, what it found)."""
+    usage = main_usage(records, session)
+    if usage is None:
+        return False, f"{LEDGER} has no main-session line for session {session}"
+    ok = usage["billed"] <= MAIN_BUDGET_INPUT and usage["output"] <= MAIN_BUDGET_OUTPUT
+    return ok, (f"main session ({usage['models']}, {usage['calls']} calls): billed input {usage['billed']:,} against "
+                f"{MAIN_BUDGET_INPUT:,}, output {usage['output']:,} against {MAIN_BUDGET_OUTPUT:,}")
+
+
+def audit_spawns(records):
+    """The main session's audit spawns in a hook log, as (finders, skeptics):
+    spawns of an agent outside the squad, a skeptic being one whose prompt
+    carries the skeptic brief, which asks it to refute a finding."""
+    spawns = [r for r in main_calls(records) if spawned_agent(r) and not spawned_agent(r).startswith("squad-")]
+    skeptics = [r for r in spawns if "refute" in str((r.get("tool_input") or {}).get("prompt") or "").lower()]
+    finders = [r for r in spawns if r not in skeptics]
+    return finders, skeptics
+
+
+def audit_counts(entry):
+    """(Findings n, skeptics run k, cap) from an ## Audit Findings entry, or None."""
+    for _, text in entry["body"]:
+        match = re.fullmatch(r"Findings: ([0-9]+); skeptics run: ([0-9]+) \(cap ([0-9]+)\)", text)
+        if match:
+            return tuple(int(group) for group in match.groups())
+    return None
+
+
+def s9_judgment(entries, records, protocol):
+    """S9's audit-cap rule (WO-3f acceptance): the call appended one
+    ## Audit Findings entry whose finders found more findings than the skeptic
+    cap, whose skeptics run equal the cap, and whose other findings read
+    UNREVIEWED, and the hook log shows exactly that many skeptic spawns.
+    Returns (ok, what it found)."""
+    cap, unreviewed_word = protocol.audit["cap"], protocol.audit["unreviewed"]
+    finders, skeptics = audit_spawns(records)
+    spawned = f"the hook log shows {len(finders)} finder and {len(skeptics)} skeptic spawns"
+    audits = [e for e in entries if e["heading"] == check_logs.AUDIT_HEADING]
+    if len(audits) != 1:
+        return False, f"{len(audits)} new {check_logs.AUDIT_HEADING} entries; {spawned}"
+    counts = audit_counts(audits[0])
+    if counts is None:
+        return False, f"the {check_logs.AUDIT_HEADING} entry has no 'Findings: <n>; skeptics run: <k> (cap <N>)' line"
+    total, run, _ = counts
+    unreviewed = sum(1 for _, text in audits[0]["body"] if text.startswith(f"- {unreviewed_word} "))
+    found = (f"Findings: {total}; skeptics run: {run}; {unreviewed} {unreviewed_word} (cap {cap}); {spawned}")
+    if total <= cap:
+        found += f"; the finders returned {total} findings, so the cap of {cap} never bound"
+    ok = total > cap and run == cap and unreviewed == total - run and len(skeptics) == run
+    return ok, found
+
+
+LIVE_FIXTURES = os.path.join("tests", "fixtures", "live")
+# The checks whose rules read the hook log or the ledger, each with its cases
+# in tests/fixtures/live/<check>.json.
+LOG_RULE_CHECKS = ("s8", "s9")
+
+
+def seed_text(fixture):
+    """The seed log a tests/fixtures/live/ file names ("seed"), or ""."""
+    name = fixture.get("seed")
+    if not name:
+        return ""
+    return read_text(os.path.join(REPO_ROOT, "tests", "fixtures", "logs", f"{name}.log.md")) or ""
+
+
+def judge_case(check, fixture, case):
+    """Apply a live check's rule to one case of tests/fixtures/live/<check>.json
+    (check 8b runs every case): the hook log a live call could leave
+    ("events"), with S8's ledger lines ("ledger") for its session ("session"),
+    or the lines S9's call could append to the file's seed ("append"). S8's
+    repo is the seeds' worktree, and its product source is the file's fixture
+    repo (tests/fixtures/<repo>/) as tracked. Returns (ok, what it found)."""
+    events = case.get("events") or []
+    if check == "s8":
+        folder = os.path.join("tests", "fixtures", fixture.get("repo") or "")
+        tracked = [p for p in git(REPO_ROOT, "ls-files", "-z", "--", folder).split("\0") if p]
+        if not fixture.get("repo") or not tracked:
+            raise SetupError(f"{LIVE_FIXTURES}/{check}.json names no tracked fixture repo ('repo')")
+        product = product_source([os.path.relpath(p, folder) for p in tracked])
+        ok_reads, reads = stage0_judgment(events, SEED_WORKTREE, product)
+        ok_pointer, pointers = pointer_judgment(events)
+        ok_budget, budget = budget_judgment(case.get("ledger") or [], case.get("session"))
+        return ok_reads and ok_pointer and ok_budget, f"{reads}; {pointers}; {budget}"
+    if check == "s9":
+        start = len(seed_text(fixture).rstrip("\n").splitlines()) + 2
+        protocol = check_logs.load_protocol(SKILL_PATH)
+        return s9_judgment(entries_of(case.get("append") or [], start), events, protocol)
+    raise SetupError(f"no hook-log or ledger rule for check {check!r}")
+
+
 def cmd_snapshot(repo, base, out):
     state = snapshot(repo, base)
     with open(out, "w", encoding="utf-8") as handle:
@@ -339,11 +827,12 @@ def executor_routes():
 
 
 class Context(object):
-    def __init__(self, repo, base, before, result):
+    def __init__(self, repo, base, before, result, events=None):
         self.repo = os.path.abspath(repo)
         self.base = base
         self.before = before
         self.result = result
+        self.events = events   # the hook log's records, or None without one
         stats = result.get("subagent_stats") or {}
         self.by_type = {
             (k[len(PLUGIN_PREFIX):] if k.startswith(PLUGIN_PREFIX) else k): v
@@ -847,6 +1336,65 @@ def check_s7b(ctx, report, protocol):
               "the final message names the three-FAIL stop", text[:300])
 
 
+def expect_tool_log(ctx, report):
+    return report.ok(bool(ctx.events), "run.sh's hook log recorded this call's tool calls", "no hook log, or an empty one")
+
+
+def check_s8(ctx, report, protocol):
+    """S8: the reference run, "/squad <goal>" on an empty log (WO-3f)."""
+    report.ok("squad-recon" in ctx.by_type, "a squad-recon spawn (Stage 2)", f"got {ctx.by_type}")
+    verdicts = [e["heading"] for e in ctx.new_entries if e["heading"] in check_logs.VERDICT_HEADINGS]
+    report.ok("## PM — PASS" in verdicts, "the run reaches a PM PASS, so its usage is a whole reference run's",
+              f"verdicts {verdicts}")
+    if expect_tool_log(ctx, report):
+        tracked = git(ctx.repo, "ls-tree", "-r", "-z", "--name-only", ctx.before["base"]).split("\0")
+        ok, found = stage0_judgment(ctx.events, ctx.repo, product_source([p for p in tracked if p]))
+        report.ok(ok, "before the first squad-recon spawn the main session reads no product source (Read, Grep, or "
+                      "a Bash read) and runs no test or build (SKILL.md's Stage 0 bound)", found)
+        if ok:
+            report.note(found)
+        ok, found = pointer_judgment(ctx.events)
+        report.ok(ok, "every main-session stage spawn prompt is the pointer and nothing else (SKILL.md's Spawn "
+                      "prompts and routing)", found)
+        if ok:
+            report.note(found)
+    ok, found = budget_judgment(ledger(ctx.repo), ctx.result.get("session_id"))
+    report.ok(ok, f"the main session stays within {MAIN_BUDGET_INPUT:,} billed input and {MAIN_BUDGET_OUTPUT:,} output "
+                  f"tokens (the ledger's main-session line)", found)
+    if ok:
+        report.note(found + "; the ledger's output can read low (the ledger check below notes any shortfall)")
+
+
+def check_s9(ctx, report, protocol):
+    """S9: the audit seed, WO-1 with about 30 planted defects; "Resume the squad run." (WO-3f)."""
+    report.ok(set(ctx.by_type) == {"general-purpose"},
+              "every spawn is the host's general-purpose agent (finders and skeptics), and no squad agent runs",
+              f"got {ctx.by_type}")
+    if expect_tool_log(ctx, report):
+        cap = protocol.audit["cap"]
+        ok, found = s9_judgment(ctx.new_entries, ctx.events, protocol)
+        report.ok(ok, f"the finders' findings exceed the cap of {cap}, one skeptic spawn per reviewed finding runs "
+                      f"{cap} skeptics, and the ## Audit Findings entry marks the rest "
+                      f"{protocol.audit['unreviewed']}", found)
+        if ok:
+            report.note(found + f"; the seed plants about {S9_PLANTED}")
+        finders, skeptics = audit_spawns(ctx.events)
+        report.ok(sum(ctx.by_type.values()) == len(finders) + len(skeptics),
+                  "subagent_stats counts the finder and skeptic spawns the hook log shows",
+                  f"by_type {ctx.by_type}, hook log {len(finders)} + {len(skeptics)}")
+        for role, spawns in (("finder", finders), ("skeptic", skeptics)):
+            models = collections.Counter(str((r.get("tool_input") or {}).get("model") or "none") for r in spawns)
+            report.note(f"{role} spawns by model: {dict(models)}")
+    tail = [e["heading"] for e in ctx.new_entries[-2:]]
+    report.ok(tail == [check_logs.AUDIT_HEADING, check_logs.STATUS_HEADING] and "squad-pm" in ctx.status.get("Next", ""),
+              "the call ends with the ## Audit Findings entry and a ## Status whose Next: spawns squad-pm (ACCEPT)",
+              f"last entries {tail}, Next: {ctx.status.get('Next')}")
+    expect_product_unchanged(ctx, report)
+    expect_log_kept(ctx, report)
+    expect_no_new_archive(ctx, report, "the run stops before acceptance")
+    expect_no_new_grant(ctx, report)
+
+
 CHECKS = collections.OrderedDict([
     ("s1-plan", check_s1_plan),
     ("s1-approve", check_s1_approve),
@@ -863,13 +1411,16 @@ CHECKS = collections.OrderedDict([
     ("s6a", check_s6a),
     ("s6b", check_s6b),
     ("s7b", check_s7b),
+    ("s8", check_s8),
+    ("s9", check_s9),
 ])
 
 
 def check_ledger(ctx, report):
     """WO-3c acceptance: the usage ledger's lines for this session total the
-    host's billed input within 1% and never exceed its output, and this call
-    added one line per spawn."""
+    host's billed input within 1% and never exceed its output, and this call's
+    new lines name one agent per spawn (an agent continued with SendMessage
+    writes a line at each stop, and its last one counts)."""
     session = ctx.result.get("session_id")
     records = [r for r in ledger(ctx.repo) if r.get("session") == session]
     if not records:
@@ -904,12 +1455,13 @@ def check_ledger(ctx, report):
         report.note(f"ledger output reads {host_output - output:,} tokens "
                     f"({(host_output - output) / host_output:.1%}) below modelUsage")
     added = collections.Counter(r.get("agent") for aid, r in agents.items() if aid not in set(ctx.before["ledger_ids"]))
-    report.ok(dict(added) == ctx.by_type, "the ledger gained one line per spawned agent", f"ledger {dict(added)}, spawned {ctx.by_type}")
+    report.ok(dict(added) == ctx.by_type, "the ledger gained lines for one agent per spawn", f"ledger {dict(added)}, spawned {ctx.by_type}")
 
 
-def cmd_verify(check, repo, base, state_path, result_path, summary, label):
+def cmd_verify(check, repo, base, state_path, result_path, summary, label, tools=None):
     with open(state_path, encoding="utf-8") as handle:
         before = json.load(handle)
+    events = read_tool_log(tools)
     report = Report()
     print(f"{label or check}: check {check}")
     try:
@@ -922,9 +1474,11 @@ def cmd_verify(check, repo, base, state_path, result_path, summary, label):
         return finish(report, summary, label, check, None)
 
     protocol = check_logs.load_protocol(SKILL_PATH)
-    ctx = Context(repo, base, before, result)
+    ctx = Context(repo, base, before, result, events)
     report.note(f"cost ${float(result.get('total_cost_usd') or 0):.2f}, {result.get('num_turns')} turns, "
                 f"by_type {ctx.by_type or '{}'}, {len(ctx.denials)} permission denials")
+    if events is not None:
+        report.note(f"hook log: {len(events)} tool calls, {len(main_calls(events))} of them the main session's")
     for denial in ctx.denials:
         report.note("denied: " + json.dumps(denial)[:300])
     report.ok(result.get("is_error") is False and result.get("subtype") == "success",
@@ -981,8 +1535,11 @@ def main(argv=None):
     verify.add_argument("base")
     verify.add_argument("state")
     verify.add_argument("result")
+    verify.add_argument("--tools", help="the hook log toollog wrote for this call")
     verify.add_argument("--summary")
     verify.add_argument("--label")
+    toollog = sub.add_parser("toollog")
+    toollog.add_argument("path")
     sub.add_parser("checks")
     args = parser.parse_args(argv)
     try:
@@ -995,7 +1552,10 @@ def main(argv=None):
         if args.command == "snapshot":
             return cmd_snapshot(args.repo, args.base, args.out)
         if args.command == "verify":
-            return cmd_verify(args.check, args.repo, args.base, args.state, args.result, args.summary, args.label)
+            return cmd_verify(args.check, args.repo, args.base, args.state, args.result, args.summary, args.label,
+                              args.tools)
+        if args.command == "toollog":
+            return cmd_toollog(args.path)
         if args.command == "checks":
             for name, function in CHECKS.items():
                 print(f"{name}\t{function.__doc__}")

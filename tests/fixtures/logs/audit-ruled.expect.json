@@ -1,0 +1,24 @@
+{
+  "note": "An audit-grade run: the PASS names every CONFIRMED and NEEDS-HUMAN finding of the ## Audit Findings entry with a ruling. The confirmed per-IP finding is placed outside the goal by quoting its Out of scope line, and the NEEDS-HUMAN one is settled by showing the guard.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "name every CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding in the latest one with your ruling in your verdict entry."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "A CONFIRMED finding is FAIL evidence unless you quote the Out of scope or criterion text of the latest `## Goal — Locked` entry that places it outside the goal; a defect this change introduced is never outside it."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "run the high-stakes review procedure",
+      "via": "row: `## PM — PASS` in a high-stakes run"
+    }
+  ]
+}

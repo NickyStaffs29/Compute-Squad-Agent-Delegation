@@ -1,0 +1,22 @@
+{
+  "note": "The PASS rules on the NEEDS-HUMAN finding but never names the CONFIRMED per-IP finding, so nothing shows why a confirmed finding did not fail the work.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "name every CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding in the latest one with your ruling in your verdict entry."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "audit-ruling"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "run the high-stakes review procedure",
+      "via": "row: `## PM — PASS` in a high-stakes run"
+    }
+  ]
+}

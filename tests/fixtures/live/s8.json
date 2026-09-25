@@ -1,0 +1,6377 @@
+{
+ "note": "Cases for the live S8 check (tests/live/check_live.py, work order WO-3f), which check 8b runs through the same rules: the hook log a reference run could leave and the usage ledger's lines for it. Stage 0 may read the skill, the log, the README and the instruction files, and make one listing; before its first squad-recon spawn the main session reads no other tracked file of the fixture repo, by a Read, a Grep, or a Bash command that prints, searches, or counts one, and runs no test or build command. A subagent's calls, and the main session's calls after that spawn (the high-stakes review reads the diff and re-runs the tests), are outside the bound. Every main-session spawn of a squad stage carries the five-line pointer and nothing else, in at most 400 characters, except a helper spawned for a DELEGATE: subtask: squad-helper, or squad-mech with a prompt that does not open with Stage:, spawned after a stage that writes entries and before a high-stakes review; squad-mech's Stage 1 and closing archives stay held to the pointer. The session's main-session running total, its ledger line with the most calls, must stay within 756,000 billed input and 12,400 output tokens, the after model's estimate for the orchestrating session in the 3.9.2 analysis (section 5), which is WO-3f's acceptance.",
+ "cites": [
+  {
+   "file": "skills/compute-squad/SKILL.md",
+   "text": "Stage 0 reads only what finding gaps in the goal needs: the user's request, the project instructions already in context, the README, at most one directory listing, files the user named, and `COMPUTE_SQUAD_LOG.md` for the checks above."
+  },
+  {
+   "file": "skills/compute-squad/SKILL.md",
+   "text": "It never reads product source to map it, never runs tests or builds, and never lists files or questions for Recon; mapping and the baseline run are Recon's."
+  },
+  {
+   "file": "skills/compute-squad/SKILL.md",
+   "text": "and report for each line the agent, model, elapsed seconds, billed input (input + cache_write + cache_read) and output."
+  },
+  {
+   "file": "skills/compute-squad/SKILL.md",
+   "text": "Every stage spawn prompt is a pointer of at most 400 characters, in exactly this form:"
+  },
+  {
+   "file": "skills/compute-squad/SKILL.md",
+   "text": "a helper spawned for a `DELEGATE:` subtask gets that subtask's exact procedure, copied from the log"
+  },
+  {
+   "file": "skills/compute-squad/SKILL.md",
+   "text": "spawn the requested helpers (`squad-mech` for intern tasks; `squad-helper` for execution tasks)"
+  }
+ ],
+ "repo": "repo-reset",
+ "cases": [
+  {
+   "note": "Stage 0 within the bound, a Goal append whose text names npm test, and the review's reads after Recon; usage within the budget",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "the spawn tool under its other name, Task",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Task",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "a subagent's read of product source before Recon is not the main session's",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/app.js"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "a Grep over the repo for Markdown only reaches the instruction files",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Grep",
+     "tool_input": {
+      "pattern": "cooldown",
+      "glob": "*.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "usage exactly at the budget",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 0,
+     "cache_write": 100000,
+     "cache_write_1h": 100000,
+     "cache_read": 656000,
+     "output": 12400,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "another session's larger main-session line does not count",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "0000-other-session",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 30,
+     "input": 0,
+     "cache_write": 200000,
+     "cache_write_1h": 200000,
+     "cache_read": 900000,
+     "output": 20000,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 prints the README and searches the instruction files and the log in Bash, which the bound allows",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "cat README.md 2>/dev/null | head -n 40; grep -rn -E 'cooldown|reset' CLAUDE.md COMPUTE_SQUAD_LOG.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Recon's intern DELEGATE: squad-mech gets the subtask's exact procedure, copied from the log, which the pointer rule exempts like squad-helper",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Recon\nTimestamp: 2026-09-25T10:12:00Z\nRun: 2026-09-25-reset-cooldown\nBase: 4f2c9a1\nBaseline: npm test, 12 passing\nDELEGATE:\n- [intern] find . -path ./node_modules -prune -o -type f -print | wc -l; return at most 5 lines.\nEOF"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "- [intern] find . -path ./node_modules -prune -o -type f -print | wc -l; return at most 5 lines."
+     },
+     "prompt_chars": 96
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "find . -path ./node_modules -prune -o -type f -print | wc -l"
+     },
+     "agent_id": "a03mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Delegated — Recon\nTimestamp: 2026-09-25T10:14:00Z\n- 214\nRan as written; 0 lines cut.\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "squad-mech's closing archive after an upheld high-stakes review, in the pointer with Mode: close",
+   "live": "pass",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## High-stakes review\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nResult: upheld\n\n## Status\nTimestamp: $d\nNext: spawn squad-mech to close the run\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: close\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: ## High-stakes review, ## Status"
+     },
+     "prompt_chars": 164
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 reads a product source file",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 reads package.json, which the bound does not list",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/package.json"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 reads product source by a relative path",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "src/server/app.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 greps the whole repo",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Grep",
+     "tool_input": {
+      "pattern": "requestPasswordReset"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 greps under src",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Grep",
+     "tool_input": {
+      "pattern": "listResetTokens",
+      "path": "src"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 runs the test suite",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 20"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 runs node's test runner after a cd",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "cd /home/dev/app && node --test"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "no squad-recon spawn in the hook log",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "billed input one token over the budget",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 1,
+     "cache_write": 100000,
+     "cache_write_1h": 100000,
+     "cache_read": 656000,
+     "output": 12000,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "output one token over the budget",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 12401,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "no main-session ledger line for this session",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "an earlier running total written last does not hide the larger final one",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 0,
+     "cache_write": 200000,
+     "cache_write_1h": 200000,
+     "cache_read": 600000,
+     "output": 12000,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 prints a product source file with cat",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "cat src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 prints part of a product source file with sed",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "sed -n 1,80p src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 searches src with grep -r",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -rn requestPasswordReset src/"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 runs the tests through yarn's jest",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "yarn jest 2>&1 | tail -n 20"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Stage 0 runs make test",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "make test"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "Recon's spawn prompt adds the goal after the pointer lines",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn\nGoal: add a 60-second resend cooldown to password reset requests; map reset.service.js first."
+     },
+     "prompt_chars": 234
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "a spawn prompt over the pointer's 400 characters",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn (the Goal entry and the Status entry) (the Goal entry and the Status entry) (the Goal entry and the Status entry) (the Goal entry and the Status entry) (the Goal entry and the Status entry) (the Goal entry and the Status entry) (the Goal entry and the Status entry) (the Goal entry and the Status entry)"
+     },
+     "prompt_chars": 444
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "squad-mech's Stage 1 archive spawn is not the pointer: no stage has written an entry yet, so it is no DELEGATE helper",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Archive COMPUTE_SQUAD_LOG.md to compute-squad-archive/ and clear it; run 2026-09-25-reset-cooldown."
+     },
+     "prompt_chars": 99
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  },
+  {
+   "note": "squad-mech's closing archive after an upheld high-stakes review is not the pointer, although a DELEGATE helper ran earlier in the run",
+   "live": "fail",
+   "session": "5c1f0e2a-live",
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Skill",
+     "tool_input": {
+      "skill": "compute-squad:squad"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/.claude/plugins/compute-squad/skills/compute-squad/SKILL.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "test -s COMPUTE_SQUAD_LOG.md && echo non-empty || echo empty"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Glob",
+     "tool_input": {
+      "pattern": "*",
+      "path": "/home/dev/app"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/CLAUDE.md"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Stage: Archive\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: new run"
+     },
+     "prompt_chars": 138
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md || echo 'log was already empty.'"
+     },
+     "agent_id": "a01mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## Goal — Locked\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nAttended: no\nGoal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.\nAcceptance criteria:\n- AC4: npm test passes.\nOut of scope: per-IP throttling\nAssumptions: none\n\n## Status\nTimestamp: $d\nNext: spawn squad-recon\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-recon",
+      "description": "compute-squad:squad-recon",
+      "prompt": "Stage: Recon\nMode: none\nRepo root: /home/dev/app\nLog: COMPUTE_SQUAD_LOG.md, run 2026-09-25-reset-cooldown\nSince your last spawn: first spawn"
+     },
+     "prompt_chars": 140
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "set -o pipefail; npm test 2>&1 | tail -n 5; echo \"exit $?\""
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Recon\nTimestamp: 2026-09-25T10:12:00Z\nRun: 2026-09-25-reset-cooldown\nBase: 4f2c9a1\nBaseline: npm test, 12 passing\nDELEGATE:\n- [intern] find . -path ./node_modules -prune -o -type f -print | wc -l; return at most 5 lines.\nEOF"
+     },
+     "agent_id": "a02recon",
+     "agent_type": "compute-squad:squad-recon"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "- [intern] find . -path ./node_modules -prune -o -type f -print | wc -l; return at most 5 lines."
+     },
+     "prompt_chars": 96
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "find . -path ./node_modules -prune -o -type f -print | wc -l"
+     },
+     "agent_id": "a03mech",
+     "agent_type": "compute-squad:squad-mech"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Delegated — Recon\nTimestamp: 2026-09-25T10:14:00Z\n- 214\nRan as written; 0 lines cut.\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Read",
+     "tool_input": {
+      "file_path": "/home/dev/app/src/server/auth/reset.service.js"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "npm test 2>&1 | tail -n 5"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<EOF\n## High-stakes review\nTimestamp: $d\nRun: 2026-09-25-reset-cooldown\nResult: upheld\n\n## Status\nTimestamp: $d\nNext: spawn squad-mech to close the run\nEOF"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "compute-squad:squad-mech",
+      "description": "compute-squad:squad-mech",
+      "prompt": "Close the run: archive COMPUTE_SQUAD_LOG.md and clear it."
+     },
+     "prompt_chars": 57
+    }
+   ],
+   "ledger": [
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-mech",
+     "agent_id": "a01mech",
+     "models": "claude-sonnet-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 3,
+     "input": 8,
+     "cache_write": 6000,
+     "cache_write_1h": 6000,
+     "cache_read": 9000,
+     "output": 400,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 4,
+     "input": 6,
+     "cache_write": 40000,
+     "cache_write_1h": 40000,
+     "cache_read": 50000,
+     "output": 2100,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "squad-recon",
+     "agent_id": "a02recon",
+     "models": "claude-opus-5-5",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 9,
+     "input": 30,
+     "cache_write": 30000,
+     "cache_write_1h": 30000,
+     "cache_read": 70000,
+     "output": 6800,
+     "entries": ""
+    },
+    {
+     "v": 1,
+     "run": "2026-09-25-reset-cooldown",
+     "session": "5c1f0e2a-live",
+     "agent": "main",
+     "agent_id": "main",
+     "models": "claude-fable-5-1",
+     "started": "2026-09-25T10:00:00Z",
+     "stopped": "2026-09-25T10:40:00Z",
+     "elapsed_s": 2400,
+     "calls": 15,
+     "input": 20,
+     "cache_write": 90000,
+     "cache_write_1h": 90000,
+     "cache_read": 610000,
+     "output": 11800,
+     "entries": ""
+    }
+   ]
+  }
+ ]
+}

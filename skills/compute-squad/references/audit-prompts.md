@@ -1,12 +1,29 @@
 # Audit-grade run: finder and skeptic briefs
 
-Use these on audit-grade runs, after execution and before the PM's verdict. Spawn the five finders in parallel on the mid rung, scoped to the diff and the files Recon mapped. Then run the skeptic on the top rung over every finding they return. Only skeptic-CONFIRMED findings count as FAIL evidence.
+Procedure for the main session on an audit-grade run, after execution and before spawning `squad-pm` in ACCEPT mode. Spawn finders and skeptics as the host's general-purpose agent type, never as a squad agent (squad agents append pipeline entries), with the model set per spawn.
+
+1. Run `git status --porcelain` and keep its output.
+2. In one message, spawn the five finders in parallel on the mid rung, scoped to the diff and the files Recon mapped.
+3. Order the findings by severity, high first, then by finder number. In one message, spawn one skeptic per finding on the top rung, in parallel, for at most 10 findings. The rest are UNREVIEWED.
+4. Run `git status --porcelain` again. If the output differs from step 1, stop, append nothing, and report the change to the user.
+5. Append one entry, then the usual `## Status`:
+
+```
+## Audit Findings
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Agent: main session (<model ID as your context states it>)
+Findings: <n>; skeptics run: <k> (cap 10)
+- <CONFIRMED | REFUTED | NEEDS-HUMAN | UNREVIEWED> <file>:<line> (<severity>): <claim> Evidence: <deciding evidence, the refutation reason, what reproduction needs, or for UNREVIEWED the finder's evidence>
+```
+
+Before anything else, every finder reads the locked record: `awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md`. The latest Goal entry and the latest Recon and Plan attempts govern. Judge scope only against them. Finders and skeptics change nothing: no file edits, no commits, no log entries.
 
 Every finder returns findings in this format, one per finding, and nothing else:
 
 ```
 file: <path>
 line: <line or range>
+severity: <high | medium | low>
 claim: <one sentence, what is wrong>
 evidence: <the code, command output, or doc text that shows it>
 ```

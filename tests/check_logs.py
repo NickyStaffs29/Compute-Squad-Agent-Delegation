@@ -34,7 +34,19 @@ is overturned, and an upheld review closes the run. The answers rule holds
 every re-run to the Answers: line that names what sent it back (finding 13),
 and the recon-checks rule holds the Recon entry's Checks: block to its
 goal-facts line and one baseline line (finding 14); scripts/verify.sh check 7x
-holds the Recon template to the same forms. Python 3.9 stdlib only.
+holds the Recon template to the same forms. The block-column rule keeps every
+DELEGATE: and BLOCKER: line at column 0, where the main session's route grep
+in SKILL.md finds it (finding 5). The delegate-cap rule holds every DELEGATE:
+subtask to the output cap SKILL.md's DELEGATE step 1 requires, and the
+## Delegated entries answering a block to its caps, plus the one line per
+subtask that step 2 allows (finding 18). The audit rules hold the main
+session's ## Audit Findings entry to the procedure and template in
+references/audit-prompts.md, whose skeptic cap, verdicts, and severities the
+linter reads, and to SKILL.md's sentence on which verdicts count: the entry
+follows execution, lists as many verdict lines as its Findings: count, runs
+skeptics on at most the cap's findings in severity order, and every PASS or
+FAIL after it names each finding the PM must rule on (finding 20).
+Python 3.9 stdlib only.
 """
 import argparse
 import collections
@@ -105,6 +117,21 @@ RULES = (
                 " ## High-stakes review since the latest PASS, or reads none when there is none"),
     ("recon-checks", "every ## Recon entry's Checks: block opens with a '- goal facts:' line, then its baseline line: a"
                      " check line ending '; tree changed: <no | the paths>', or '- baseline: not run, <why>'"),
+    ("block-column", "every DELEGATE: and BLOCKER: line starts at column 0, with no indent or markup before it, so the"
+                     " main session's route grep finds the block"),
+    ("delegate-cap", "every subtask item of a DELEGATE: block names the most lines its helper may return ('return at"
+                     " most <N> lines'), and the ## Delegated entries answering the block hold together at most those"
+                     " caps added up, plus one line per subtask, not counting Timestamp: lines and blank lines"),
+    ("audit", "an ## Audit Findings entry follows an Executor entry (Status, Decision, and Delegated entries aside) and"
+              " is the main session's: one 'Agent: main session' line, one 'Findings: <n>; skeptics run: <k> (cap <N>)'"
+              " line, and exactly n verdict lines in the template's '- <verdict> <file>:<line> (<severity>): <claim>"
+              " Evidence: <evidence>' form"),
+    ("audit-cap", "an ## Audit Findings entry ran one skeptic per finding for at most the cap's findings: skeptics run"
+                  " reads the smaller of n and the cap, that many findings have a verdict other than UNREVIEWED, and no"
+                  " UNREVIEWED finding has a higher severity than one a skeptic reviewed"),
+    ("audit-ruling", "a PASS or FAIL whose judged Executor entry is followed by an ## Audit Findings entry names, by its"
+                     " <file>:<line>, every finding of the latest such entry whose verdict the PM must rule on"
+                     " (CONFIRMED, UNREVIEWED, and NEEDS-HUMAN)"),
 )
 
 HEADING_BULLET = "- Log entries use only these headings: "
@@ -117,6 +144,23 @@ STATUS_HEADING = "## Status"
 CONT_RULE = ", and only for a stage continuing after its own `BLOCKING` `DELEGATE:` block"
 FIELDS_BULLET = "- Routing values sit on fixed lines at the top of an entry"
 HIGH_STAKES_RULE = "A run is high-stakes once any line in the log reads `High-stakes: yes`; no later entry lowers it."
+# DELEGATE step 1's subtask form and step 2's allowance for each appended
+# result (finding 18); the delegate-cap rule reads the cap from each item.
+DELEGATE_ITEM = "`- [<intern|execution>] <exact procedure>; return at most <N> lines.`"
+DELEGATED_ALLOWANCE = "Each appended result keeps to its subtask's line cap, plus one line saying how the procedure ran"
+CAP = re.compile(r"\breturn at most ([1-9][0-9]*) lines?\b")
+# The audit (finding 20). The main session appends the ## Audit Findings
+# entry from the template in references/audit-prompts.md; the linter reads
+# the skeptic cap, the verdicts, and the finder severities from that file, and
+# from SKILL.md's audit section which verdicts the PM must rule on.
+AUDIT_HEADING = "## Audit Findings"
+AUDIT_PROMPTS = os.path.join("references", "audit-prompts.md")   # relative to the skill's directory
+AUDIT_AGENT = "Agent: main session"
+AUDIT_COUNT = "Findings: "
+AUDIT_EVIDENCE = re.compile(
+    r"([A-Z][A-Z-]+) and ([A-Z][A-Z-]+) findings are FAIL evidence, a ([A-Z][A-Z-]+) finding stops for the user, and a "
+    r"([A-Z][A-Z-]+) finding is not evidence\."
+)
 # The routing fields of each stage entry, in order under its Agent: line, as
 # (name, template placeholder, value pattern). A (cont.) entry carries its
 # heading's fields. A field in OPTIONAL_FIELDS may be absent (Answers: appears
@@ -200,7 +244,7 @@ class ProtocolError(Exception):
 
 
 class Protocol(object):
-    def __init__(self, fixed, cont, delegated, goal, time_format, targets, gate, relock, criteria=None):
+    def __init__(self, fixed, cont, delegated, goal, time_format, targets, gate, relock, criteria=None, audit=None):
         self.fixed = fixed            # listed headings without a placeholder
         self.cont = cont              # listed headings that may add " (cont.)"
         self.delegated = delegated    # "## Delegated — ", the part before <stage>
@@ -210,6 +254,7 @@ class Protocol(object):
         self.gate = gate              # the grant hook script, run with sh
         self.relock = relock          # dict: decision heading, type line, attended line, supersedes field
         self.criteria = criteria      # dict: ID prefix, table header and separator, block labels, point prefix, top executor
+        self.audit = audit            # dict: cap, verdicts, the unreviewed verdict, the verdicts the PM rules on, severities
 
 
 def load_protocol(skill_path):
@@ -302,6 +347,10 @@ def load_protocol(skill_path):
         raise ProtocolError(f"{skill_path}: the BLOCKER: rerun targets no longer match the FAIL entry's Rerun: values {rerun_values!r}")
     if HIGH_STAKES_RULE not in " ".join(text.split()):
         raise ProtocolError(f"{skill_path}: no rule reading {HIGH_STAKES_RULE!r}")
+    for needed in (DELEGATE_ITEM, DELEGATED_ALLOWANCE):
+        if needed not in text:
+            raise ProtocolError(f"{skill_path}: the DELEGATE protocol no longer reads {needed!r}; teach "
+                                "tests/check_logs.py the new subtask form")
     gate = os.path.join(os.path.dirname(os.path.abspath(skill_path)), GATE)
     if not os.path.isfile(gate):
         raise ProtocolError(f"{gate}: the grant hook the grant rule runs is missing")
@@ -338,8 +387,61 @@ def load_protocol(skill_path):
         "top": route.group(1),
     }
 
+    if AUDIT_HEADING not in fixed:
+        raise ProtocolError(f"{skill_path}: {AUDIT_HEADING!r} is not on the heading list")
+    audit = load_audit(skill_path, text)
+
     return Protocol(fixed, cont, delegated, goal.group(1), stamp.group(1), first.group(1).split("|"), gate, relock,
-                    criteria)
+                    criteria, audit)
+
+
+def load_audit(skill_path, skill_text):
+    """Read the audit's cap, verdicts, and severities from the template and
+    procedure in references/audit-prompts.md, and the verdicts the PM rules on
+    from SKILL.md's audit section (finding 20)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(skill_path)), AUDIT_PROMPTS)
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    lines = text.splitlines()
+    at = next((i for i in range(len(lines) - 1) if lines[i] == "```" and lines[i + 1] == AUDIT_HEADING), None)
+    block = []
+    for line in lines[at + 2:] if at is not None else []:
+        if line == "```":
+            break
+        block.append(line)
+    count = [m for m in (re.fullmatch(r"Findings: <n>; skeptics run: <k> \(cap ([1-9][0-9]*)\)", line) for line in block) if m]
+    item = [m for m in (re.fullmatch(r"- <([A-Z][A-Z-]*(?: \| [A-Z][A-Z-]*)+)> <file>:<line> \(<severity>\): <claim> "
+                                     r"Evidence: <[^<>]+>", line) for line in block) if m]
+    agent = [line for line in block if line.startswith("Agent: ")]
+    if len(count) != 1 or len(item) != 1 or len(agent) != 1 or not agent[0].startswith(AUDIT_AGENT + " "):
+        raise ProtocolError(
+            f"{path}: no bare-fenced {AUDIT_HEADING!r} template with one '{AUDIT_AGENT} (...)' line, one 'Findings: <n>; "
+            f"skeptics run: <k> (cap <N>)' line, and one '- <A | B> <file>:<line> (<severity>): <claim> Evidence: <...>' line"
+        )
+    flat = " ".join(text.split())
+    rest = re.search(r"for at most ([1-9][0-9]*) findings\. The rest are ([A-Z][A-Z-]*)\.", flat)
+    severity = [m for m in (re.fullmatch(r"severity: <([a-z]+(?: \| [a-z]+)+)>", line) for line in lines) if m]
+    if not rest or rest.group(1) != count[0].group(1) or len(severity) != 1:
+        raise ProtocolError(
+            f"{path}: the procedure no longer reads 'for at most <N> findings. The rest are <VERDICT>.' with the "
+            f"template's cap, or the finder format has no one 'severity: <high | ...>' line"
+        )
+    verdicts = item[0].group(1).split(" | ")
+    evidence = AUDIT_EVIDENCE.search(" ".join(skill_text.split()))
+    if not evidence or sorted(evidence.groups()) != sorted(verdicts) or rest.group(2) not in verdicts \
+            or rest.group(2) == evidence.group(4):
+        raise ProtocolError(
+            f"{skill_path}: no audit sentence reading '<A> and <B> findings are FAIL evidence, a <C> finding stops for "
+            f"the user, and a <D> finding is not evidence.' over the verdicts {verdicts!r} of {path}'s template, with "
+            f"the unreviewed verdict among the evidence"
+        )
+    return {
+        "cap": int(count[0].group(1)),
+        "verdicts": verdicts,
+        "unreviewed": rest.group(2),
+        "ruled": list(evidence.groups()[:3]),
+        "severities": severity[0].group(1).split(" | "),
+    }
 
 
 def read_log(path, fenced):
@@ -440,6 +542,19 @@ def check_timestamps(entries, protocol, report):
         if previous is not None and when < previous[1]:
             report(number, "timestamp-order", f"{value} is earlier than the timestamp at line {previous[0]} above it")
         previous = (number, when)
+
+
+# A block the route grep in SKILL.md cannot see: its DELEGATE: or BLOCKER:
+# line is indented, quoted, or wrapped in emphasis or code markup.
+OFF_COLUMN_BLOCK = re.compile(r"[ \t>*_`]+(DELEGATE|BLOCKER):")
+
+
+def check_block_columns(entry, report):
+    for number, text in entry["body"]:
+        found = OFF_COLUMN_BLOCK.match(text)
+        if found:
+            report(number, "block-column", f"{text.strip()!r}: a {found.group(1)}: line starts at column 0 with no "
+                                           "indent or markup, or the main session's route grep misses the block")
 
 
 def check_blockers(entry, protocol, report):
@@ -705,6 +820,54 @@ def delegates_blocking(entry):
         if inside and "BLOCKING" in text:
             return True
     return False
+
+
+def delegate_items(entry):
+    """The subtask items of the entry's DELEGATE: block, as [line number,
+    text] pairs: each '- ' line at column 0 up to a BLOCKER: line or the end
+    of the entry, with its indented continuation lines joined on."""
+    items, inside = [], False
+    for number, text in entry["body"]:
+        if text.startswith("DELEGATE:"):
+            inside = True
+        elif text.startswith("BLOCKER:") or OFF_COLUMN_BLOCK.match(text):
+            inside = False
+        elif inside and text.startswith("- "):
+            items.append([number, text])
+        elif inside and items and text[:1] in (" ", "\t") and text.strip():
+            items[-1][1] += " " + text.strip()
+    return items
+
+
+def check_delegate_caps(entries, protocol, report):
+    answers = collections.OrderedDict()   # requester index -> the Delegated entries answering it
+    for index, entry in enumerate(entries):
+        for number, text in delegate_items(entry):
+            if not CAP.search(text):
+                report(number, "delegate-cap", "a DELEGATE: subtask names no output cap; end it with "
+                                               "'return at most <N> lines' (DELEGATE step 1)")
+        if not (protocol.delegated and entry["heading"].startswith(protocol.delegated)):
+            continue
+        requester = next((i for i in range(index - 1, -1, -1)
+                          if not entries[i]["heading"].startswith(protocol.delegated)
+                          and entries[i]["heading"] != STATUS_HEADING), None)
+        if requester is not None:
+            answers.setdefault(requester, []).append(entry)
+    for requester, delegated in answers.items():
+        items = delegate_items(entries[requester])
+        caps = [CAP.search(text) for _, text in items]
+        if not items or not all(caps):
+            continue   # the heading rule reports a missing block, and the loop above a missing cap
+        allowed = sum(int(cap.group(1)) for cap in caps) + len(items)
+        used = 0
+        for entry in delegated:
+            used += sum(1 for _, text in entry["body"] if text.strip() and not text.startswith("Timestamp: "))
+            if used > allowed:
+                report(entry["line"], "delegate-cap",
+                       f"the Delegated entries answering the DELEGATE: block of {entries[requester]['heading']!r} at "
+                       f"line {entries[requester]['line']} hold {used} lines; its {len(items)} subtask(s) allow "
+                       f"{allowed}: their caps plus one line each (DELEGATE step 2)")
+                break
 
 
 def check_cont(entries, protocol, report):
@@ -1109,6 +1272,90 @@ def check_recon_checks(entries, report):
                    "changed: <no | the paths>', or '- baseline: not run, <why>'")
 
 
+def check_audits(entries, protocol, report):
+    """Hold each ## Audit Findings entry to the audit procedure and template
+    (finding 20), and keep its findings on the entry for the ruling rule."""
+    rules = protocol.audit
+    finding = re.compile(
+        r"- (" + "|".join(map(re.escape, rules["verdicts"])) + r") (\S+:[0-9]+(?:-[0-9]+)?) \(("
+        + "|".join(map(re.escape, rules["severities"])) + r")\): \S.*? Evidence: \S.*"
+    )
+    form = (f"'- <{' | '.join(rules['verdicts'])}> <file>:<line> (<{' | '.join(rules['severities'])}>): <claim> "
+            f"Evidence: <evidence>'")
+    for index, entry in enumerate(entries):
+        if entry["heading"] != AUDIT_HEADING:
+            continue
+        body = entry["body"]
+        above = next((e for e in reversed(entries[:index]) if e["heading"] not in (STATUS_HEADING, DECISION_HEADING)
+                      and not (protocol.delegated and e["heading"].startswith(protocol.delegated))), None)
+        if above is None or base_heading(above["heading"]) != EXECUTOR_HEADING:
+            report(entry["line"], "audit",
+                   f"{AUDIT_HEADING!r} follows {above['heading'] if above else 'no stage entry'!r}; the main session "
+                   f"runs the audit after execution and before ACCEPT, so the entry above it is an Executor entry")
+        agents = [(number, text) for number, text in body if text.startswith("Agent: ")]
+        if len(agents) != 1 or not (agents[0][1] == AUDIT_AGENT or agents[0][1].startswith(AUDIT_AGENT + " (")):
+            report(agents[0][0] if agents else entry["line"], "audit",
+                   f"{AUDIT_HEADING!r} is the main session's: one '{AUDIT_AGENT} (<model ID>)' line; finders and "
+                   f"skeptics write no log entries")
+        counts = [(number, text) for number, text in body if text.startswith(AUDIT_COUNT)]
+        found, entry["findings"] = [], []
+        for number, text in body:
+            if not text.strip() or text.startswith(("Timestamp: ", "Agent: ", AUDIT_COUNT)):
+                continue
+            match = finding.fullmatch(text)
+            if not match:
+                report(number, "audit", f"{text!r}: every other line of {AUDIT_HEADING!r} is one finding, {form}")
+                continue
+            found.append((number, match.group(1), match.group(2), match.group(3)))
+        entry["findings"] = found
+        count = re.fullmatch(re.escape(AUDIT_COUNT) + r"([0-9]+); skeptics run: ([0-9]+) \(cap "
+                             + str(rules["cap"]) + r"\)", counts[0][1]) if len(counts) == 1 else None
+        if count is None:
+            report(counts[0][0] if counts else entry["line"], "audit",
+                   f"{AUDIT_HEADING!r} carries one 'Findings: <n>; skeptics run: <k> (cap {rules['cap']})' line")
+            continue
+        total, skeptics = int(count.group(1)), int(count.group(2))
+        if len(found) != total:
+            report(counts[0][0], "audit", f"'Findings: {total}', but the entry lists {len(found)} finding lines")
+        want = min(total, rules["cap"])
+        reviewed = [f for f in found if f[1] != rules["unreviewed"]]
+        unreviewed = [f for f in found if f[1] == rules["unreviewed"]]
+        if skeptics != want:
+            report(counts[0][0], "audit-cap",
+                   f"'skeptics run: {skeptics}': one skeptic per finding for at most {rules['cap']} findings makes "
+                   f"{want} for {total}; the rest are {rules['unreviewed']}")
+        elif len(reviewed) != skeptics:
+            report(counts[0][0], "audit-cap",
+                   f"'skeptics run: {skeptics}', but {len(reviewed)} findings have a verdict other than "
+                   f"{rules['unreviewed']}")
+        rank = rules["severities"].index
+        if reviewed and unreviewed:
+            lowest = max(reviewed, key=lambda f: rank(f[3]))
+            higher = [f for f in unreviewed if rank(f[3]) < rank(lowest[3])]
+            if higher:
+                report(higher[0][0], "audit-cap",
+                       f"a {higher[0][3]} finding reads {rules['unreviewed']} while the {lowest[3]} finding at line "
+                       f"{lowest[0]} had a skeptic; skeptics take the findings by severity, high first")
+
+
+def check_audit_rulings(entries, protocol, report):
+    """A verdict names every finding the PM must rule on (finding 20)."""
+    ruled = protocol.audit["ruled"]
+    for index, entry in enumerate(entries):
+        if entry["heading"] not in VERDICT_HEADINGS:
+            continue
+        plain = max((i for i in range(index) if entries[i]["heading"] == EXECUTOR_HEADING), default=None)
+        audits = [e for e in entries[plain:index] if e["heading"] == AUDIT_HEADING] if plain is not None else []
+        if not audits:
+            continue
+        text = "\n".join(line for _, line in entry["body"])
+        for _, verdict, where, _ in audits[-1].get("findings", []):
+            if verdict in ruled and not re.search(re.escape(where) + r"(?![0-9-])", text):
+                report(entry["line"], "audit-ruling",
+                       f"{entry['heading']!r} gives no ruling on the {verdict} finding {where} of the {AUDIT_HEADING!r} "
+                       f"entry at line {audits[-1]['line']}; a verdict names every {', '.join(ruled)} finding")
+
+
 def lint(lines, protocol):
     """Return (number of entries, problems), each problem (line, rule, message)."""
     problems = []
@@ -1125,6 +1372,7 @@ def lint(lines, protocol):
     for index, entry in enumerate(entries):
         check_heading(entry, entries[:index], protocol, report)
         check_blockers(entry, protocol, report)
+        check_block_columns(entry, report)
         entry["fields"] = check_fields(entry, report)
     check_timestamps(entries, protocol, report)
     check_attempts(entries, report)
@@ -1141,6 +1389,9 @@ def lint(lines, protocol):
     check_reviews(entries, report)
     check_answers(entries, report)
     check_recon_checks(entries, report)
+    check_delegate_caps(entries, protocol, report)
+    check_audits(entries, protocol, report)
+    check_audit_rulings(entries, protocol, report)
     return len(entries), sorted(problems)
 
 

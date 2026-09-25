@@ -1,0 +1,26 @@
+{
+  "note": "Thirty findings and ten skeptics, but a finding a skeptic confirmed is logged UNREVIEWED: 21 UNREVIEWED lines where ten skeptics leave 20, so the entry hides a skeptic's verdict.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Order the findings by severity, high first, then by finder number. In one message, spawn one skeptic per finding on the top rung, in parallel, for at most 10 findings. The rest are UNREVIEWED."
+    },
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Findings: <n>; skeptics run: <k> (cap 10)"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "audit-cap"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Audit Findings`"
+    }
+  ]
+}

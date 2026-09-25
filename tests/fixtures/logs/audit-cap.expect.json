@@ -1,0 +1,26 @@
+{
+  "note": "Twelve findings, and a skeptic ran on each of them: past the cap of 10, the two least severe should read UNREVIEWED.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Order the findings by severity, high first, then by finder number. In one message, spawn one skeptic per finding on the top rung, in parallel, for at most 10 findings. The rest are UNREVIEWED."
+    },
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Findings: <n>; skeptics run: <k> (cap 10)"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "audit-cap"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Audit Findings`"
+    }
+  ]
+}

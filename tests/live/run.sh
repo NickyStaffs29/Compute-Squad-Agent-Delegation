@@ -13,7 +13,9 @@
 # preflight --setup-only prints. Run the live
 # scenarios by hand before a release, three repeats per scenario. S5 needs
 # Playwright (in the fixture's node_modules or the global npm root) with its
-# Chromium; S5b hides that Chromium from the session.
+# Chromium; S5b hides that Chromium from the session. S8's token budget is the
+# estimate for a top-rung main session, so run it without --model or with the
+# top rung's alias. S9 runs five finders and up to ten skeptics.
 #
 # Usage: tests/live/run.sh [options] <scenario>... | all
 #   --list                 print the scenarios, their seeds and patches, and exit
@@ -41,7 +43,9 @@
 #      and excludes the log and compute-squad-archive/ from git status. S2c
 #      and S6a also apply tests/live/repo-reset-wo1.patch, and S5
 #      tests/live/repo-ui-note.patch, the work the seed's Executor entry
-#      reports, without committing it. S3a, S3b, S4, and S4b then apply their
+#      reports, without committing it, and S9 applies
+#      tests/live/repo-reset-audit.patch, WO-1 with about 30 planted
+#      defects for its audit to find. S3a, S3b, S4, and S4b then apply their
 #      scenario's patches and commit them, so HEAD moves past the seed's Base:
 #      (commit B for S3, the external implementation C for S4), and a prompt's
 #      <C> becomes that commit's short SHA. S5b makes an empty browser
@@ -55,10 +59,17 @@
 #   4. runs each turn's prompt (a second turn resumes the first turn's
 #      session) and checks subagent_stats.by_type, permission_denials, the
 #      usage ledger against modelUsage, the log's new entries, the product
-#      tree against A, and the archive files' sha256. A scenario stops at its
-#      first failing turn, so a broken run does not keep spending.
+#      tree against A, and the archive files' sha256. Each claude call also
+#      gets, through --settings, a PreToolUse hook with no matcher that
+#      appends every tool call, the main session's and each subagent's, to a
+#      hook log (check_live.py toollog; it prints nothing and always exits 0).
+#      S8 reads it for the Stage 0 bound and the spawn pointer, and S9 for
+#      its skeptic spawns. A
+#      scenario stops at its first failing turn, so a broken run does not
+#      keep spending.
 # Results, one directory per scenario run, stay in --out: each turn's
-# prompt command, claude JSON and stderr, state snapshot, and assertion output.
+# prompt command, claude JSON and stderr, hook log, state snapshot, and
+# assertion output.
 set -u -o pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -81,7 +92,7 @@ ACCEPT_C='The external implementation of WO-1 is commit <C>. Accept it.'
 CONTINUE='Continue the squad run.'
 CONTINUE_SHORT='Continue.'
 
-SCENARIOS=(s1 s1n s2 s2b s2c s2o s3a s3b s4 s4b s5 s5b s6a s6b s7b)
+SCENARIOS=(s1 s1n s2 s2b s2c s2o s3a s3b s4 s4b s5 s5b s6a s6b s7b s8 s9)
 # Environment assignments for a scenario's preflight and claude calls, set by
 # run_scenario from SETUP.
 RUN_ENV=()
@@ -193,6 +204,17 @@ scenario() {
       SEED=s7b
       PROMPTS=("$RESUME")
       CHECKS=(s7b) ;;
+    s8)
+      DESC='S8 (WO-3f): the reference run, /squad <goal> on an empty log, to a PASS: before its first squad-recon spawn the main session reads no product source and runs no test, every stage spawn prompt is the five-line pointer (hook log), and its billed input and output stay within 756,000 and 12,400 tokens'
+      SEED=s1
+      PROMPTS=("/squad $GOAL")
+      CHECKS=(s8) ;;
+    s9)
+      DESC='S9 (WO-3f): the WO-1 change carries about 30 planted defects and the log says run the audit, then stop before acceptance; resuming runs the finders, at most 10 skeptics, and one ## Audit Findings entry whose other findings read UNREVIEWED'
+      SEED=s9
+      PATCH="$HERE/repo-reset-audit.patch"
+      PROMPTS=("$RESUME")
+      CHECKS=(s9) ;;
     *) return 1 ;;
   esac
 }
@@ -293,16 +315,35 @@ step() {
   fi
 }
 
-# claude_cmd <prompt> <session or empty>: the section 6 invocation, in CMD.
+# settings_json <hook log>: the --settings value. It turns off an installed
+# copy of the plugin, so only this checkout loads (--plugin-dir), and adds the
+# hook log: a PreToolUse hook with no matcher that runs check_live.py toollog
+# on every tool call. The hook's output goes nowhere and a failure exits 0, so
+# it never blocks or changes a call.
+settings_json() {
+  "$PYTHON" - "$CHECK" "$1" <<'PYEOF'
+import json, shlex, sys
+check, log = sys.argv[1:3]
+hook = " ".join(shlex.quote(part) for part in (sys.executable, check, "toollog", log)) + " >/dev/null 2>&1 || true"
+print(json.dumps({"enabledPlugins": {"compute-squad@compute-squad": False},
+                  "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": hook}]}]}},
+                 separators=(",", ":")))
+PYEOF
+}
+
+# claude_cmd <prompt> <session or empty> <hook log>: the section 6
+# invocation, in CMD, with the hook log in its --settings.
 # Task joins Agent in --allowedTools because Claude Code 2.1.282 names the
 # spawn tool Task. Skill must stay: under -p that CLI passes "/squad ..." to
 # the model as text, and the model loads the plugin command through the Skill
 # tool. --model and --max-budget-usd are added only when given.
 claude_cmd() {
+  local settings
+  settings=$(settings_json "$3") || die "cannot build the --settings value with $PYTHON"
   CMD=()
   [ ${#RUN_ENV[@]} -eq 0 ] || CMD=(env "${RUN_ENV[@]}")
   CMD+=("$CLAUDE_BIN" -p "$1" --output-format json --plugin-dir "$ROOT"
-    --settings '{"enabledPlugins":{"compute-squad@compute-squad":false}}'
+    --settings "$settings"
     --permission-mode acceptEdits)
   [ -z "$MODEL" ] || CMD+=(--model "$MODEL")
   [ -z "$BUDGET" ] || CMD+=(--max-budget-usd "$BUDGET")
@@ -319,7 +360,7 @@ run_claude() {
 }
 
 run_scenario() {
-  local name=$1 rep=$2 dir repo base head session= i turn check prompt patch rc=0
+  local name=$1 rep=$2 dir repo base head session= i turn check prompt patch tools rc=0
   scenario "$name"
   dir="$OUT/$name-$rep"
   repo="$dir/repo"
@@ -379,10 +420,11 @@ run_scenario() {
     turn=$((i + 1))
     check=${CHECKS[$i]}
     prompt=${PROMPTS[$i]//<C>/$head}
+    tools="$dir/turn$turn.tools.jsonl"
     if [ "$MODE" = live ]; then
-      claude_cmd "$prompt" "$session"
+      claude_cmd "$prompt" "$session" "$tools"
     else
-      claude_cmd "$prompt" "$([ "$turn" -gt 1 ] && printf '<session_id from turn 1>')"
+      claude_cmd "$prompt" "$([ "$turn" -gt 1 ] && printf '<session_id from turn 1>')" "$tools"
     fi
     printf '  turn %s, check %s:\n    (cd %q &&\n     ' "$turn" "$check" "$repo"
     printf '%q ' "${CMD[@]}"; printf ')\n'
@@ -393,7 +435,8 @@ run_scenario() {
     run_claude "$repo" "$dir/turn$turn"
     printf '    claude exited %s\n' "$?"
     "$PYTHON" "$CHECK" verify "$check" "$repo" "$base" "$dir/turn$turn.state.json" "$dir/turn$turn.json" \
-      --summary "$OUT/summary.tsv" --label "$name#$rep turn $turn" | tee "$dir/turn$turn.check.txt" | sed 's/^/    /'
+      --tools "$tools" --summary "$OUT/summary.tsv" --label "$name#$rep turn $turn" \
+      | tee "$dir/turn$turn.check.txt" | sed 's/^/    /'
     rc=$?
     [ "$rc" -eq 0 ] || { printf '    stopping %s here; later turns skipped\n' "$name"; return "$rc"; }
     session=$("$PYTHON" -c 'import json, sys; print(json.load(open(sys.argv[1])).get("session_id") or "")' \

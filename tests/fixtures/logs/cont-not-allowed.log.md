@@ -30,9 +30,11 @@ none found
 
 DELEGATE:
 - [intern] List every test file under test/ with its case count (procedure:
-  grep -c "it(" per file). Non-blocking; context for the PM.
+  grep -c "it(" per file); return at most 10 lines. Non-blocking; context for
+  the PM.
 - [intern] List every call to fs.writeFileSync under src/cli/ with file and
-  line (procedure: grep -n "writeFileSync" -r src/cli). Non-blocking.
+  line (procedure: grep -n "writeFileSync" -r src/cli); return at most 20
+  lines. Non-blocking.
 
 ## Delegated — Recon
 Timestamp: 2026-09-01T10:05:10Z

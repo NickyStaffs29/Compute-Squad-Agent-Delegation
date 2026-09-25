@@ -24,7 +24,7 @@
       "state": {
         "audit": true
       },
-      "next": "run the audit, then spawn squad-pm in ACCEPT mode",
+      "next": "run the audit procedure and append its ## Audit Findings entry",
       "via": "row: `## Executor`"
     }
   ]

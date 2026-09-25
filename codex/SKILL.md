@@ -1,6 +1,6 @@
 # Compute Squad: Codex reading copy
 
-Version: 4.3.0
+Version: 4.4.0
 No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
@@ -84,6 +84,49 @@ parked run only onto an empty log (`test ! -s COMPUTE_SQUAD_LOG.md && cp
 recompute `Next:` from the resume table as if the park entries were absent and
 append a fresh `## Status`; the archive stays.
 
+Stage 0 reads only what finding gaps in the goal needs: the user's request, the
+project instructions already in context, the README, at most one directory
+listing, files the user named, and `COMPUTE_SQUAD_LOG.md` for the checks above.
+It never reads product source to map it, never runs tests or builds, and never
+lists files or questions for Recon; mapping and the baseline run are Recon's.
+
+## Spawn prompts and routing
+
+Every stage spawn prompt is a pointer of at most 400 characters, in exactly
+this form:
+
+```
+Stage: <Archive|Recon|Plan|Execute|Accept>
+Mode: <PLAN|ACCEPT|close|none>
+Repo root: <absolute path>
+Log: COMPUTE_SQUAD_LOG.md, run <Run of the latest ## Status entry, or none>
+Since your last spawn: <new run | first spawn | the headings appended since your last entry>
+```
+
+Nothing else goes in it: no goal, criteria, assumptions, files or questions to
+map, entry format, archive name, classification, high-stakes, attendance,
+blocker policy, or verdict, and never an instruction to read `AGENTS.md` or
+`CLAUDE.md`. A helper spawned for a `DELEGATE:` subtask gets that subtask's
+exact procedure, copied from the log, and an audit finder or skeptic gets its
+brief; neither has a length bound. `Mode: close` is only for `squad-mech`'s
+closing archive after an upheld high-stakes review. Anything else a stage needs
+goes on the `Next:` line of a `## Status` appended before the spawn.
+
+Route from the log, never from a stage's final message. After every spawn
+returns, run:
+
+```bash
+grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12
+```
+
+If a `DELEGATE:` or `BLOCKER:` line follows the newest heading, read that block
+first. Route on those field lines, not on the entry's prose. Only the reports of
+`squad-mech` and `squad-helper`, an `ARCHIVE FAILED:` line, and the archive
+path of a PM that cleared the log come from final messages. On the manual path
+the operator plays the main session: paste the prompt files as they are, adding
+only the close line `codex/README.md` gives for the closing archive, and route
+by the same grep.
+
 ## Modes, grants, and the Status entry
 
 The first word of a `/squad` request, or the user's own words, sets the mode;
@@ -149,9 +192,9 @@ verified archive procedure here.
 
 ## Stage 2 — Recon (`squad-recon`, mid rung)
 
-Spawn `squad-recon` with the locked goal and criteria. It changes nothing
-except its log entry, and its one command beyond inspection is a single
-baseline run. It maps exact files, functions, line ranges, call sites, tests,
+Spawn `squad-recon`; it reads the locked goal and criteria from the log. It
+changes nothing except its log entry, and its one command beyond inspection is
+a single baseline run. It maps exact files, functions, line ranges, call sites, tests,
 migrations, config, invariants, risks, and unresolved ambiguities for the PM.
 It also checks the evidence prerequisites (the goal's stated facts, one
 baseline run of the test or verify command, and the tools the criteria's
@@ -217,7 +260,7 @@ archive.
 - **Accept pending:** the PM needed delegated work or a user decision before
   it could decide. Run its `DELEGATE:` block and append the results, or put its
   `needs-human:` question to the user and record the answer as a `## Decision`
-  followed by a `## Status`; then respawn the PM for the verdict.
+  followed by a `## Status`; then continue or respawn the PM for the verdict.
 
 Every PASS and FAIL entry, and every pending entry that asks the user about a
 criterion, carries the PM's criteria block, one row per criterion ID in the
@@ -262,13 +305,21 @@ appended to an archive after it is written.
 ## Intra-stage delegation
 
 Stages may end their own entry with a `DELEGATE:` block containing exact,
-zero-judgment procedures and a target tier: `intern` for `squad-mech`, or
-`execution` for `squad-helper`. The main session spawns the requested helpers
-(`squad-mech` for intern tasks; `squad-helper` for execution tasks), appends
-their results under `## Delegated — <stage>`, and re-spawns a blocking
-requester, which appends a `(cont.)` entry covering only the remainder of its
-work; the one-entry rule is per spawn, not per run. Delegation flows downward
-only and is capped at 5 helpers per stage per run.
+zero-judgment procedures, a target tier (`intern` for `squad-mech`, or
+`execution` for `squad-helper`), and the most output lines each helper may
+return, one item per subtask:
+`- [<intern|execution>] <exact procedure>; return at most <N> lines.`
+Only work too large to do in a few commands is delegated: counts, listings, and
+single-directory inventories stay in-stage, and the stage puts the result in
+its own entry. The main session spawns the requested helpers (`squad-mech` for
+intern tasks; `squad-helper` for execution tasks) and appends their results
+under `## Delegated — <stage>`, each within its subtask's line cap plus one
+line on how the procedure ran. It continues a `BLOCKING` requester by messaging
+its finished agent with a pointer to that entry, and re-spawns the requester
+only when the host cannot message a finished agent or the message fails. The
+requester appends a `(cont.)` entry covering only the remainder of its work;
+the one-entry rule is per spawn or continuation, not per run. Delegation flows
+downward only and is capped at 5 helpers per stage per run.
 
 ## Log and escalation rules
 
@@ -327,19 +378,29 @@ BLOCKER:
 - Three total FAILs on one run → stop, summarize the log history, and hand back
   to the user.
 - Anything that changes the locked goal, criteria, or assumptions returns to
-  Stage 0 and the user. A `needs-human:` blocker stops the pipeline: spawn no
-  stage until it is resolved. With the user present, resolve it with them,
-  record the re-lock, and re-spawn the stage that raised it. Unattended, do not
-  resolve it yourself: append a `## Status` entry whose `Stop:` quotes the
-  blocker and whose `Next:` names the stage to re-spawn, leave the log intact,
-  and end the run. Never tell a stage the run is unattended.
+  Stage 0 and the user. A `needs-human:` blocker stops the pipeline: spawn or
+  continue no stage until it is resolved. With the user present, resolve it
+  with them, record the re-lock, and re-spawn the stage that raised it.
+  Unattended, do not resolve it yourself: append a `## Status` entry whose
+  `Stop:` quotes the blocker and whose `Next:` names the stage to re-spawn,
+  leave the log intact, and end the run. Never tell a stage the run is
+  unattended.
 
 ## Audit-grade runs
 
 When the user asks for an audit or says `be thorough`, after execution fan out
 parallel mid-rung finders across runtime integrity, security/privacy, dead code,
-accessibility, and docs drift. Use a fresh top-rung pass to refute each finding;
-only findings that survive refutation count as acceptance failures.
+accessibility, and docs drift, then one fresh top-rung skeptic per finding, for
+at most 10 findings; the rest are UNREVIEWED. Follow the procedure in
+`skills/compute-squad/references/audit-prompts.md`. Finders and skeptics run as
+the host's general-purpose agent with the rung's model set per spawn, never as
+a squad agent, and change nothing. Before it spawns the PM in ACCEPT mode, the
+main session records the result in one `## Audit Findings` entry. CONFIRMED and
+UNREVIEWED findings are FAIL evidence, a NEEDS-HUMAN finding stops for the user,
+and a REFUTED finding is not evidence. The PM rules on every CONFIRMED,
+UNREVIEWED, and NEEDS-HUMAN finding the entry lists and settles a NEEDS-HUMAN
+finding only by showing the guard; otherwise it ends a pending entry with a
+`needs-human:` blocker, which stops the pipeline.
 
 ## Hard rules
 

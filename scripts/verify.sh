@@ -30,7 +30,8 @@
 #      blocks, prompts) to models.conf and the agent bodies.
 #   7. Shared protocol blocks and facts read identically across files:
 #      7a the Goal — Locked template; 7b the BLOCKER block in both SKILL.md
-#      files; 7c the helper cap; 7d each of the four files with a generated
+#      files; 7c the helper cap, and the audit's skeptic cap with the rest of
+#      finding 20's audit text; 7d each of the four files with a generated
 #      routing block has one begin and one end marker; 7e the product
 #      description; 7f the ## Status and ## Decision templates in SKILL.md
 #      and codex/README.md; 7g the PM's criteria block in both SKILL.md
@@ -49,7 +50,10 @@
 #      read, the rule that changing a criterion's command redefines the
 #      criterion, and finding 9's (cont.), plan-read, verdict-scope,
 #      attempt, routing, and FAIL-count text, squad-mech's open-run guard,
-#      and finding 13's Answers: sentence in every stage body; 7q the agent
+#      finding 13's Answers: sentence in every stage body, and finding 5's
+#      precedence sentences, final-message forms, Stage 0 bound, spawn
+#      pointer, and route grep, finding 18's per-spawn-or-continuation
+#      rule and output caps, and finding 20's audit ruling in ACCEPT; 7q the agent
 #      description budget; 7r no agent has a tool to spawn agents; 7s
 #      codex/SKILL.md stays a reading copy and both SKILL.md files carry the
 #      no-absorption rule; 7t no file names a renamed executor or the old
@@ -63,7 +67,12 @@
 #      checks, and the PLAN template a Totals: line; 7x Recon checks the
 #      evidence prerequisites, its template's Checks: block matches the
 #      linter's forms, PLAN starts from it and reconciles its counts, and no
-#      stage keeps the old one-carve-out Bash rule.
+#      stage keeps the old one-carve-out Bash rule; 7y both SKILL.md files
+#      bound Stage 0's reads, give every stage a pointer spawn prompt, and
+#      route from the log with a grep that names every routing field the
+#      log linter checks, and no stage ends with a summary final message; 7z
+#      small work stays in-stage, a BLOCKING requester is continued before it
+#      is re-spawned, and every DELEGATE: subtask caps its helper's output.
 #   8. Behavior without a model, on fixtures under tests/: log grammar,
 #      including the grant hook's verdict on every Executor entry, the
 #      re-lock record, the stop at a needs-human blocker, and the routing
@@ -71,15 +80,23 @@
 #      and (cont.) rule, the numbered criteria and every verdict's criteria
 #      block, waivers, top-rung parity, entry labels, Executor points, plan
 #      totals, the high-stakes review's place, Rerun: line, and close, the
-#      Answers: line of every re-run, and the Recon entry's goal-facts and
-#      baseline lines, over every fixture log and over the verdicts a live
+#      Answers: line of every re-run, the Recon entry's goal-facts and
+#      baseline lines, DELEGATE: and BLOCKER: lines at column 0, where
+#      the route grep finds them, every DELEGATE: subtask's output cap,
+#      which the Delegated entries answering it keep to, and the audit's
+#      ## Audit Findings entry, skeptic cap, and PM rulings, over every
+#      fixture log and over the verdicts a live
 #      seed lists as outcomes, S5's among them (8a), the next action
 #      references/resume.md gives
 #      for every fixture log under the states its .expect.json names, with
 #      every row, step, and check exercised, each live scenario's repo as
 #      tests/live/run.sh --setup-only builds it giving its static twin's
 #      state and action, the live S5 check's verdict rule agreeing with
-#      those outcomes, and squad-mech's open-run guard agreeing with the
+#      those outcomes, the rules of the live checks that read the hook log
+#      and the usage ledger (S8's Stage 0 bound and main-session budget,
+#      S9's skeptic cap) agreeing with the cases in tests/fixtures/live/,
+#      every claude call run.sh prints carrying the hook log, and
+#      squad-mech's open-run guard agreeing with the
 #      one-active-run rule (8b), the
 #      grant hook's decisions on synthetic PreToolUse JSON and over the live
 #      seed logs, including its hold on every stage agent except squad-mech
@@ -745,9 +762,10 @@ for path, block in blocker_blocks.items():
 
 print(f"PASS: check 7: BLOCKER grammar block is byte-identical across {', '.join(blocker_paths)}")
 
-# ---- 7c: the "5 helpers per stage per run" cap names the same digit
-# everywhere it's restated: the shared skill, the reading copy, the README,
-# and each stage body that can delegate.
+# ---- 7c: the caps. The "5 helpers per stage per run" cap names the same
+# digit everywhere it's restated: the shared skill, the reading copy, the
+# README, and each stage body that can delegate. The audit's skeptic cap
+# follows below.
 cap_paths = [
     "skills/compute-squad/SKILL.md",
     "codex/SKILL.md",
@@ -764,6 +782,90 @@ for path in cap_paths:
         fail(f"{path}: no '5 ... per stage per run' helper-cap phrase found")
 
 print(f"PASS: check 7: the 5-helper-per-stage-per-run cap reads '5' in {', '.join(cap_paths)}")
+
+# The audit's skeptic cap (finding 20) names one number everywhere it is
+# stated: the procedure and the ## Audit Findings template in
+# references/audit-prompts.md, whose template the log linter reads, and the
+# audit sections of both SKILL.md files. The rest of finding 20 stays in
+# place: the entry's heading and its UNREVIEWED and NEEDS-HUMAN verdicts in
+# SKILL.md, the brief, and the PM body and its Codex prompt; the procedure's
+# spawn type, scope read, severity field, and no-writes rule; the skeptic's
+# production-only security verdict beside the concurrency and accessibility
+# carve-out; SKILL.md's routing of each verdict; the Codex reading copy's
+# pointer to the procedure; and README's tree comment. No file keeps the old
+# rule that only skeptic-confirmed findings count.
+AUDIT_PROMPTS = "skills/compute-squad/references/audit-prompts.md"
+AUDIT_CAP_FORMS = {
+    AUDIT_PROMPTS: (r"for at most ([0-9]+) findings\. The rest are UNREVIEWED\.",
+                    r"^Findings: <n>; skeptics run: <k> \(cap ([0-9]+)\)$"),
+    "skills/compute-squad/SKILL.md": (r"attempt to refute each finding, for at most ([0-9]+) findings\.",),
+    "codex/SKILL.md": (r"one fresh top-rung skeptic per finding, for at most ([0-9]+) findings; the rest are UNREVIEWED\.",),
+}
+audit_caps = {}
+for path, forms in AUDIT_CAP_FORMS.items():
+    text = " ".join(read(path).split()) if path != AUDIT_PROMPTS else read(path)
+    for form in forms:
+        found = re.findall(form, text, re.MULTILINE)
+        if len(found) != 1:
+            fail(f"{path}: needs exactly one audit skeptic cap reading {form!r}; found {len(found)}")
+        audit_caps[f"{path} ({form.split('(')[0].strip('^ ')})"] = found[0]
+if len(set(audit_caps.values())) != 1:
+    fail(f"the audit skeptic cap differs between files: {audit_caps!r}")
+audit_cap = next(iter(audit_caps.values()))
+AUDIT_TEXT = {
+    AUDIT_PROMPTS: (
+        "## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN",
+        f"at most {audit_cap} findings",
+        "whose reproduction needs credentials",
+        "Spawn finders and skeptics as the host's general-purpose agent type, never as a squad agent",
+        "every finder reads the locked record: `awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md`",
+        "severity: <high | medium | low>",
+        "Order the findings by severity, high first, then by finder number.",
+        "If the output differs from step 1, stop, append nothing, and report the change to the user.",
+        "Finders and skeptics change nothing: no file edits, no commits, no log entries.",
+        "For concurrency findings (races, unserialized concurrent writes) and accessibility findings (keyboard "
+        "operability, ARIA, focus order): failure to reproduce is not refutation.",
+        "return `NEEDS-HUMAN` with what reproduction would need, never `REFUTED`.",
+        "First read the locked goal:",
+    ),
+    "skills/compute-squad/SKILL.md": (
+        "## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN",
+        "following the procedure in `references/audit-prompts.md`, and records the result in one `## Audit Findings` "
+        "entry.",
+        "CONFIRMED and UNREVIEWED findings are FAIL evidence, a NEEDS-HUMAN finding stops for the user, and a REFUTED "
+        "finding is not evidence.",
+        "That stop runs through the PM:",
+        "it rules on every CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding the entry lists",
+        "an audit whose `git status --porcelain` changed (`references/audit-prompts.md` step 4)",
+    ),
+    "agents/squad-pm.md": ("## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN"),
+    "codex/05-pm-accept.md": ("## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN"),
+    "codex/SKILL.md": (
+        "## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN",
+        "Follow the procedure in `skills/compute-squad/references/audit-prompts.md`.",
+        "CONFIRMED and UNREVIEWED findings are FAIL evidence, a NEEDS-HUMAN finding stops for the user, and a REFUTED "
+        "finding is not evidence.",
+        "The PM rules on every CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding the entry lists",
+    ),
+    "skills/compute-squad/references/resume.md": ("| `## Audit Findings` | Spawn `squad-pm` in ACCEPT mode. |",),
+    "README.md": ("audit-prompts.md  # audit procedure, finder and skeptic briefs",),
+}
+for path, needed in AUDIT_TEXT.items():
+    flat = " ".join(read(path).split())
+    missing = [text for text in needed if " ".join(text.split()) not in flat]
+    if missing:
+        fail(f"{path}: missing the audit text (finding 20) {missing!r}")
+OLD_AUDIT_RULE = re.compile(r"only (?:skeptic-confirmed|skeptic-CONFIRMED|findings that survive refutation) (?:findings )?"
+                            r"counts?", re.IGNORECASE)
+stale = [path for path in tracked_files("agents", "codex", "skills", "README.md", "docs")
+         if OLD_AUDIT_RULE.search(" ".join(read(path).split()))]
+if stale:
+    fail(f"these files keep the old audit rule that only skeptic-confirmed findings count: {stale!r}")
+
+print(
+    f"PASS: check 7: the audit skeptic cap reads '{audit_cap}' in {', '.join(AUDIT_CAP_FORMS)}, and finding 20's "
+    f"procedure, entry, verdicts, and PM ruling are in {', '.join(AUDIT_TEXT)}"
+)
 
 # ---- 7d: the routing blocks. codex/build-agents.py writes each block from
 # models.conf between one "<!-- routing:begin -->" line and one
@@ -1417,8 +1519,9 @@ VERDICT_SCOPE = (
 )
 WORK_ORDER_STOP = (
     "If any line in the log reads `High-stakes: yes`, or the governing plan revision has a work order after the one "
-    "you accepted, stop here: archive nothing and clear nothing. Your final summary says which: the log awaits the "
-    "main session's high-stakes review, the run stays open for the next work order, or both."
+    "you accepted, stop here: archive nothing and clear nothing. Your final message's archive line reads "
+    "`No archive.` followed by which: the log awaits the main session's high-stakes review, the run stays open for "
+    "the next work order, or both."
 )
 PLAN_ATTEMPT = (
     "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n "
@@ -1454,6 +1557,60 @@ OPEN_RUN_GUARD_SPAN = (
     "When told a new run is starting, first run `grep '^Next: ' COMPUTE_SQUAD_LOG.md | tail -n 1`. If it prints a "
     "line other than `Next: none`, change nothing and report `ARCHIVE REFUSED: open run` followed by that line."
 )
+# Finding 5: the main session routes from the log, so a stage's final message
+# only points at its entry, and every spawn prompt is a pointer in one form.
+# The main session reads product source only from Recon on, and after every
+# spawn it greps the log's headings, fixed lines, and blocks (7y ties the grep
+# to the linter's field table).
+FINAL_MESSAGE = (
+    "Then end with a final message of at most three lines: the heading you appended, then the first line of each "
+    "`DELEGATE:` or `BLOCKER:` block your entry ends with, or `No DELEGATE or BLOCKER block.` Do not restate the entry."
+)
+ACCEPT_FINAL_MESSAGE = (
+    "End every ACCEPT run with a final message of at most five lines: the heading you appended, the first line of any "
+    "`DELEGATE:` or `BLOCKER:` block your entry ends with, the archive path and the result of the check that verified "
+    "it (or `No archive.`), and whether you cleared the log. That verified confirmation belongs in this message, not "
+    "in the log: the append-only `## PM — PASS` entry only ever states the archive target as intent, since it is "
+    "written before the copy exists."
+)
+STAGE0_BOUND = (
+    "Stage 0 reads only what finding gaps in the goal needs: the user's request, the project instructions already in "
+    "context, the README, at most one directory listing, files the user named, and `COMPUTE_SQUAD_LOG.md` for the "
+    "checks above. It never reads product source to map it, never runs tests or builds, and never lists files or "
+    "questions for Recon; mapping and the baseline run are Recon's."
+)
+SPAWN_POINTER = "\n".join((
+    "```",
+    "Stage: <Archive|Recon|Plan|Execute|Accept>",
+    "Mode: <PLAN|ACCEPT|close|none>",
+    "Repo root: <absolute path>",
+    "Log: COMPUTE_SQUAD_LOG.md, run <Run of the latest ## Status entry, or none>",
+    "Since your last spawn: <new run | first spawn | the headings appended since your last entry>",
+    "```",
+))
+ROUTE_GREP = (
+    "grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' "
+    "COMPUTE_SQUAD_LOG.md | tail -n 12"
+)
+# Finding 18: every DELEGATE: subtask caps what its helper returns, and the
+# helpers keep to the cap (8a's delegate-cap rule holds logs to it; 7z holds
+# the rest of the delegation text).
+DELEGATION_CAP = "Each subtask names the most output lines the helper may return (`return at most <N> lines`)."
+HELPER_OUTPUT_CAP = (
+    "If the procedure caps the output, return at most that many lines of it (the last ones, for command output) and "
+    "say how many lines you cut."
+)
+# Finding 20: ACCEPT rules on every audit finding the PM must answer for
+# (8a's audit-ruling rule holds verdicts to it; 7c holds the rest).
+AUDIT_RULING = (
+    "If an `## Audit Findings` entry follows the Executor entry you are judging, name every CONFIRMED, UNREVIEWED, and "
+    "NEEDS-HUMAN finding in the latest one with your ruling in your verdict entry. A CONFIRMED finding is FAIL evidence "
+    "unless you quote the Out of scope or criterion text of the latest `## Goal — Locked` entry that places it outside "
+    "the goal; a defect this change introduced is never outside it. An UNREVIEWED finding is FAIL evidence until you "
+    "refute it yourself. A NEEDS-HUMAN finding you cannot settle by showing the guard goes into a "
+    "`## PM — Accept (pending)` entry ending with a `BLOCKER:` block (`needs-human: <what reproduction needs>`), never "
+    "into a PASS. You may reopen a REFUTED finding whose only reason is that it did not reproduce."
+)
 
 
 def span_row(name, files, text=None, canon=None, start=None, end=None, mask=None, contains=()):
@@ -1470,16 +1627,16 @@ SHARED_SPANS = [
              start="race can silently drop", end="appended in between"),
     span_row("pointer", BODIES, canon="agents/squad-executor.md",
              start="the spawn prompt is a pointer", end="the log is the record"),
-    span_row("per-spawn", BODIES + CODEX_STAGE_PROMPTS, text="The one-entry rule is per spawn."),
+    span_row("per-spawn", BODIES + CODEX_STAGE_PROMPTS, text="The one-entry rule is per spawn or continuation."),
     span_row("cont only after BLOCKING", BODIES + CODEX_STAGE_PROMPTS, canon="agents/squad-executor.md",
              start="Append `## ", end="any other re-spawn also appends a new, complete entry.",
              mask=("Append `## ", " (cont.)`")),
-    span_row("precedence", BODIES, canon="agents/squad-executor.md",
+    span_row("precedence", BODIES + CODEX_STAGE_PROMPTS, canon="agents/squad-executor.md",
              start="Your own protocol and the log outrank your spawn prompt", end="name the conflict in your entry."),
     span_row("latest Goal read", BODIES + CODEX_STAGE_PROMPTS, text=LATEST_GOAL_READ),
     span_row("criterion command", [SKILL, "agents/squad-pm.md"] + EXECUTOR_BODIES + CODEX_STAGE_PROMPTS[1:],
              text=CRITERION_COMMAND),
-    span_row("mech precedence", ["agents/squad-mech.md"],
+    span_row("mech precedence", ["agents/squad-mech.md", "codex/01-archive.md"],
              text="The procedures in this file outrank your spawn prompt: where the prompt conflicts with one, "
                   "follow this file and name the conflict in your report."),
     span_row("7k blocker grammar", BODIES + CODEX_STAGE_PROMPTS, canon="agents/squad-executor.md",
@@ -1507,6 +1664,15 @@ SHARED_SPANS = [
     span_row("FAIL count", [SKILL], text=FAIL_COUNT),
     span_row("open-run guard", ["agents/squad-mech.md", "codex/01-archive.md"], text=OPEN_RUN_GUARD_SPAN),
     span_row("answers", BODIES + ["codex/02-recon.md", "codex/03-pm-plan.md", "codex/04-execute.md"], text=ANSWERS_SENTENCE),
+    span_row("final message", BODIES + CODEX_STAGE_PROMPTS[:3], text=FINAL_MESSAGE),
+    span_row("ACCEPT final message", PM_FILES, text=ACCEPT_FINAL_MESSAGE),
+    span_row("Stage 0 bound", [SKILL], text=STAGE0_BOUND),
+    span_row("spawn pointer", [SKILL, "codex/SKILL.md"], text=SPAWN_POINTER),
+    span_row("route grep", [SKILL, "codex/SKILL.md"], text=ROUTE_GREP),
+    span_row("delegation cap", BODIES + CODEX_STAGE_PROMPTS, text=DELEGATION_CAP),
+    span_row("helper output cap", ["agents/squad-helper.md", "agents/squad-mech.md", "codex/01-archive.md"],
+             text=HELPER_OUTPUT_CAP),
+    span_row("audit ruling", PM_FILES, text=AUDIT_RULING),
 ]
 
 
@@ -1954,6 +2120,140 @@ print(
     f"the log linter's recon-checks forms, PLAN starts from it and reconciles its counts ({', '.join(PLAN_PATHS)}), the "
     f"executors' stop target names it, and no agent body or Codex prompt keeps {OLD_CARVE_OUT!r}"
 )
+
+# ---- 7y: orchestrator economy (finding 5). Stage 0 reads no product source,
+# every stage spawn prompt is the five-line pointer, and the main session
+# routes from the log: after every spawn it greps the headings, the fixed
+# lines, and the DELEGATE: and BLOCKER: blocks, never a stage's final message,
+# which only points at the entry (the 7p rows "Stage 0 bound", "spawn
+# pointer", "route grep", "final message", and "ACCEPT final message" pin
+# the text). Both SKILL.md files carry the rules, compared with whitespace
+# collapsed; the grep names every routing field tests/check_logs.py --fields
+# lints, and its tail covers the longest entry's matching lines (heading,
+# fixed lines, DELEGATE:, BLOCKER:). No stage body or Codex prompt keeps the
+# one-paragraph summary, and neither SKILL.md passes Recon the goal.
+ECONOMY_RULES = (
+    STAGE0_BOUND,
+    "Every stage spawn prompt is a pointer of at most 400 characters, in exactly",
+    "Route from the log, never from a stage's final message.",
+    "Route on those field lines, not on the entry's prose.",
+    "Spawn `squad-recon`; it reads the locked goal and criteria from the log.",
+)
+for path in (SKILL, "codex/SKILL.md"):
+    flat = " ".join(read(path).split())
+    missing = [rule for rule in ECONOMY_RULES if " ".join(rule.split()) not in flat]
+    if missing:
+        fail(f"{path}: missing the Stage 0 bound, pointer, or route-from-log text {missing!r}")
+    if "Spawn `squad-recon` with the locked goal" in flat:
+        fail(f"{path}: Recon reads the goal from the log; its spawn prompt never carries it")
+# squad-mech keys its two archive procedures on the pointer's values, so the
+# closing archive and the refusal-guarded new-run archive never depend on
+# prose in the prompt.
+MECH_POINTER = (
+    "A spawn prompt reading `Mode: close` tells you to close a run; one reading `Mode: none` and "
+    "`Since your last spawn: new run` tells you a new run is starting."
+)
+for path in ("agents/squad-mech.md", "codex/01-archive.md", "codex/agents/squad-mech.toml"):
+    if MECH_POINTER not in " ".join(read(path).split()):
+        fail(f"{path}: squad-mech must name the pointer values that start each archive procedure: {MECH_POINTER!r}")
+grep_match = re.fullmatch(r"grep -n -E '\^\(([^)]*)\)' COMPUTE_SQUAD_LOG\.md \| tail -n ([0-9]+)", ROUTE_GREP)
+if not grep_match:
+    fail(f"the route grep {ROUTE_GREP!r} is not one grep -n -E '^(...)' over the log piped to tail -n N")
+grep_alternatives = grep_match.group(1).split("|")
+grep_wanted = ["## ", "DELEGATE:", "BLOCKER:"] + [name + ": " for name in field_names]
+grep_missing = [item for item in grep_wanted if item not in grep_alternatives]
+if grep_missing:
+    fail(f"the route grep misses {grep_missing!r}; it must match every heading, block, and routing field "
+         f"tests/check_logs.py --fields lints ({', '.join(field_names)})")
+longest_entry = 1 + max(len(fields) for fields in field_table.values()) + 2
+if int(grep_match.group(2)) < longest_entry:
+    fail(f"the route grep keeps {grep_match.group(2)} lines, fewer than the {longest_entry} one entry can match, so "
+         f"the newest heading could fall off")
+RETIRED_SUMMARY = ("one-paragraph summary", "final summary")
+stale_summary = [f"{path}: {phrase!r}" for path in tracked_files("agents/", "codex/", "skills/")
+                 for phrase in RETIRED_SUMMARY if phrase in " ".join(read(path).split())]
+if stale_summary:
+    fail("a stage's final message points at its entry and never summarizes it: " + "; ".join(stale_summary))
+
+print(
+    f"PASS: check 7: both SKILL.md files bound Stage 0, send every stage a pointer prompt, and route from the log "
+    f"with a grep over {', '.join(grep_wanted)} (tail -n {grep_match.group(2)}, one entry matches at most "
+    f"{longest_entry}), and no stage body or Codex prompt keeps a summary final message"
+)
+
+# ---- 7z: delegation economy (finding 18). Small work stays in-stage, a
+# BLOCKING requester is continued with SendMessage and re-spawned only when
+# that fails, and every subtask caps its helper's output (the 7p rows
+# "delegation cap" and "helper output cap" pin the body sentences, and 8a's
+# delegate-cap rule holds logs to the cap). The switchboard stays: 7r keeps
+# spawning tools out of every agent file and 7p's "switchboard" row keeps
+# SKILL.md's reason. Both SKILL.md files carry the rules, compared with
+# whitespace collapsed; every stage body limits delegation to work too large
+# to do in a few commands; no agent body or Codex prompt says a stage is
+# only re-spawned; the resume table continues or re-spawns a BLOCKING
+# requester; and a needs-human: blocker holds continuations as it holds
+# spawns.
+DELEGATION_RULES = {
+    SKILL: (
+        "Delegate only work too large to do in a few commands: a count, a listing, or an inventory of one directory "
+        "costs less in-stage than the orchestrating session's spawn and append turns, so the stage does it and puts "
+        "the result in its own entry.",
+        "Each subtask is one item: `- [<intern|execution>] <exact procedure>; return at most <N> lines.`",
+        "Each appended result keeps to its subtask's line cap, plus one line saying how the procedure ran and how many "
+        "lines were cut.",
+        "If the requesting stage marked the block `BLOCKING`, continue that stage's agent with SendMessage (load it "
+        "through ToolSearch if it is listed only by name) and point it at the new `## Delegated — <stage>` entry",
+        "re-spawn the stage only when the host cannot message a finished agent or the message fails.",
+        "the one-entry rule is per spawn or continuation, not per run.",
+        "Counts, listings, and single-directory inventories stay in-stage.",
+        "then continue or re-spawn the PM in ACCEPT mode for the verdict (DELEGATE step 2).",
+        "A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved.",
+    ),
+    "codex/SKILL.md": (
+        "`- [<intern|execution>] <exact procedure>; return at most <N> lines.`",
+        "counts, listings, and single-directory inventories stay in-stage",
+        "re-spawns the requester only when the host cannot message a finished agent or the message fails.",
+        "the one-entry rule is per spawn or continuation, not per run.",
+        "then continue or respawn the PM for the verdict.",
+        "A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved.",
+    ),
+    "skills/compute-squad/references/resume.md": (
+        "Then, if the block is `BLOCKING`, continue or re-spawn that stage to finish",
+        "only the session that spawned the stage's agent can continue it, so any other session re-spawns it.",
+    ),
+    "README.md": ("push busywork too large to do in-stage down a tier",),
+}
+for path, rules in DELEGATION_RULES.items():
+    flat = " ".join(read(path).split())
+    missing = [rule for rule in rules if " ".join(rule.split()) not in flat]
+    if missing:
+        fail(f"{path}: missing finding 18's delegation text {missing!r}")
+IN_STAGE_LIMIT = {path: "zero-judgment bulk work too large to do in a few commands" for path in ["agents/squad-recon.md"]}
+IN_STAGE_LIMIT.update({path: "zero-judgment busywork too large to do in a few commands" for path in EXECUTOR_BODIES})
+IN_STAGE_LIMIT["agents/squad-pm.md"] = "zero-judgment inputs too large to gather in a few commands"
+for path, phrase in IN_STAGE_LIMIT.items():
+    if phrase not in read(path):
+        fail(f"{path}: its DELEGATE paragraph must limit delegation to {phrase!r}")
+bare_respawn = [
+    f"{path}:{number}" for path in tracked_files("agents/*.md", "codex/0*.md")
+    for number, line in enumerate(read(path).splitlines(), 1)
+    for match in re.finditer(r"re-spawns you", line) if not line[:match.start()].endswith("continues or ")
+]
+if bare_respawn:
+    fail("a stage waiting on its own delegation is continued first; say 'continues or re-spawns you', not a bare "
+         "'re-spawns you': " + ", ".join(bare_respawn))
+old_examples = [f"{path}: {phrase!r}" for path in tracked_files("agents/", "codex/", "skills/")
+                for phrase in ("symbol counts", "bulk file inventories") if phrase in " ".join(read(path).split())]
+if old_examples:
+    fail("counts and single-directory inventories stay in-stage, so no protocol file offers them for delegation: "
+         + "; ".join(old_examples))
+
+print(
+    f"PASS: check 7: both SKILL.md files keep small work in-stage, continue a BLOCKING requester before re-spawning "
+    f"it, and cap every subtask's output; the {len(IN_STAGE_LIMIT)} stage bodies delegate only work too large to do "
+    f"in a few commands, no agent body or Codex prompt only re-spawns a waiting stage, and the resume table and "
+    f"README agree"
+)
 PYEOF
 
 # ---------------------------------------------------------------------------
@@ -1967,6 +2267,7 @@ import datetime
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -2012,8 +2313,20 @@ def read(path):
 # upheld review has no open item and closes the run. Its answers rule holds
 # every re-run to finding 13's Answers: line, and its recon-checks rule holds
 # the Recon entry's Checks: block to finding 14's goal-facts and baseline
-# lines (check 7x holds the template to the same forms). The example
-# log must lint clean. Each fixture tests/fixtures/logs/<name>.log.md has a
+# lines (check 7x holds the template to the same forms). Its block-column
+# rule keeps every DELEGATE: and BLOCKER: line at column 0, where the main
+# session's route grep finds it (finding 5; 7y holds the grep). Its
+# delegate-cap rule holds every DELEGATE: subtask to its output cap, and the
+# ## Delegated entries answering a block to those caps plus one line per
+# subtask (finding 18; 7z holds the protocol text). Its audit, audit-cap,
+# and audit-ruling rules hold the main session's ## Audit Findings entry to
+# finding 20's procedure and template, whose cap, verdicts, and severities it
+# reads from references/audit-prompts.md: the entry follows execution, lists
+# as many findings as its Findings: count, runs skeptics on at most the cap's
+# findings in severity order and marks the rest UNREVIEWED, and every PASS or
+# FAIL after it names each CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding
+# (7c and 7p hold the protocol text). The example log must
+# lint clean. Each fixture tests/fixtures/logs/<name>.log.md has a
 # <name>.expect.json that cites the protocol text it tests (each cited text
 # must still be in the cited file) and says whether the linter passes it or
 # which rules it fails. Every negative fixture must fail with exactly its
@@ -2148,7 +2461,9 @@ print(
 # spawn, and SKILL.md's one-active-run rule for a new goal over the log.
 # Every fixture log's .expect.json carries resume cases, each a state (what
 # the session sees besides the log: the request, the host, HEAD and the
-# paths moved since Base:, the dirty paths) with the next action and the
+# paths moved since Base:, the dirty paths, and whether it can still message
+# the agent of a BLOCKING requester, which it then continues rather than
+# re-spawns (finding 18)) with the next action and the
 # step or row the model must give for it. Every row, step, and check must
 # be exercised by a fixture that lints clean. The section 6 scenarios whose
 # static twin is 8b must map to the case named below, with the action the
@@ -2157,9 +2472,17 @@ print(
 # tests/fixtures/repo-ui/, the rest on tests/fixtures/repo-reset/; S5's
 # verdicts are also 8a's outcomes, and S6a and S6b also have 8d twins),
 # and the live S5 check's rule gives each of its seed's outcomes the value
-# the fixture states: run.sh's --list,
+# the fixture states. The rules of the live checks that read the hook log or
+# the usage ledger, S8's Stage 0 bound and main-session budget and S9's
+# skeptic cap (work order WO-3f), give each case in tests/fixtures/live/
+# <check>.json the value it states, over cases that pass and cases that fail,
+# and S9's passing cases, appended to its seed, lint clean. run.sh's --list,
 # --dry-run, and --setup-only run for every scenario with CI set and a claude
-# stub that must never be called, and in each repo --setup-only builds, HEAD
+# stub that must never be called, --dry-run prints each claude call's
+# --settings with the hook that writes the hook log (a PreToolUse hook with no
+# matcher, which, run with sh and dash on synthetic input, prints nothing,
+# exits 0, and writes one record per call), and in each repo
+# --setup-only builds, HEAD
 # and git status against the seeded Base: must give the twin's state, and the
 # model over the seeded log must give the twin's action with the repo's own
 # commits in it. Where node is installed, each repo's npm test script passes,
@@ -2220,6 +2543,9 @@ RESUME_TWINS = [
     ("S6b", "run-parked", {"request": "new-goal"}, "new run: archive", "archive the log", "refuse"),
     ("S7b", "s7b", {}, "step 2", "three FAILs", "append"),
     ("second run", "s2", {"request": "new-goal"}, "new run: refuse", "park, or abandon", "Stage 1"),
+    ("S9", "s9", {"dirty": ["package.json", "src/server/auth/__tests__/reset.routes.test.js",
+                            "src/server/auth/reset.service.js"]},
+     "step 4: perform Next", "run the audit", "squad-pm"),
 ]
 
 
@@ -2271,7 +2597,7 @@ LIVE_CHECK = "tests/live/check_live.py"
 LIVE_TWINS = {
     "s1": "S1 turn 1", "s1n": "S1 turn 1", "s2": "S2", "s2b": "S2b", "s2c": "S2c", "s2o": "second run",
     "s3a": "S3a", "s3b": "S3b", "s4": "S4", "s4b": "S4b", "s5": "S5", "s5b": "S5b", "s6a": "S6a", "s6b": "S6b",
-    "s7b": "S7b",
+    "s7b": "S7b", "s8": "S1 turn 1", "s9": "S9",
 }
 GIT_STATE = ("head", "moved", "dirty")
 for path in (LIVE_RUN, LIVE_CHECK):
@@ -2303,6 +2629,59 @@ for seed, judge in LIVE_JUDGES.items():
             fail(f"{LIVE_CHECK}'s {seed} rule " + ("accepts" if accepted else "rejects") + f" outcome {number} of "
                  f"{FIXTURES}{seed}.expect.json ({found}); the fixture says live: {outcome['live']}")
         judged_outcomes += 1
+
+# The live rules that read the hook log or the usage ledger (WO-3f): S8's
+# Stage 0 bound and main-session budget, and S9's skeptic cap. Each case in
+# tests/fixtures/live/<check>.json is what a live call could leave (its hook
+# log, and S8's ledger lines or the entries S9's call appends to its seed),
+# and the check's rule must give it the case's "live" value; each file holds
+# cases the rule accepts and cases it rejects, and cites the protocol text it
+# tests. S9's accepted cases, appended to its seed, must lint clean.
+LIVE_RULES = check_live.LIVE_FIXTURES + "/"
+live_rule_files = tracked_files(LIVE_RULES)
+live_rule_checks = sorted(os.path.basename(p)[:-len(".json")] for p in live_rule_files if p.endswith(".json"))
+if sorted(live_rule_files) != sorted(LIVE_RULES + c + ".json" for c in live_rule_checks) \
+        or live_rule_checks != sorted(check_live.LOG_RULE_CHECKS):
+    fail(f"{LIVE_RULES} holds exactly one <check>.json for each check whose rule reads the hook log or the ledger "
+         f"({', '.join(check_live.LOG_RULE_CHECKS)}); found {live_rule_files!r}")
+LIVE_CASE_KEYS = {"note", "live", "events", "session", "ledger", "append"}
+live_cases = 0
+with tempfile.TemporaryDirectory() as tmp:
+    for check in live_rule_checks:
+        path = LIVE_RULES + check + ".json"
+        try:
+            fixture = json.loads(read(path))
+            cases, cites = fixture["cases"], fixture["cites"]
+        except (ValueError, KeyError, TypeError) as e:
+            fail(f"{path}: needs 'cites' and 'cases': {e}")
+        for cite in cites if isinstance(cites, list) else [None]:
+            if not isinstance(cite, dict) or cite.get("file") not in tracked_set or not cite.get("text"):
+                fail(f"{path}: each cite needs a tracked 'file' and the 'text' it quotes; got {cite!r}")
+            if collapse(cite["text"]) not in collapse(read(cite["file"])):
+                fail(f"{path}: {cite['file']} no longer contains the cited text {cite['text']!r}; update the cases "
+                     f"with the protocol")
+        if not isinstance(cases, list) or {c.get("live") for c in cases if isinstance(c, dict)} != {"pass", "fail"}:
+            fail(f"{path}: needs cases the live {check} rule accepts ('live': 'pass') and cases it rejects ('fail')")
+        seed = check_live.seed_text(fixture)
+        for number, case in enumerate(cases, 1):
+            if not isinstance(case, dict) or not set(case) <= LIVE_CASE_KEYS or not {"note", "live", "events"} <= set(case):
+                fail(f"{path}: case {number} needs 'note', 'live', and 'events', and only keys from "
+                     f"{sorted(LIVE_CASE_KEYS)!r}")
+            try:
+                accepted, found = check_live.judge_case(check, fixture, case)
+            except (check_live.SetupError, check_live.check_logs.ProtocolError) as e:
+                fail(f"{path}: case {number}: {e}")
+            if accepted != (case["live"] == "pass"):
+                fail(f"{LIVE_CHECK}'s {check} rule " + ("accepts" if accepted else "rejects") + f" case {number} of "
+                     f"{path} ({case['note']}): {found}; the case says live: {case['live']}")
+            if accepted and case.get("append"):
+                appended = os.path.join(tmp, f"{check}-{number}.log.md")
+                with open(appended, "w", encoding="utf-8") as handle:
+                    handle.write(seed.rstrip("\n") + "\n\n" + "\n".join(case["append"]) + "\n")
+                run = run_linter(appended)
+                if run.returncode != 0:
+                    fail(f"{path}: case {number}, appended to its seed, should lint clean:\n{run.stdout}{run.stderr}")
+            live_cases += 1
 
 
 def porcelain_paths(text):
@@ -2360,6 +2739,63 @@ with tempfile.TemporaryDirectory() as tmp:
         wanted = [f"== {name} (run 1 of 1)"] + [f"turn {i}, check {turn}:" for i, turn in enumerate(turns.split(), 1)]
         if any(line not in dry.stdout for line in wanted):
             fail(f"{LIVE_RUN} --dry-run all does not print {name}'s setup and every turn's claude command")
+    # Every claude call's --settings carries the hook log: a PreToolUse hook
+    # with no matcher that runs check_live.py toollog on this scenario run's
+    # file and can never block a call.
+    settings_seen, hook_command = 0, None
+    for line in dry.stdout.splitlines():
+        if claude_stub + " -p " not in line:
+            continue
+        try:
+            words = shlex.split(line.strip())
+            settings = json.loads(words[words.index("--settings") + 1])
+            hooks = settings["hooks"]["PreToolUse"]
+            command = hooks[0]["hooks"][0]["command"]
+        except (ValueError, KeyError, IndexError, TypeError) as e:
+            fail(f"{LIVE_RUN} --dry-run all prints a claude call whose --settings has no hook log: {e}: {line[:300]}")
+        if (len(hooks) != 1 or "matcher" in hooks[0] or settings.get("enabledPlugins") != {"compute-squad@compute-squad": False}
+                or not re.search(r"check_live\.py'? toollog '?<out>/\S+/turn[0-9]+\.tools\.jsonl'? >/dev/null 2>&1 \|\| true$",
+                                 command)):
+            fail(f"{LIVE_RUN} --dry-run all: the --settings hook must be one PreToolUse hook with no matcher running "
+                 f"'check_live.py toollog <out>/<run>/turn<n>.tools.jsonl >/dev/null 2>&1 || true'; got {settings!r}")
+        settings_seen += 1
+        hook_command = hook_command or command
+    if settings_seen != sum(len(turns.split()) for _, _, turns in scenarios):
+        fail(f"{LIVE_RUN} --dry-run all printed {settings_seen} claude calls with --settings; the scenarios have "
+             f"{sum(len(turns.split()) for _, _, turns in scenarios)} turns")
+    # The hook as a command hook runs, with sh (and dash where installed), on
+    # synthetic PreToolUse input: it prints nothing and exits 0 on every
+    # input, one it cannot parse and a log it cannot write included, and
+    # writes one record per tool call that keeps what the live checks read,
+    # a subagent's agent_id and agent_type, and a prompt cut to 4,000
+    # characters with its full length.
+    hook_log = os.path.join(tmp, "hook.tools.jsonl")
+    hook_path = re.compile(r"'?<out>/\S+/turn[0-9]+\.tools\.jsonl'?")
+    main_read = {"session_id": "s", "transcript_path": "/t", "cwd": "/w", "hook_event_name": "PreToolUse",
+                 "tool_name": "Read", "tool_input": {"file_path": "/w/src/a.js", "limit": 5}, "tool_use_id": "t1"}
+    sub_spawn = {"session_id": "s", "agent_id": "a1", "agent_type": "general-purpose", "cwd": "/w",
+                 "hook_event_name": "PreToolUse", "tool_name": "Agent",
+                 "tool_input": {"subagent_type": "general-purpose", "model": "fable", "prompt": "x" * 5000}}
+    want_records = [
+        {"session_id": "s", "cwd": "/w", "tool_name": "Read", "tool_use_id": "t1",
+         "tool_input": {"file_path": "/w/src/a.js"}},
+        {"session_id": "s", "agent_id": "a1", "agent_type": "general-purpose", "cwd": "/w", "tool_name": "Agent",
+         "prompt_chars": 5000, "tool_input": {"subagent_type": "general-purpose", "model": "fable", "prompt": "x" * 4000}},
+    ]
+    hook_shells = [shell for shell in ("sh", "dash") if shutil.which(shell)]
+    for shell in hook_shells:
+        for target in (hook_log, os.path.join(tmp, "missing", "hook.tools.jsonl")):
+            for payload in (json.dumps(main_read), json.dumps(sub_spawn), "not json", ""):
+                run = subprocess.run([shell, "-c", hook_path.sub(lambda _: shlex.quote(target), hook_command)],
+                                     input=payload, capture_output=True, text=True, timeout=60)
+                if run.returncode != 0 or run.stdout or run.stderr:
+                    fail(f"{LIVE_RUN}'s hook-log command under {shell} exited {run.returncode} and printed "
+                         f"{(run.stdout + run.stderr)[:300]!r} on {payload[:80]!r}; it must print nothing and exit 0")
+    hook_records = check_live.read_tool_log(hook_log)
+    if hook_records != want_records * len(hook_shells) \
+            or [r.get("tool_name") for r in check_live.main_calls(hook_records)] != ["Read"] * len(hook_shells):
+        fail(f"{LIVE_RUN}'s hook-log command wrote {hook_records!r}; expected {want_records!r} under each of "
+             f"{hook_shells!r}")
 
     out = os.path.join(tmp, "out")
     node = shutil.which("node")
@@ -2471,6 +2907,10 @@ print(
     + (f" ({', '.join(preflights_skipped)} not run: Playwright's Chromium does not start here)"
        if preflights_skipped else "")
     + f"; the live S5 rule accepts and rejects the {judged_outcomes} outcomes its seed lists as they state"
+    + f"; the live {', '.join(live_rule_checks)} rules, which read the hook log and the ledger, give the "
+    f"{live_cases} cases in {LIVE_RULES} their stated values, and every claude call --dry-run prints carries "
+    f"the hook log in its --settings, whose command writes one record per call and prints nothing under "
+    f"{', '.join(hook_shells)}"
     + f"; squad-mech's open-run guard agrees with the one-active-run rule "
     f"over every fixture log ({guard_checked} runs under {', '.join(guard_shells)})"
 )
@@ -2496,8 +2936,9 @@ print(
 # Every other agent, and input the script cannot read, is allowed silently.
 # Over the live seeds in tests/fixtures/logs/ that tests/live/run.sh uses
 # (8b reads them from run.sh --list, and each needs a verdict here), every
-# executor is denied for s1, s2b, s4, and run-parked (S6b) and allowed for
-# s2, s2c, s3, s5, s5b, s6a, and s7b. The hook and the plan's Attempt: line name the same revision
+# executor is denied for s1 (S1 and S8), s2b, s4, and run-parked (S6b) and
+# allowed for s2, s2c, s3, s5, s5b, s6a, s7b, and s9. The hook and the plan's
+# Attempt: line name the same revision
 # (finding 9): a plan whose Attempt: line is wrong does not move the hook's
 # count, and over the fixtures with a (cont.) plan or two revisions, a grant
 # for the latest plan's Attempt: number allows and a grant for any other
@@ -2583,7 +3024,7 @@ GATE_CASES = [
 ]
 SEED_VERDICTS = [("s1", "deny"), ("s2", "allow"), ("s2b", "deny"), ("s2c", "allow"), ("s3", "allow"),
                  ("s4", "deny"), ("s5", "allow"), ("s5b", "allow"), ("s6a", "allow"), ("run-parked", "deny"),
-                 ("s7b", "allow")]
+                 ("s7b", "allow"), ("s9", "allow")]
 unjudged = sorted(set(seed for _, seed, _ in scenarios) - set(seed for seed, _ in SEED_VERDICTS))
 if unjudged:
     fail(f"check 8c needs the grant hook's verdict over every live seed {LIVE_RUN} uses; none for {unjudged!r}")
@@ -2711,7 +3152,8 @@ with tempfile.TemporaryDirectory() as tmp:
     # allow: S5 and S6a spawn no executor because their next action is ACCEPT
     # and the high-stakes review (8b), and S5b's stop is Recon's needs-human:
     # blocker, which this hook then holds (check_live.py asserts it). S6b's
-    # parked plan-mode log denies.
+    # parked plan-mode log denies. S9's r1 WO-1 grant allows: it spawns no
+    # executor because its next action is the audit (8b).
     for seed, expected in SEED_VERDICTS:
         with open(log, "w", encoding="utf-8") as handle:
             handle.write(read(FIXTURES + seed + ".log.md"))
@@ -3362,7 +3804,8 @@ print(
 # ledger. The run ID is the log's, or the newest archive's once the log is
 # empty. It prints nothing and exits 0 on every input, malformed included.
 # Last, the end-of-run command in SKILL.md's Hard rules, run on that ledger,
-# prints the run's subagent lines and then its last main line.
+# prints the run's last line for each subagent, a continued one included, and
+# then its last main line.
 LEDGER = "skills/compute-squad/hooks/usage-ledger.sh"
 LEDGER_COMMAND = 'sh "${CLAUDE_PLUGIN_ROOT}/' + LEDGER + '"'
 LEDGER_FIXTURES = "tests/fixtures/ledger/"
@@ -3600,13 +4043,26 @@ with tempfile.TemporaryDirectory() as tmp:
                                                    main_path=os.path.join(tmp, "gone.jsonl")), tmp)
         step("empty transcripts", ledger_payload("SubagentStop", repo, agent_type="compute-squad:squad-pm",
                                                  agent_path=empty, main_path=empty), tmp)
-        # The end-of-run command prints this run's subagent lines, then its last main line.
+        # The end-of-run command prints this run's last line for each
+        # subagent, in the order each first stopped, then its last main line.
+        # A subagent continued with SendMessage (finding 18) stops again under
+        # the same agent_id, and its later line is a running total that
+        # repeats the earlier one's tokens (measured on Claude Code 2.1.282),
+        # so the records above, which all carry the fixture's agent_id, print
+        # as one; two more agents follow, one of them continued.
         with open(os.path.join(repo, LEDGER_TARGET), "a", encoding="utf-8") as handle:
             handle.write(json.dumps(dict(main_rec(OLD_RUN), output=1), separators=(",", ":")) + "\n")
+            for agent_id, output in (("b1c2d3e4f5a6b7c8d", 5), ("c2d3e4f5a6b7c8d9e", 7), ("b1c2d3e4f5a6b7c8d", 9)):
+                handle.write(json.dumps(dict(rec(agent_fixture, RUN, "squad-helper", agent_id), output=output),
+                                        separators=(",", ":")) + "\n")
         lines = read(os.path.join(repo, LEDGER_TARGET)).splitlines()
         mine = [line for line in lines if f'"run":"{RUN}"' in line]
-        want = [line for line in mine if '"agent":"main"' not in line] + [
-            [line for line in mine if '"agent":"main"' in line][-1]]
+        last = {}
+        for line in mine:
+            last.setdefault(json.loads(line)["agent_id"], []).append(line)
+        want = [runs[-1] for agent_id, runs in last.items() if agent_id != "main"] + [last["main"][-1]]
+        if len(want) != 4 or len(last["b1c2d3e4f5a6b7c8d"]) != 2:
+            fail("check 8f's end-of-run case needs three subagents, one of them continued, and a main line")
         printed = subprocess.run([shell, "-c", END_COMMAND.replace("<run ID>", RUN)], capture_output=True, text=True,
                                  cwd=repo, env=ledger_env, timeout=60)
         if printed.returncode != 0 or printed.stdout.splitlines() != want:

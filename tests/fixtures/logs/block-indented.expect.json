@@ -1,0 +1,26 @@
+{
+  "note": "The executor-blocker log with its BLOCKER: line indented two spaces. The main session's route grep matches only column 0, so it would miss the block and route on the DELEGATE: block alone, as the resume case shows: ACCEPT instead of a Plan re-run.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If a `DELEGATE:` or `BLOCKER:` line follows the newest heading, read that block before doing anything else."
+    },
+    {
+      "file": "agents/squad-executor.md",
+      "text": "Blockers use one grammar, as the last block of your own entry, after any `DELEGATE:` block:"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "block-column"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "run the helpers and append their results, then spawn squad-pm in ACCEPT mode",
+      "via": "row: Ends in a `DELEGATE:` block / `## Executor`"
+    }
+  ]
+}

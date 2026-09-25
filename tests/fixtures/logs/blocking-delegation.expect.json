@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. The stage then appends a `(cont.)` entry covering only the remainder of its work (Hard rules)"
+      "text": "If the requesting stage marked the block `BLOCKING`, continue that stage's agent with SendMessage (load it through ToolSearch if it is listed only by name) and point it at the new `## Delegated — <stage>` entry, in the pointer form of Spawn prompts and routing; re-spawn the stage only when the host cannot message a finished agent or the message fails. A continued or re-spawned `BLOCKING` requester appends a `## <Stage> (cont.)` entry covering only the remainder of its work (Hard rules)"
     },
     {
       "file": "agents/squad-helper.md",

@@ -67,7 +67,7 @@ plan does not need in order to finish; the Executor reads it from the log.
 
 DELEGATE:
 - [intern] For each name exported from src/index.js, print the name when
-  `git diff --quiet v2.3.0 -- <its file>` exits 1.
+  `git diff --quiet v2.3.0 -- <its file>` exits 1; return at most 10 lines.
 
 ## Status
 Timestamp: 2026-09-04T12:07:58Z

@@ -65,7 +65,8 @@ listing is zero-judgment work.
 
 DELEGATE:
 - [intern] For each name exported from src/index.js, print the name when
-  `git diff --quiet v2.3.0 -- <its file>` exits 1. BLOCKING.
+  `git diff --quiet v2.3.0 -- <its file>` exits 1; return at most 10 lines.
+  BLOCKING.
 
 ## Status
 Timestamp: 2026-09-04T12:07:58Z

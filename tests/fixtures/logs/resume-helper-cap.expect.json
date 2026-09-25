@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "Never spawn a sixth: append `## Delegated — <stage>` listing each subtask left undone as `not run: helper cap reached`, and re-spawn the stage, which does those subtasks itself under step 2's heading rule."
+      "text": "Never spawn a sixth: append `## Delegated — <stage>` listing each subtask left undone as `not run: helper cap reached`, and re-spawn the stage (or continue it, as step 2 does for a `BLOCKING` block); it does those subtasks itself under step 2's heading rule."
     },
     {
       "file": "skills/compute-squad/references/resume.md",

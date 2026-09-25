@@ -1,5 +1,173 @@
 # Changelog
 
+## 4.4.0 — 2026-09-25
+
+Lands work order WO-3f of the 3.9.2 analysis: orchestrator economy, delegation, and audits (the rest
+of finding 5, and findings 18 and 20), with the live scenarios finding 26 names for the work order's
+acceptance items. Stage 0 now has a read bound, every stage spawn prompt is a five-line pointer, and
+the main session routes from the log's fixed lines. Small work stays in-stage, and a `BLOCKING`
+requester is continued rather than re-spawned. The audit gets a written procedure, a cap of 10
+skeptics, and a `## Audit Findings` entry the PM rules on. The switchboard is unchanged: stages
+still spawn no stages, and only the main session writes `## Delegated — <stage>` entries.
+
+- **Bounded Stage 0 (finding 5).** A new last paragraph of Stage 0 in
+  `skills/compute-squad/SKILL.md` and `codex/SKILL.md` limits Stage 0 to the user's request, the
+  project instructions in context, the README, at most one directory listing, files the user named,
+  and `COMPUTE_SQUAD_LOG.md`. It never reads product source to map it, never runs tests or builds,
+  and never lists files or questions for Recon. The log is an addition to the report's list, since
+  the resume offer and the one-active-run rule read it. The bound covers Stage 0 only, so the
+  high-stakes review can still read the diff and re-run commands. `README.md`'s Stage 0 bullet gains
+  one sentence.
+- **Spawn prompts and routing (findings 5 and 9).** A new section in both SKILL.md files gives the
+  pointer form (`Stage:`, `Mode:`, `Repo root:`, `Log:`, `Since your last spawn:`, at most 400
+  characters) and says nothing else goes in it; a helper's `DELEGATE:` procedure and an audit brief
+  are the two exceptions. Changes the tree forced: `Mode:` gains `close` for squad-mech's closing
+  archive after an upheld review, and anything a stage needs that neither its file nor the log
+  holds, such as a base-check re-map's paths, goes on the `Next:` line of a `## Status` appended
+  before the spawn. Routing uses finding 9's grep, extended to every fixed line in the fixed-field
+  Hard rule (`Attempt:`, `Answers:`, `Plan:`, `Classification:`, `High-stakes:`, `Rerun:`,
+  `Result:`), with the report's `tail -n 12`, and ends with "Route on those field lines, not on the
+  entry's prose." That sentence is finding 9's replacement for the last sentence of finding 5's
+  paragraph ("Read a whole entry only when a block or a decision addressed to you requires it."),
+  so the finding 5 sentence is not in the tree. One added sentence names what still comes from a final message: squad-mech and
+  squad-helper reports, an `ARCHIVE FAILED:` line, and the archive path after an ordinary PASS.
+  Stage 2 now reads "Spawn `squad-recon`; it reads the locked goal and criteria from the log.", and
+  Stage 5's ACCEPT spawn prompt "is the pointer (Spawn prompts and routing) and nothing else".
+  `agents/squad-mech.md` names the values that start each archive procedure: `Mode: close` for the
+  closing archive, and `Mode: none` with `Since your last spawn: new run` for a new run.
+  `codex/SKILL.md` carries a condensed copy, plus one line for the manual path, which allows the
+  close line `codex/README.md` gives for the closing archive. `README.md`'s FAQ on the shared log
+  gains one sentence.
+- **Short final messages (finding 5).** `agents/squad-recon.md`, the three executor bodies, and the
+  PM's PLAN mode end with a final message of at most three lines (the heading appended, then the
+  first line of each `DELEGATE:` or `BLOCKER:` block, or `No DELEGATE or BLOCKER block.`), in place
+  of a one-paragraph summary. ACCEPT ends with at most five lines, adding the archive path and its
+  check (or `No archive.`) and whether the log was cleared. PM PASS steps 2 and 3 and two sentences
+  of `docs/example-log.md` now say "final message" in place of "final summary", and step 2's wait
+  (high-stakes review, next work order, or both) goes on the final message's `No archive.` line, so
+  it fits the five-line form. squad-helper is exempt.
+- **Small work in-stage and output caps (finding 18).** DELEGATE step 1 delegates only work too
+  large to do in a few commands; counts, listings, and single-directory inventories stay in-stage.
+  Each subtask is one item, `- [<intern|execution>] <exact procedure>; return at most <N> lines.`, a
+  form added so the linter can read the cap, and each appended result keeps to its cap plus one
+  line. "Typical uses" is the report's text. The Recon, PM, and three executor bodies say "too large
+  to do (or gather) in a few commands" and carry the cap sentence; `agents/squad-helper.md` and
+  `agents/squad-mech.md` return at most the capped lines and say how many they cut. `README.md`'s
+  delegation paragraph reads "push busywork too large to do in-stage down a tier".
+- **Continuing a `BLOCKING` requester (finding 18).** DELEGATE step 2 continues a `BLOCKING`
+  requester's agent with SendMessage, in the pointer form, and re-spawns it only when the host
+  cannot message a finished agent or the message fails. The refusal case and step 4's helper-cap
+  case continue a `BLOCKING` requester the same way. WO-3d's `(cont.)` rule is unchanged: a
+  continued stage still writes `(cont.)` extending its latest attempt, and "the one-entry rule is
+  per spawn" becomes "per spawn or continuation" in SKILL.md and the five stage bodies. Step 2's
+  `(cont.)` sentence reads "A continued or re-spawned `BLOCKING` requester" where the report says
+  "stage", since a stage re-spawned after a refused non-`BLOCKING` request writes a plain heading.
+  The stage bodies, the Stage 5 pending bullet, and the PM's pending-verdict and
+  pre-existing-failure sentences say "continues or re-spawns". An addition: a `needs-human:` blocker
+  now reads "spawn or continue no stage until it is resolved", because the grant hook matches only
+  Agent and Task and never sees a SendMessage. `skills/compute-squad/references/resume.md`'s
+  DELEGATE row says only the session that spawned the agent can continue it; `tests/resume_next.py`
+  gains a `continuable` state key, false by default.
+- **Usage ledger after a continuation (finding 18).** A Haiku probe showed the usage hook writes a
+  line at each stop of a continued agent, each a running total, so the end-of-run command in
+  SKILL.md's Hard rules would have counted a continued stage twice. It now keeps the last line per
+  `agent_id`, in first-stop order, then the main session's last line. The hook's code is unchanged;
+  its header comment, `README.md`'s ledger line, and the live ledger check's docstring now say a
+  continued agent writes a line at each stop.
+- **The audit procedure (finding 20).** `skills/compute-squad/references/audit-prompts.md` opens
+  with a five-step procedure for the main session: spawn finders and skeptics as the host's
+  general-purpose agent with the model set per spawn, one parallel batch each; order findings by
+  severity; run skeptics on at most 10, the rest UNREVIEWED; stop and append nothing if `git status
+  --porcelain` changed; append one `## Audit Findings` entry. Finders read the Goal, Recon, and Plan
+  entries for scope and report `severity: <high | medium | low>`. The template uses the tree's
+  `Timestamp:` line and `Agent: main session (<model ID as your context states it>)`. The skeptic's
+  Goal read and security default from WO-1 are unchanged. `README.md`'s tree comment reads "audit
+  procedure, finder and skeptic briefs".
+- **Audit routing and the PM's ruling (findings 9, 10, and 20).** SKILL.md's audit section caps
+  skeptics at 10 findings and replaces "Only skeptic-confirmed findings count as FAIL evidence" with
+  the report's two sentences: CONFIRMED and UNREVIEWED findings are FAIL evidence, a NEEDS-HUMAN
+  finding stops for the user, a REFUTED one is not evidence. One added sentence routes NEEDS-HUMAN
+  through the PM, which rules on every CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding (as its step 7
+  does) and settles a NEEDS-HUMAN one by showing the guard or ends a pending entry with a
+  `needs-human:` blocker; WO-1 had left this open. `## Audit Findings` joins the closed heading
+  list, the Status rule's no-append stops gain the audit's changed-tree stop, and resume.md gains
+  finding 10's `## Audit Findings` row and Executor row text. `agents/squad-pm.md` ACCEPT gains step
+  7: rule on every CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding of the latest audit that follows
+  the judged Executor entry (the report said "the log", which a re-run with several audits makes
+  ambiguous). `codex/SKILL.md` mirrors the section. `README.md`'s Stage 5 bullet says your session
+  runs the audit fan-out first and the PM rules on its findings.
+- **Example log (findings 5 and 18).** In `docs/example-log.md`, Recon counts the four auth test
+  files itself, in its `Tests:` section and one check line, and its `DELEGATE:` block and the
+  `## Delegated — Recon` entry are gone. The closing paragraph shows a delegation worth its turns: an
+  Executor's `BLOCKING` block for 40 fixture files, which the main session continues. The report's
+  `## Delegated — Executor` is written in the list's placeholder form, as check 7i requires.
+- **Generated files.** `codex/01-archive.md` to `codex/05-pm-accept.md` and `codex/agents/*.toml`
+  were regenerated with `codex/build-agents.py`, and `dist/compute-squad.plugin` was rebuilt.
+  `codex/README.md` is unchanged.
+- **Check 7 (findings 5, 18, and 20).** In `scripts/verify.sh`, 7c now also holds the skeptic cap to
+  one number (10) in the procedure, the template, and both SKILL.md files, pins finding 20's
+  procedure, verdicts, routing, the PM's ruling in both SKILL.md files, and PM step, and bans the
+  old skeptic-confirmed rule. 7p gains rows for the final messages, the Stage 0 bound, the spawn
+  pointer, the route grep, the delegation cap, the helper output cap, and the audit ruling (36
+  rows); its precedence rows now cover the Codex prompts, and its per-spawn and work-order-stop rows
+  follow the new text. New 7y (the report's 7x for finding 5) holds both SKILL.md files to the
+  bound, the pointer rule, and the route sentences, ties the grep to the linter's routing fields and
+  its tail to the longest entry, holds squad-mech's body, prompt, and TOML to the pointer values of
+  its two archives, and bans "one-paragraph summary" and "final summary" in agents/, codex/, and
+  skills/. New 7z (finding 18) holds the delegation rules in both SKILL.md files, resume.md, README,
+  and the stage bodies, and bans a bare "re-spawns you" and the old "symbol counts" and "bulk file
+  inventories" examples.
+- **Check 8 (findings 5, 18, and 20).** `tests/check_logs.py` gains five rules: `block-column` (a
+  `DELEGATE:` or `BLOCKER:` line off column 0, which the route grep would miss), `delegate-cap`
+  (every subtask names its cap, and the `## Delegated` entries keep within it), `audit`,
+  `audit-cap`, and `audit-ruling`. It reads the item form, the cap, the verdicts, and the severities
+  from SKILL.md and `audit-prompts.md`, and exits 2 if they drift. The eleven existing fixture logs
+  with `DELEGATE:` blocks gained caps. New fixtures: `block-indented`, `delegate-no-cap`,
+  `delegated-over-cap`, `audit-count`, `audit-agent`, `audit-cap`, `audit-order`,
+  `audit-unreviewed-count` (a skeptic's verdict logged UNREVIEWED), `audit-after-plan` (the entry
+  above any Executor entry), `audit-line-form` (a finding line without its severity), and
+  `audit-unruled` fail one rule each; `audit-findings` (30 findings, 10 with skeptics, 20
+  UNREVIEWED, the static twin of the audit-cap acceptance) and `audit-ruled` lint clean. 8a reports
+  41 passing and 50 failing fixture logs; 8b checks 15 resume rows over 112 cases and 91 logs; 8c
+  makes 1580 grant-hook decisions. 8f's expected output now keeps the last ledger line per agent,
+  with one agent continued.
+- **The live tier (findings 5, 20, and 26).** `tests/live/run.sh` gives every claude call a
+  PreToolUse hook with no matcher that runs `check_live.py toollog`, which appends one record per
+  tool call (main session or subagent) to a hook log, prints nothing, and always exits 0. New S8
+  runs `/squad <goal>` from the empty S1 seed to a PASS and asserts, before the first squad-recon
+  spawn, no main-session read of product source (a Read, a Grep, or a Bash command that prints,
+  searches, or counts it, such as `cat`, `sed`, `grep -r`, `rg`, `git grep`, or `git show`) and no
+  test or build command (npm, yarn, pnpm, bun, npx, `node --test`, make, jest, vitest, mocha,
+  pytest, go, or cargo); that every main-session stage spawn prompt is the five-line pointer,
+  within 400 characters and with `Stage:` and `Mode:` values from SKILL.md's form, except a helper
+  spawned for a `DELEGATE:` subtask (squad-helper, or squad-mech with a prompt that does not open
+  with `Stage:`, spawned after a stage that writes entries and before a high-stakes review, so
+  squad-mech's Stage 1 and closing archives stay held to the pointer); and the main-session budget
+  of 756,000 billed input and 12,400 output tokens from the ledger. It counts `package.json` as
+  product source, and flags Grep, Bash reads, test commands, and prompts as well as Read, which
+  widens the acceptance item. New S9 applies `tests/live/repo-reset-audit.patch` (WO-1 with about 30
+  planted defects) under the new seed `s9` and asserts more findings than the cap, exactly 10
+  skeptic spawns in the hook log and the entry, the rest UNREVIEWED, and an unchanged tree. S9 stops
+  before acceptance, so the PM's ruling is not exercised live, and it cannot pin the finders to
+  exactly 30. `tests/fixtures/live/s8.json` and `s9.json` hold 38 static cases run through the same
+  rules; 8b checks them and the `--settings` hook of every call `--dry-run` prints, and runs the
+  hook under sh and dash.
+- **Not landed, or not run.** No live scenario ran, so all three acceptance items are unmeasured:
+  the main-session budget on a reference run (S8), no main-session Read of product source before
+  Recon (S8), and a seeded audit spawning at most 10 skeptics with the rest UNREVIEWED (S9). Cheap
+  Haiku probes, about $0.38 in total: squad-mech archived and cleared a log from the `Mode: close`
+  pointer; a headless SendMessage continuation worked and exposed the ledger double count; a
+  general-purpose spawn with `model: sonnet` ran on Sonnet; the toollog hook told main-session and
+  subagent calls apart. Codex's `spawn_agent` with a per-spawn model and SendMessage continuation on
+  Codex are untested. Not built: finding 5's two live routing stubs and its prompt-flag hook
+  (finding 1 never defined it; S8 checks the pointer form after the run instead, and bans no words,
+  since the pointer's own values can name `Archive` or a `## High-stakes review` heading), finding
+  18's live checks, and finding 20's three-defect audit fixture. There is no `## Decision` Type for
+  a user's answer to an audit NEEDS-HUMAN question, and a resumed session cannot tell from the log
+  that a run is audit-grade. Tuning the in-stage threshold for small DELEGATEs is left to WO-4.
+  S3a's scoped re-map now depends on Recon following the latest `## Status`'s `Next:` line rather
+  than its prompt.
+
 ## 4.3.0 — 2026-09-25
 
 Lands work order WO-3e of the 3.9.2 analysis: acceptance grammar, the high-stakes review, and

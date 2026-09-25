@@ -1,0 +1,26 @@
+{
+  "note": "A finder or skeptic appended the ## Audit Findings entry itself. Only the main session writes it; finders and skeptics write no log entries.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Finders and skeptics change nothing: no file edits, no commits, no log entries."
+    },
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Spawn finders and skeptics as the host's general-purpose agent type, never as a squad agent (squad agents append pipeline entries), with the model set per spawn."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "audit"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Audit Findings`"
+    }
+  ]
+}
