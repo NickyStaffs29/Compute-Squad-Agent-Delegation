@@ -20,6 +20,9 @@ deny() {
 }
 if [ "$executor" = yes ]; then
   grant=$(awk '/^## /{s=($0=="## Status"); if(s) g=""} s && /^Grant: /{g=$0} END{print g}' "$log" 2>/dev/null)
+  # The current revision r<N> is the count of plan headings without (cont.),
+  # the number the latest plan writes on its Attempt: line. A mislabeled
+  # Attempt: line cannot move it.
   plans=$(grep -c '^## PM — Plan$' "$log" 2>/dev/null)
   case "$grant" in
     "Grant: all revisions"*) ;;

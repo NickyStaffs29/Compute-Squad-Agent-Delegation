@@ -23,6 +23,7 @@ Stop: after the PM verdict
 ## Recon
 Timestamp: 2026-09-01T09:03:40Z
 Agent: squad-recon (claude-sonnet-5)
+Attempt: 1
 
 The field is read in src/importer/map.js (lines 12-30) and written in
 src/importer/write.js (lines 40-44). 40 JSON fixtures under
@@ -31,9 +32,12 @@ test/fixtures/importer/ carry it. Tests: test/importer.test.js (9 cases).
 ## PM — Plan
 Timestamp: 2026-09-01T09:08:02Z
 Agent: squad-pm (claude-opus-5-5)
-
+Attempt: 1
+Classification: STANDARD
+High-stakes: no
 Totals: 2 source files changed, 40 fixtures regenerated, 0 tests added.
-Classification: STANDARD. Tasks, in order: 1. rename the field in map.js and
+
+Tasks, in order: 1. rename the field in map.js and
 write.js; 2. regenerate the 40 fixtures from the exact template in
 test/fixtures/importer/README.md; 3. run npm test. Must NOT change: the API
 response shape. Non-goals: none. Risks: none material.
@@ -41,6 +45,8 @@ response shape. Non-goals: none. Risks: none material.
 ## Executor
 Timestamp: 2026-09-01T09:15:27Z
 Agent: squad-executor (claude-sonnet-5)
+Attempt: 1
+Plan: r1, work order all
 
 Renamed the field in src/importer/map.js and src/importer/write.js (task 1).
 Tasks 2 and 3 wait for the fixtures.
@@ -61,6 +67,8 @@ no judgment applied).
 ## Executor (cont.)
 Timestamp: 2026-09-01T09:21:09Z
 Agent: squad-executor (claude-sonnet-5)
+Attempt: 1
+Plan: r1, work order all
 
 Ran the remaining task: `npm test` -> exit 0; 9 passed. A grep for legacyId
 under both paths returns nothing.
@@ -70,6 +78,7 @@ Deviations: none. For acceptance: confirm each fixture matches the template.
 ## PM — PASS
 Timestamp: 2026-09-01T09:30:44Z
 Agent: squad-pm (claude-opus-5-5)
+Attempt: 1
 
 - `npm test` -> exit 0; 9 passed
 - `grep -rn legacyId src/importer test/fixtures/importer` -> exit 1; no match

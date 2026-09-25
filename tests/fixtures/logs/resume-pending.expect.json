@@ -1,0 +1,24 @@
+{
+  "note": "A pending ACCEPT entry whose DELEGATE: block is not BLOCKING, answered by a Delegated entry. The DELEGATE row falls through to the pending row, so resuming spawns the PM in ACCEPT mode for the verdict.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Resolve its `DELEGATE:` block or `needs-human:` question, then spawn `squad-pm` in ACCEPT mode for the verdict."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Run the `DELEGATE:` block, append the results, and re-spawn the PM in ACCEPT mode for the verdict."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode for the verdict",
+      "via": "row: Ends in a `DELEGATE:` block / `## PM — Accept (pending)`"
+    }
+  ]
+}

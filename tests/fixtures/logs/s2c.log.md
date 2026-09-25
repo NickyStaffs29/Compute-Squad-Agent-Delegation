@@ -26,6 +26,7 @@ Stop: after the plan
 ## Recon
 Timestamp: 2026-09-02T09:04:31Z
 Agent: squad-recon (claude-opus-5-5)
+Attempt: 1
 
 Base 4f2c9a1. The endpoint is POST /api/auth/reset-request, registered in
 src/server/auth/auth.routes.js (lines 6-13): 400 for a missing email, otherwise
@@ -66,9 +67,12 @@ Stop: after the plan
 ## PM — Plan
 Timestamp: 2026-09-02T09:09:48Z
 Agent: squad-pm (claude-fable-5-1)
-
+Attempt: 1
+Classification: STANDARD
+High-stakes: yes
 Totals: 3 files changed, 3 tests added, 2 work orders (WO-1: 2 files, 2 tests; WO-2: 3 files, 1 test).
-Classification: STANDARD. Spec: enforce a per-account 60-second cooldown inside
+
+Spec: enforce a per-account 60-second cooldown inside
 requestPasswordReset(), not the route, so every future caller inherits it. A
 refused request returns GENERIC_RESULT, so no response changes.
 
@@ -133,6 +137,8 @@ Stop: after the PM verdict on WO-1
 ## Executor
 Timestamp: 2026-09-03T08:43:27Z
 Agent: squad-executor (claude-opus-5-5)
+Attempt: 1
+Plan: r1, work order WO-1
 
 Completed WO-1, tasks 1 and 2. src/server/auth/reset.service.js gains
 RESEND_COOLDOWN_MS (line 7) and the newest-token check after the unknown-account
@@ -158,6 +164,7 @@ Stop: after the PM verdict on WO-1
 ## PM — PASS
 Timestamp: 2026-09-03T08:49:05Z
 Agent: squad-pm (claude-fable-5-1)
+Attempt: 1
 
 WO-1 of plan r1, against criteria 1, 2, 3 and 5; criterion 4 belongs to WO-2,
 which this grant does not cover. Re-ran the checks myself:
@@ -170,6 +177,6 @@ Refutations attempted: a second account inside the window still gets its email
 (test a); exactly 60 s later a token is created (test b); an unknown address
 during a known account's cooldown still gets the generic body. HIGH-STAKES: yes.
 The change sits on the password-reset auth path and the
-no-account-existence-leak invariant, so the log stays intact for the main
-session's high-stakes review. Verdict: PASS.
-Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-09-03_084912_2026-09-02-reset-cooldown.md
+no-account-existence-leak invariant. WO-2 remains in plan r1, so this PASS
+archives and clears nothing: the log stays intact for the main session's
+high-stakes review and the next work order. Verdict: PASS.

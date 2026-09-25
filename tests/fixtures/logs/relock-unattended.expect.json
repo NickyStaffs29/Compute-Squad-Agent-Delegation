@@ -15,5 +15,12 @@
     "rules": [
       "re-lock"
     ]
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in PLAN mode",
+      "via": "row: `## Recon`"
+    }
+  ]
 }

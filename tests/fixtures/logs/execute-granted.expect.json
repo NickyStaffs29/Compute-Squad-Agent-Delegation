@@ -13,5 +13,19 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    },
+    {
+      "state": {
+        "audit": true
+      },
+      "next": "run the audit, then spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    }
+  ]
 }

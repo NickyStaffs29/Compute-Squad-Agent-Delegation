@@ -1,0 +1,37 @@
+{
+  "note": "An Executor writes a line reading 'Next: none' in its prose. The run is still open (its latest Status names WO-1's executor, and the Executor entry awaits acceptance), but squad-mech's open-run guard reads the latest Next: line in the whole log, so a second run's Stage 1 would archive and clear this live log: the new-goal case below shows the guard and the one-active-run rule both letting it through. The linter rejects the stray line, which is what makes the guard safe (finding 11: 'A stray Next: line refuses safely (8a confines the field)').",
+  "cites": [
+    {
+      "file": "agents/squad-mech.md",
+      "text": "When told a new run is starting, first run `grep '^Next: ' COMPUTE_SQUAD_LOG.md | tail -n 1`. If it prints a line other than `Next: none`, change nothing and report `ARCHIVE REFUSED: open run` followed by that line."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Next: <the one permitted next action, or none when the run is closed>"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Only the main session writes `## Status` and `## Decision`."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "next-line"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "run Stage 1: archive the log and start the new run",
+      "via": "new run: archive"
+    }
+  ]
+}

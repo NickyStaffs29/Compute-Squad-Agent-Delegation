@@ -38,6 +38,7 @@ Stop: after the closing archive
 ## Recon
 Timestamp: 2026-07-25T14:02:17Z
 Agent: squad-recon (claude-sonnet-5)
+Attempt: 1
 
 The reset endpoint is POST /api/auth/reset-request in src/server/auth/auth.routes.ts
 (lines 141-168), calling requestPasswordReset() in src/server/auth/reset.service.ts
@@ -73,9 +74,12 @@ mfa.service.test.ts: 19 (procedure ran as specified; no judgment applied).
 ## PM — Plan
 Timestamp: 2026-07-25T14:09:33Z
 Agent: squad-pm (claude-opus-5-5)
+Attempt: 1
+Classification: STANDARD
+High-stakes: yes
 
-Classification: STANDARD. Spec: enforce a per-account 60s cooldown inside
-requestPasswordReset(), not the route, so every future call site inherits it.
+Spec: enforce a per-account 60s cooldown inside requestPasswordReset(), not the
+route, so every future call site inherits it.
 
 Tasks, in order:
 1. reset.service.ts: after the account lookup, query the newest
@@ -112,6 +116,8 @@ Stop: after the closing archive
 ## Executor
 Timestamp: 2026-07-25T14:21:52Z
 Agent: squad-executor (claude-sonnet-5)
+Attempt: 1
+Plan: r1, work order all
 
 Implemented tasks 1-3 exactly as specified: cooldown check added to
 reset.service.ts (lines 31-42) using the newest-token query; short-circuit returns
@@ -130,6 +136,7 @@ response.
 ## PM — PASS
 Timestamp: 2026-07-25T14:33:04Z
 Agent: squad-pm (claude-opus-5-5)
+Attempt: 1
 
 Re-ran npm test and npm run ci:verify independently: GREEN (2,754/12, matching).
 Verified invariants: response bodies byte-identical between cooldown-hit and normal
@@ -160,4 +167,4 @@ Stop: after the closing archive
 
 ---
 
-The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM's archive command appends that line as the entry's last, then writes the copy and verifies it with `cmp`, and the PM reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_2026-07-25-reset-cooldown.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and closes the run as its last step with the archive command, which archives the log again and clears `COMPUTE_SQUAD_LOG.md` only after `cmp` succeeds. On an ordinary, non-high-stakes change the PM's archive command writes the copy, verifies it with `cmp`, and clears the log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.
+The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM's archive command appends that line as the entry's last, then writes the copy and verifies it with `cmp`, and the PM reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_2026-07-25-reset-cooldown.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and closes the run as its last step with the archive command, which archives the log again and clears `COMPUTE_SQUAD_LOG.md` only after `cmp` succeeds. On an ordinary, non-high-stakes change the PM's archive command writes the copy, verifies it with `cmp`, and clears the log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and a `Rerun:` line naming exactly one stage, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.

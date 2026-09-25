@@ -15,5 +15,12 @@
     "rules": [
       "blocker-prose"
     ]
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    }
+  ]
 }

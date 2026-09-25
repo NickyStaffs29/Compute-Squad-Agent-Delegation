@@ -23,6 +23,7 @@ Stop: after the plan
 ## Recon
 Timestamp: 2026-09-02T09:03:40Z
 Agent: squad-recon (claude-opus-5-5)
+Attempt: 1
 
 The command is defined in src/cli/export.js (lines 12-58). It writes through
 writeOutputs() in src/cli/write.js (lines 5-31), its only caller. Tests:
@@ -42,9 +43,12 @@ Stop: after the plan
 ## PM — Plan
 Timestamp: 2026-09-02T09:08:02Z
 Agent: squad-pm (claude-fable-5-1)
-
+Attempt: 1
+Classification: STANDARD
+High-stakes: no
 Totals: 2 source files changed, 2 tests added, 2 work orders.
-Classification: STANDARD. WO-1: parse --dry-run in src/cli/export.js and pass
+
+WO-1: parse --dry-run in src/cli/export.js and pass
 dryRun to writeOutputs(); in src/cli/write.js, print each path and skip the
 write when dryRun is set. WO-2: add one test per criterion to
 test/export.test.js. Must NOT change: a real run's output. Verification plan:

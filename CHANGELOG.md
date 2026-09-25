@@ -1,5 +1,182 @@
 # Changelog
 
+## 4.2.0 — 2026-09-24
+
+Lands work order WO-3d of the 3.9.2 analysis: wire format, resume, handoff, and one active run
+(finding 9's fixed fields, attempts, and governing-plan pointer, finding 10, and finding 11's
+one-active-run rule), plus the seeds and harness scenarios finding 26 needs for them. Stage
+entries now carry fixed routing lines, a re-run is a new complete attempt, a resumed session
+routes by a written table, and a second run can no longer archive a live one. The archive command
+from WO-2 is byte-identical. This release closes the WO-1 `(cont.)` inconsistency, the WO-3c risk
+that a PASS on WO-1 cleared a log still holding WO-2, and leftover finding N9 (the resume branch
+had no defined routing consequence).
+
+- **Fixed routing lines (finding 9).** A new Hard rule in `skills/compute-squad/SKILL.md` puts
+  routing values on fixed lines directly under `Agent:`, one value each: `Attempt:` on every stage
+  entry, `Plan: r<N>, work order <ID or all>` on Executor entries, `Classification:` and
+  `High-stakes:` on PM Plan entries, and `Rerun:` on PM FAIL entries. The session routes and counts
+  from these lines and `- rerun:` blocker lines, never from prose or a final message. A run is
+  high-stakes once any line reads `High-stakes: yes`, and no later entry lowers it; PM PASS step 2
+  now also runs its high-stakes form when any line reads `High-stakes: yes`. There is no separate
+  `Revision:` field: a plan's `Attempt:` number is its revision r<n>, as finding 9 defines it.
+  Stage 4 routes by the governing plan's `Classification:` line, and a missing or unknown value
+  routes as COMPLEX ("When unsure, route up" stays). The FAIL bullet reads the `Rerun:` line, and
+  the first escalation bullet counts FAILs as the lines matching `^(Rerun: |- rerun: )`. The charge
+  rule is restored to finding 7's wording: "charged to the stage its `Rerun:` or `- rerun:` line
+  names". `codex/SKILL.md` mirrors each rule.
+- **Attempts and `(cont.)` (finding 9).** The closed heading list's bullet now says a stage may add
+  ` (cont.)` only when continuing after its own `BLOCKING` `DELEGATE:` block, and that entry
+  extends the stage's latest attempt. A re-run after a FAIL or a `rerun:` blocker is a new,
+  complete attempt under the plain heading, and the latest attempt of each stage governs. DELEGATE
+  step 2 points to that rule, which resolves the WO-1 inconsistency: `agents/squad-recon.md`,
+  `agents/squad-pm.md`, and the three executor bodies now say the same, with one clause added to
+  the report's body sentences ("any other re-spawn also appends a new, complete entry") so they
+  match DELEGATE step 2's non-`BLOCKING` case. The re-run sentences drop "or an overturned
+  high-stakes review", since that entry is finding 3's (WO-3e). `codex/README.md`'s On FAIL
+  paragraph gains "Each re-run is a new, complete entry, never `(cont.)`".
+- **The governing plan revision (finding 9).** The sentence WO-3c added to the Modes section now
+  points to the Hard rule: the governing revision is the latest `## PM — Plan` entry with its
+  `(cont.)` entries, the next `## Status` names it on its `Plan:` line, and revision r<N> is the
+  plan whose `Attempt:` line reads N, the Nth without ` (cont.)`, "which is how the grant hook
+  counts". `skills/compute-squad/hooks/grant-gate.sh` still counts `^## PM — Plan$` headings, so a
+  mislabeled `Attempt:` line cannot move the revision; it gains only a comment.
+- **Stage templates (findings 9 and 28 part T).** The PM PLAN template carries `Attempt:`,
+  `Classification:`, `High-stakes:`, and `Totals:` under `Agent:`, one classification covers the
+  whole revision (any COMPLEX task makes it COMPLEX), and a FAIL or `rerun: Plan` gets a new,
+  complete plan classified from scratch. The ACCEPT template gains `Attempt:` (counting PASS and
+  FAIL entries; a pending entry takes the number of the verdict it waits for) and `Rerun:
+  <Recon|Plan|Executor>`. The report defines no verdict count, and verdicts count over the whole
+  log rather than per work order as the Executor's attempts do: finding 9 gives a verdict no
+  `Plan:` line, so a per-work-order count would rest on the Status entries between verdicts, while
+  the whole-log count is one grep that the linter checks exactly; PASS and pending entries have no
+  `Rerun:` line. Recon gains `Attempt:`. The three executors gain `Attempt:` and `Plan:` lines and
+  now work only the plan revision and work order the latest `## Status` names, stopping at the end
+  of that work order. The generated `codex/02-recon.md` to `codex/05-pm-accept.md` and the matching
+  `codex/agents/*.toml` were regenerated.
+- **One work order at a time (finding 9, closing WO-3c's risk).** ACCEPT judges only the plan
+  revision and work order the latest `## Status` names. PM PASS step 1 stops when the governing
+  revision has a later work order: it archives nothing and clears nothing. SKILL.md Stage 5 says
+  such a PASS archives and clears nothing whatever its stakes, appends a `## Status` naming the
+  next work order (which needs its own grant outside `full` mode), and that a high-stakes closing
+  archive waits for the last work order's PASS. The Hard rules now clear the log only after a PASS
+  on the last work order. Finding 9's replacement clearing clause is written on finding 3's
+  squad-mech closing archive (WO-3e), so only the work-order condition was added to WO-2's three
+  clearers, including squad-mech's list of them and the PM's closing sentence ("an ordinary PASS of
+  the last work order"). `codex/README.md`'s On PASS, `codex/SKILL.md`'s Stage 5 PASS bullet and
+  log rule, and `README.md`'s ACCEPT and executor text say the same.
+- **Resume and handoff (finding 10).** New `skills/compute-squad/references/resume.md` holds five
+  resume steps, an 11-row next-action table keyed on the last entry that is neither a Status nor a
+  Delegated entry, a tree check, and a base check. SKILL.md gains a "Resume and handoff" section: a
+  session reads resume.md only when the log is non-empty at invocation or the user says resume,
+  never runs Stage 1 on that log, and counts FAILs earlier sessions logged. The latest `## Status`
+  is the handoff record; a handover of acceptance names the tree as `<commit SHA>, working tree
+  <clean | N changed files>` rather than finding 2's `Tested:` form, which is WO-3e's. Finding 1's
+  wording WO-3c had to drop is restored: resume recomputes `Next:` "from `references/resume.md`",
+  and the `execute` bullet says "then revalidate, execute it, accept it, and stop". Changes to the
+  report's table, each forced by the tree: step 2 appends a Status only when none follows the third
+  FAIL; step 4 skips Status entries (WO-3c puts one after every stage entry) and stops on an
+  unmatched heading; the DELEGATE row also covers helpers that already ran, and, as DELEGATE steps
+  2 and 4 require, re-spawns the stage for a new, complete entry when a result reports a step
+  `REFUSED:` or `not run:` even if the block is not `BLOCKING`; the Plan row names the executor's
+  rung as the escalation rules do (the higher of the `Classification:` line's rung and the rung
+  escalation has reached); the base check's scoped re-map is a new Recon attempt that names the
+  earlier attempt as the map for every other path, so the latest-attempt rule does not drop that
+  map; the Goal row re-spawns the stage whose `needs-human:` blocker a re-lock answers; the `##
+  High-stakes review` and `## Audit Findings` rows are left out (WO-3e and WO-3f), so the PASS rows
+  split on whether any line reads `High-stakes: yes`; and the tree check uses the run's Executor
+  entries in place of `Files changed:` lines (finding 16, WO-3e). Mirrored in `codex/SKILL.md`, a
+  takeover paragraph in `codex/README.md`, `README.md`'s FAQ and repo tree, and the packaged
+  `dist/compute-squad.plugin`, which now contains resume.md.
+- **One active run per worktree (finding 11).** SKILL.md gains the rule: a new run over a non-empty
+  log whose latest `Next:` is not `Next: none` does not spawn the archive, and asks the user to
+  resume, park (archive now, restore later), abandon, or use a separate git worktree; a park or
+  abandon is recorded as a `## Decision` and a `## Status` with `Next: none`, then Stage 1 runs.
+  Additions to the report's text, each reconciling it with the tree: an unattended run stops there
+  and appends nothing, so the other run's log is unchanged; nothing is appended to that log until
+  the user chooses; a user who declines the same-goal resume for a fresh run parks or abandons the
+  open run first, so Stage 0's "archive only if they choose the fresh run" no longer ends in
+  `ARCHIVE REFUSED`; and the Status rule's exceptions name the stops that append nothing (the
+  one-active-run rule's, as finding 11 notes, an `ARCHIVE FAILED` or `ARCHIVE REFUSED` report, and
+  a resume stop whose state the latest `## Status` already records, resume.md steps 2 and 3, so
+  S7b's log stays unchanged).
+  `codex/SKILL.md` mirrors each but the last, since its Status rule has no before-you-stop clause
+  to except these stops from. `agents/squad-mech.md` step 2 opens with finding 11's guard, which
+  reads the latest `Next:` line and reports `ARCHIVE REFUSED: open run` without changing anything,
+  and Stage 1 in both SKILL.md files and `codex/README.md` stops on `ARCHIVE FAILED` or `ARCHIVE
+  REFUSED`. `codex/01-archive.md` and `codex/agents/squad-mech.toml` were regenerated. `README.md`
+  gains "one per git worktree" and the park, abandon, or separate-worktree sentence.
+- **Mirrors (findings 9, 10, and 11).** `docs/example-log.md` gains Recon `Attempt: 1`, the plan's
+  `Attempt:`, `Classification:`, and `High-stakes: yes` lines (the prose drops "Classification:
+  STANDARD."), the Executor's `Attempt:` and `Plan:` lines, the PASS's `Attempt: 1`, and its
+  closing note says a FAIL has a `Rerun:` line naming exactly one stage. `CONTRIBUTING.md`'s check
+  8 sentence names the resume table and the live-scenario setup check. `codex/SKILL.md` mirrors
+  each rule, though the report expected it retired, because WO-2 kept it as a reading copy.
+- **Check 7 (findings 9, 10, and 11).** In `scripts/verify.sh`, 7i pins the heading bullet's
+  `(cont.)` clause word for word and holds every log template in `agents/*.md` and `codex/0*.md` to
+  the linter's field table (`tests/check_logs.py --fields`): the exact fixed lines, in order, under
+  `Agent:`, and no field line elsewhere; both SKILL.md files must carry the `Classification:` route
+  and the FAIL-count formula. 7p's per-spawn row is split in two and gains rows for the executor
+  plan read, verdict scope, work-order stop, plan attempt, verdict attempt, classification route,
+  FAIL count, and squad-mech's open-run guard (27 rows); its "refused" row now pins `` `REFUSED: ``
+  with the backtick, because squad-mech's new `ARCHIVE REFUSED:` text satisfied it and broke its
+  one-character self-test. New 7v (the report's 7x, a placeholder its findings 4, 5, 7, 9, 10, and
+  others each use for a new check) requires resume.md to be tracked and its table to route from
+  every listed heading but Status and Delegated, both SKILL.md files to carry the pointer, the
+  one-active-run rule, and the `ARCHIVE REFUSED` stop, SKILL.md to carry the resume-stop Status
+  exception, and the guard to be in squad-mech's body, prompt, and TOML.
+- **Check 8 (findings 9, 10, 11, and 26).** The log linter gains six rules: `fields`, `attempt`,
+  `governing-plan`, `high-stakes`, `cont`, and `next-line`, and exits 2 if SKILL.md loses the
+  `(cont.)` clause, a field name, or the high-stakes rule. `next-line` confines `Next:` lines to
+  `## Status` entries, which finding 11's guard relies on ("8a confines the field"). One fix beyond
+  the report: the heading rule's search for a Delegated entry's requester skips `## Status`
+  entries, which WO-3c's Status rule otherwise made reject valid delegations. Every existing
+  fixture gained the fields; four re-lock fixtures' `## Recon (cont.)` after a needs-human re-lock
+  became a complete `## Recon` with `Attempt: 2`. New passing fixtures: `fail-reruns`,
+  `fail-names-plan` (a FAIL naming Plan, then a complete plan with `Attempt: 2`), `plan-cont`,
+  `s3`, `s4`, `s7b`, `run-parked`, and `resume-delegate`, `resume-refused`, `resume-helper-cap`,
+  `resume-decision`, `resume-relock`, `resume-pending`, `resume-fail`, `resume-fail-plan`; new
+  failing fixtures: `fields-prose`, `fail-no-rerun`, `attempt-not-bumped`, `high-stakes-lowered`,
+  `cont-after-fail`, `executor-stale-plan`, and `next-outside-status`. New 8b runs
+  `tests/resume_next.py` (Python 3.9 stdlib), which reads the table from resume.md, over every
+  fixture log's `resume` cases in its `.expect.json`, requires every row, step, and check, and the
+  DELEGATE row's refusal case, to be exercised on a log that lints clean, and pins the static twins
+  of S1, S2, S2b, S2c, S3a, S3b, S4, S4b, S7b, and the second run. It builds each live scenario's
+  repo with `tests/live/run.sh --setup-only` (with a stub `claude` that fails if called) and holds
+  its HEAD, dirty paths, and next action to the twin; S2c's twin is now its dirty-tree case, to
+  match that setup. It also runs squad-mech's guard, taken from its body, under sh, dash, and bash
+  over every fixture log and requires it to refuse exactly where the one-active-run rule does. 8c
+  gains cases for a plan whose `Attempt:` line misstates its revision, and verdicts for the `s3`
+  (allow), `s4` (deny), and `s7b` (allow) seeds. Check 8a now reports 27 passing and 27 failing
+  fixtures, 8b checks 69 resume cases over 54 fixture logs and 162 guard runs, and 8c makes 1535
+  grant-hook decisions.
+- **The live tier (findings 10, 11, and 26).** `tests/live/run.sh` gains scenarios `s2o` (the
+  second run), `s3a`, `s3b`, `s4`, `s4b`, and `s7b`, with new patches
+  `tests/live/repo-reset-b-store.patch`, `repo-reset-b-notes.patch`, and
+  `repo-reset-wo2-event.patch` that are committed after seeding, and `tests/live/check_live.py`
+  gains a check for each; S3a's also requires the new Recon entry to name fewer `src/` files than
+  the seed's full map. `check_s2` and `check_s2c` now assert the log is kept and no archive is
+  written after WO-1's PASS, and the no-WO-2 check allows a Status whose `Plan:` line names WO-2 as
+  the next work order, which Stage 5 now requires. `--list` prints each scenario's seed and
+  patches, and node is required only for a live run, so check 8b can build the repos without it.
+  The S2c seed's WO-1 PASS no longer has an `Archive target:` line, since it now archives nothing.
+- **Not landed, or not run.** No live scenario ran (the run rules forbid it), so these WO-3d
+  acceptance items are unverified: S2b, S2c, S3a, S3b, S4, S4b, and S7b passing live. S4's
+  assertion that the verdict's `Tested:` line names commit C waits for finding 2 (WO-3e). The
+  squad-mech guard was probed with a Haiku main session spawning squad-mech, about $0.21 in total:
+  over the open S2 log it reported `ARCHIVE REFUSED` with the log and archive folder unchanged, and
+  over `run-parked` it archived and cleared with the copy equal to the log. A full `/squad`
+  invocation over an open log, which exercises the main session's park-or-abandon step, was not
+  run. Parts of finding 9 left to later work orders: `Answers:` and the ACCEPT template's
+  `High-stakes:` and `Tested:` lines and criterion table (WO-3e). Until the ACCEPT line lands, a PM
+  that judges a change high-stakes at ACCEPT when the plan's line reads `High-stakes: no` records
+  that only in its PASS prose (PM PASS step 2's "or the change IS high-stakes", and Stage 5's "If
+  it flagged the change high-stakes"), with no field line behind it; it keeps the log, so a resumed
+  session finds no `High-stakes: yes` line, takes the ordinary PASS row, and hands back to the
+  user, which fails closed. Also left: `Result:` and a review's `Rerun:` (finding 3, WO-3e), the
+  `## High-stakes review` and `## Audit Findings` headings and resume rows (WO-3e and WO-3f), and
+  finding 5's route-from-log grep, which is not in the tree (WO-3f). The example log's inline
+  "HIGH-STAKES: yes" and "Verdict: PASS." stay until WO-3e.
+
 ## 4.1.0 — 2026-09-24
 
 Lands work order WO-3c of the 3.9.2 analysis: modes, execution grants, unattended runs, and the

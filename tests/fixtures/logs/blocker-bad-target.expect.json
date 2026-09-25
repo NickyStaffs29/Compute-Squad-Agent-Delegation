@@ -11,5 +11,12 @@
     "rules": [
       "blocker"
     ]
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "stop: the entry names no stage to re-run (PM); show it to the user",
+      "via": "row: Ends in a `BLOCKER:` block"
+    }
+  ]
 }

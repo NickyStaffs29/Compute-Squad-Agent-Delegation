@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "If stage entries follow that entry, first recompute `Next:` from them by the stage order and the FAIL and blocker rules, and append a fresh `## Status`."
+      "text": "If stage entries follow that entry, first recompute `Next:` from `references/resume.md` and append a fresh `## Status`."
     },
     {
       "file": "skills/compute-squad/SKILL.md",
@@ -21,5 +21,12 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "append a Status that awaits a grant for r2 WO-1, and stop",
+      "via": "row: `## PM — Plan`"
+    }
+  ]
 }

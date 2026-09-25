@@ -1,0 +1,24 @@
+{
+  "note": "A PM FAIL naming Executor with no Status after it. Resuming re-runs the Executor one rung up, from the mid rung to the top, then every later stage.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Re-run the stage on its `Rerun:` line at the rung the escalation rules give, then every later stage."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "The named stage's next attempt runs one rung above its previous attempt: bottom to mid, mid to top."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-run Executor with squad-executor-complex, then every later stage",
+      "via": "row: `## PM — FAIL`"
+    }
+  ]
+}

@@ -13,5 +13,19 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: await a grant for r1",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "refuse the archive: ask the user to resume, park, or abandon the open run",
+      "via": "new run: refuse"
+    }
+  ]
 }

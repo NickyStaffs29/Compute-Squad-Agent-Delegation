@@ -5,14 +5,17 @@
 # loaded as the plugin, on a copy of tests/fixtures/repo-reset/, then checks
 # what the session did with tests/live/check_live.py. It spends model tokens:
 # about $1 to $2.50 per scenario with a top-rung main session. CI never
-# runs it: scripts/verify.sh does not call it, and it refuses to call a model
-# when CI is set. Run it by hand before a release, three repeats per scenario.
+# runs a scenario live: scripts/verify.sh (check 8b) calls this script only
+# with --list, --dry-run, and --setup-only, which call no model, and it
+# refuses to call a model when CI is set. Check 8b holds every scenario's
+# seeded repo to the next action its static twin gives. Run the live
+# scenarios by hand before a release, three repeats per scenario.
 #
 # Usage: tests/live/run.sh [options] <scenario>... | all
-#   --list                 print the scenarios and exit
+#   --list                 print the scenarios, their seeds and patches, and exit
 #   --dry-run              print each scenario's setup and claude commands; call no model
 #   --setup-only           build and seed each scenario repo, print the claude
-#                          commands, and keep the repo; call no model
+#                          commands, and keep the repo; run no test and call no model
 #   --model <alias>        main-session model (default: the host's default)
 #   --repeat <n>           run each scenario n times (default 1)
 #   --max-budget-usd <x>   pass --max-budget-usd to every claude call
@@ -28,7 +31,10 @@
 #      seed's placeholders, writes the archive copy a seeded PASS entry names,
 #      and excludes the log and compute-squad-archive/ from git status. S2c
 #      also applies tests/live/repo-reset-wo1.patch, the work its seed's
-#      Executor entry reports;
+#      Executor entry reports, without committing it. S3a, S3b, S4, and S4b
+#      then apply their scenario's patches and commit them, so HEAD moves
+#      past the seed's Base: (commit B for S3, the external implementation C
+#      for S4), and a prompt's <C> becomes that commit's short SHA;
 #   4. runs each turn's prompt (a second turn resumes the first turn's
 #      session) and checks subagent_stats.by_type, permission_denials, the
 #      usage ledger against modelUsage, the log's new entries, the product
@@ -51,12 +57,19 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 GOAL='Add a 60-second resend cooldown to the password-reset email endpoint, per-account. Acceptance criteria: a second reset request for the same account within 60 seconds of the first sends no new email and creates no new token row; a request 60 seconds or more after that account got its newest token creates a new token and sends the email as normal; no response or log reveals whether an account exists; npm test passes. Out of scope: per-IP throttling and admin-triggered resets.'
 APPROVE='Plan approved; keep it shelved.'
 RESUME='Resume the squad run.'
+# A second goal for the one-active-run scenario (finding 11).
+OTHER_GOAL='Add an X-Request-Id header to every API response. Acceptance criteria: every response carries an X-Request-Id header; npm test passes.'
+ACCEPT_C='The external implementation of WO-1 is commit <C>. Accept it.'
 
-SCENARIOS=(s1 s1n s2 s2b s2c)
+SCENARIOS=(s1 s1n s2 s2b s2c s2o s3a s3b s4 s4b s7b)
 
-# scenario <name>: sets DESC, SEED, PATCH, PROMPTS and CHECKS (one per turn).
+# scenario <name>: sets DESC, SEED, PATCH, COMMIT, COMMIT_MSG, PROMPTS and
+# CHECKS (one per turn). PATCH is applied and left uncommitted; COMMIT's
+# patches are applied and committed as one commit after the seed.
 scenario() {
   PATCH=
+  COMMIT=()
+  COMMIT_MSG=
   case $1 in
     s1)
       DESC='S1: /squad plan, then "plan approved": mech, recon and pm only, no product edits, a plan-approved Decision, no grant'
@@ -84,6 +97,44 @@ scenario() {
       PATCH="$HERE/repo-reset-wo1.patch"
       PROMPTS=("$RESUME")
       CHECKS=(s2c) ;;
+    s2o)
+      DESC='Second run (finding 11): /squad with another goal over the open S2 run spawns nothing, archives nothing, and leaves the log as it was'
+      SEED=s2
+      PROMPTS=("/squad $OTHER_GOAL")
+      CHECKS=(s2o) ;;
+    s3a)
+      DESC='S3a: commit B edits src/server/db/store.js, which the plan names; resuming re-maps it and writes plan r2, and no executor runs without a new grant'
+      SEED=s3
+      COMMIT=("$HERE/repo-reset-b-store.patch")
+      COMMIT_MSG='commit B: store.js gains deleteResetTokens'
+      PROMPTS=("$RESUME")
+      CHECKS=(s3a) ;;
+    s3b)
+      DESC='S3b: commit B adds docs/notes.md, which the plan does not name; resuming records the new Base and runs one executor, with no Recon'
+      SEED=s3
+      COMMIT=("$HERE/repo-reset-b-notes.patch")
+      COMMIT_MSG='commit B: docs/notes.md'
+      PROMPTS=("$RESUME")
+      CHECKS=(s3b) ;;
+    s4)
+      DESC='S4: WO-1 was implemented outside the squad as commit C; accepting it spawns only the PM, which passes WO-1 and leaves WO-2 open'
+      SEED=s4
+      COMMIT=("$HERE/repo-reset-wo1.patch")
+      COMMIT_MSG='commit C: WO-1, implemented outside the squad'
+      PROMPTS=("$ACCEPT_C")
+      CHECKS=(s4) ;;
+    s4b)
+      DESC='S4b: commit C also adds the WO-2 event code to src/server/log.js; the PM fails WO-1 on scope'
+      SEED=s4
+      COMMIT=("$HERE/repo-reset-wo1.patch" "$HERE/repo-reset-wo2-event.patch")
+      COMMIT_MSG='commit C: WO-1 plus a WO-2 event code'
+      PROMPTS=("$ACCEPT_C")
+      CHECKS=(s4b) ;;
+    s7b)
+      DESC='S7b: three FAILs are logged; resuming spawns nothing, appends nothing, and names the three-FAIL stop'
+      SEED=s7b
+      PROMPTS=("$RESUME")
+      CHECKS=(s7b) ;;
     *) return 1 ;;
   esac
 }
@@ -117,7 +168,16 @@ done
 if [ "$MODE" = list ]; then
   for name in "${SCENARIOS[@]}"; do
     scenario "$name"
-    printf '%-4s %s\n     seed tests/fixtures/logs/%s.log.md; turns: %s\n' "$name" "$DESC" "$SEED" "${CHECKS[*]}"
+    setup=
+    [ -z "$PATCH" ] || setup=", then applies ${PATCH#"$ROOT"/} uncommitted"
+    if [ ${#COMMIT[@]} -gt 0 ]; then
+      setup="$setup, then commits"
+      for patch in "${COMMIT[@]}"; do
+        setup="$setup ${patch#"$ROOT"/}"
+      done
+      setup="$setup as '$COMMIT_MSG'"
+    fi
+    printf '%-4s %s\n     seed tests/fixtures/logs/%s.log.md%s; turns: %s\n' "$name" "$DESC" "$SEED" "$setup" "${CHECKS[*]}"
   done
   exit 0
 fi
@@ -135,11 +195,14 @@ for name in "${selected[@]}"; do
   scenario "$name"
   [ -f "$SEEDS/$SEED.log.md" ] || die "missing seed tests/fixtures/logs/$SEED.log.md"
   [ -z "$PATCH" ] || [ -f "$PATCH" ] || die "missing $PATCH"
+  for patch in ${COMMIT[@]+"${COMMIT[@]}"}; do
+    [ -f "$patch" ] || die "missing $patch"
+  done
 done
-if [ "$MODE" != dry ]; then
-  command -v node >/dev/null 2>&1 || die "node is required: the fixture's npm test runs node --test"
-fi
+# --setup-only runs no test and calls no model, so only a live run needs node
+# (the stages run the fixture's npm test) and the claude CLI.
 if [ "$MODE" = live ]; then
+  command -v node >/dev/null 2>&1 || die "node is required: the fixture's npm test runs node --test"
   command -v "$CLAUDE_BIN" >/dev/null 2>&1 || die "$CLAUDE_BIN not found; set CLAUDE_BIN"
 fi
 
@@ -189,7 +252,7 @@ run_claude() {
 }
 
 run_scenario() {
-  local name=$1 rep=$2 dir repo base session= i turn check rc=0
+  local name=$1 rep=$2 dir repo base head session= i turn check prompt patch rc=0
   scenario "$name"
   dir="$OUT/$name-$rep"
   repo="$dir/repo"
@@ -213,6 +276,16 @@ run_scenario() {
   if [ -n "$PATCH" ]; then
     step git -C "$repo" apply "$PATCH" || return 2
   fi
+  head='<C>'
+  if [ ${#COMMIT[@]} -gt 0 ]; then
+    for patch in "${COMMIT[@]}"; do
+      step git -C "$repo" apply "$patch" || return 2
+    done
+    step git -C "$repo" add -A || return 2
+    step git -C "$repo" -c user.name=compute-squad-live -c user.email=live@example.invalid \
+      -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m "$COMMIT_MSG" || return 2
+    [ "$MODE" = dry ] || head=$(git -C "$repo" rev-parse --short=7 HEAD) || return 2
+  fi
   if [ "$MODE" = setup ]; then
     "$PYTHON" "$ROOT/tests/check_logs.py" "$repo/COMPUTE_SQUAD_LOG.md" | sed 's/^/  /' || return 1
   fi
@@ -220,10 +293,11 @@ run_scenario() {
   for i in "${!PROMPTS[@]}"; do
     turn=$((i + 1))
     check=${CHECKS[$i]}
+    prompt=${PROMPTS[$i]//<C>/$head}
     if [ "$MODE" = live ]; then
-      claude_cmd "${PROMPTS[$i]}" "$session"
+      claude_cmd "$prompt" "$session"
     else
-      claude_cmd "${PROMPTS[$i]}" "$([ "$turn" -gt 1 ] && printf '<session_id from turn 1>')"
+      claude_cmd "$prompt" "$([ "$turn" -gt 1 ] && printf '<session_id from turn 1>')"
     fi
     printf '  turn %s, check %s:\n    (cd %q &&\n     ' "$turn" "$check" "$repo"
     printf '%q ' "${CMD[@]}"; printf ')\n'

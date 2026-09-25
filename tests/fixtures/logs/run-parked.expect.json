@@ -1,0 +1,35 @@
+{
+  "note": "A plan-mode run the user parked: a park Decision and a Status with Next: none. The run is closed, so squad-mech's open-run guard lets Stage 1 archive it for a new goal.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Record a park or abandon as a `## Decision`, then a `## Status` with `Next: none`, then run Stage 1."
+    },
+    {
+      "file": "agents/squad-mech.md",
+      "text": "If it prints a line other than `Next: none`, change nothing and report `ARCHIVE REFUSED: open run` followed by that line."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "`Next: none` means the run is closed; a new goal starts at Stage 1."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "closed: a new goal starts at Stage 1",
+      "via": "step 3"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "run Stage 1: archive the log and start the new run",
+      "via": "new run: archive"
+    }
+  ]
+}

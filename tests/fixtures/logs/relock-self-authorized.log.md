@@ -23,6 +23,7 @@ Stop: after the closing archive
 ## Recon
 Timestamp: 2026-09-03T08:04:41Z
 Agent: squad-recon (claude-opus-5-5)
+Attempt: 1
 
 The endpoint is POST /api/auth/reset-request in src/server/auth/routes.js
 (lines 12-40), calling requestReset() in src/server/auth/reset.service.js
@@ -43,9 +44,12 @@ Stop: after the closing archive
 ## PM — Plan
 Timestamp: 2026-09-03T08:09:12Z
 Agent: squad-pm (claude-fable-5-1)
-
+Attempt: 1
+Classification: STANDARD
+High-stakes: yes
 Totals: 2 source files changed, 1 test added, 1 script changed.
-Classification: STANDARD. Tasks, in order: 1. add the cooldown check to
+
+Tasks, in order: 1. add the cooldown check to
 requestReset() in src/server/auth/reset.service.js; 2. add one test to
 src/server/auth/reset.test.js; 3. D8: change the npm test script in
 package.json to "node --test src/**/*.test.js" so the second criterion can

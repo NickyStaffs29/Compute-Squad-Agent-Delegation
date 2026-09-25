@@ -11,6 +11,7 @@ Assumptions: none.
 ## Recon
 Timestamp: 2026-09-01T10:03:40Z
 Agent: squad-recon (claude-sonnet-5)
+Attempt: 1
 
 The command is defined in src/cli/export.js (lines 12-58). It writes through
 writeOutputs() in src/cli/write.js (lines 5-31), its only caller.

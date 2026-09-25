@@ -23,6 +23,7 @@ Stop: after the closing archive
 ## Recon
 Timestamp: 2026-09-03T08:04:41Z
 Agent: squad-recon (claude-opus-5-5)
+Attempt: 1
 
 The endpoint is POST /api/auth/reset-request in src/server/auth/routes.js
 (lines 12-40), calling requestReset() in src/server/auth/reset.service.js
@@ -87,10 +88,16 @@ Grant: all revisions, full-mode request
 Next: re-spawn squad-recon
 Stop: after the closing archive
 
-## Recon (cont.)
+## Recon
 Timestamp: 2026-09-03T09:14:03Z
 Agent: squad-recon (claude-opus-5-5)
+Attempt: 2
 
-Under the re-locked criterion the suite runs: "node --test src/**/*.test.js"
-exits 0 on base 4f2c9a1 with 6 tests passed. The test script at package.json:7
-is the one line the plan must change for the second criterion.
+The endpoint is POST /api/auth/reset-request in src/server/auth/routes.js
+(lines 12-40), calling requestReset() in src/server/auth/reset.service.js
+(lines 3-38). Tests: src/server/auth/reset.test.js (6 cases). Under the
+re-locked criterion the suite runs: "node --test src/**/*.test.js" exits 0 on
+base 4f2c9a1 with 6 tests passed.
+
+Risks: the test script at package.json:7 is the one line the plan must change
+for the second criterion.

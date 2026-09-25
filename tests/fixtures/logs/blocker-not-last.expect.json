@@ -11,5 +11,12 @@
     "rules": [
       "blocker"
     ]
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "run the helpers and append their results, then spawn squad-pm in ACCEPT mode",
+      "via": "row: Ends in a `DELEGATE:` block / `## Executor`"
+    }
+  ]
 }

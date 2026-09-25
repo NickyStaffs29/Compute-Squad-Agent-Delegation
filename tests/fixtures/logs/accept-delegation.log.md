@@ -23,6 +23,7 @@ Stop: after the PM verdict
 ## Recon
 Timestamp: 2026-09-01T12:03:18Z
 Agent: squad-recon (claude-sonnet-5)
+Attempt: 1
 
 Public functions are exported from src/index.js (lines 1-40). The notes live in
 docs/release-notes/, one file per release. Tests: test/exports.test.js (4 cases).
@@ -30,15 +31,20 @@ docs/release-notes/, one file per release. Tests: test/exports.test.js (4 cases)
 ## PM — Plan
 Timestamp: 2026-09-01T12:07:45Z
 Agent: squad-pm (claude-opus-5-5)
-
+Attempt: 1
+Classification: MECHANICAL
+High-stakes: no
 Totals: 1 doc file added, 0 source files changed.
-Classification: MECHANICAL. Tasks, in order: 1. add docs/release-notes/2.4.0.md
+
+Tasks, in order: 1. add docs/release-notes/2.4.0.md
 listing each export from src/index.js whose body changed since v2.3.0; 2. run npm
 test. Risks: none.
 
 ## Executor
 Timestamp: 2026-09-01T12:12:20Z
 Agent: squad-executor-mechanical (claude-sonnet-5)
+Attempt: 1
+Plan: r1, work order all
 
 Added docs/release-notes/2.4.0.md with 6 functions (task 1). `npm test` -> exit
 0; 4 passed (task 2).
@@ -48,6 +54,7 @@ Deviations: none. For acceptance: the list came from git diff v2.3.0 -- src/.
 ## PM — Accept (pending)
 Timestamp: 2026-09-01T12:18:02Z
 Agent: squad-pm (claude-opus-5-5)
+Attempt: 1
 
 - `npm test` -> exit 0; 4 passed
 The first criterion needs the full list of changed exports to compare against
@@ -66,6 +73,7 @@ specified).
 ## PM — PASS
 Timestamp: 2026-09-01T12:24:55Z
 Agent: squad-pm (claude-opus-5-5)
+Attempt: 1
 
 - `npm test` -> exit 0; 4 passed
 - The helper's 6 names match the 6 in docs/release-notes/2.4.0.md.

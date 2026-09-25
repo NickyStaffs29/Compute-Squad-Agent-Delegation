@@ -96,7 +96,7 @@ generated TOMLs preserve the three routing variants (`squad-executor-mechanical`
 `squad-executor-complex`) with fixed Codex model IDs.
 
 After session 1 (`01-archive.md`) reports an archive path or an already-empty log (not
-`ARCHIVE FAILED`), append the `## Goal — Locked` entry yourself as its first entry, then the first
+`ARCHIVE FAILED` or `ARCHIVE REFUSED`), append the `## Goal — Locked` entry yourself as its first entry, then the first
 `## Status` (template under **Modes and grants** below), before pasting `02-recon.md`:
 
 ```markdown
@@ -139,9 +139,10 @@ User's words: "<verbatim>"
 
 **On FAIL:** re-run the named stage's session (and every stage after it) with the log intact. Each FAIL
 or `rerun:` blocker counts against the stage it names, and that stage's next session runs one model
-rung up (bottom to mid, mid to top); a stage already on the top rung re-runs there. Three total FAILs
-stop the run and hand the full log history back to you, a separate rule from Stage 0's, which is that
-any change to the locked goal itself returns there. Record that change as a `## Decision` entry of
+rung up (bottom to mid, mid to top); a stage already on the top rung re-runs there. Each re-run is a
+new, complete entry, never `(cont.)`. Three total FAILs stop the run and hand the full log history
+back to you, a separate rule from Stage 0's, which is that any change to the locked goal itself
+returns there. Record that change as a `## Decision` entry of
 Type re-lock followed by a new full `## Goal — Locked` entry with a `Supersedes:` line; sessions 2
 through 5 read the latest one.
 
@@ -149,7 +150,10 @@ through 5 read the latest one.
 unless it flagged the change high-stakes, in which case it leaves the log intact for your own review.
 Once that review is done, close the run with the archive command in the Hard rules of
 [`skills/compute-squad/SKILL.md`](../skills/compute-squad/SKILL.md), which archives the log again and
-clears it only after `cmp` succeeds.
+clears it only after `cmp` succeeds. While the plan has a work order after the one accepted, the
+accept session archives and clears nothing, and the next work order waits for your grant.
+
+**Resuming, or taking over a run from the other host:** before pasting the next prompt, follow [`skills/compute-squad/references/resume.md`](../skills/compute-squad/references/resume.md), which maps the log's latest state to the next session to run. When you hand a work order to Claude Code or back to Codex, append the `## Status` handoff entry yourself (template in [`SKILL.md`](../skills/compute-squad/SKILL.md)) before closing the session.
 
 Each prompt file is generated from the matching agent definition in `agents/` by
 `codex/build-agents.py`, so it carries the native path's delegation, continuation, and blocker

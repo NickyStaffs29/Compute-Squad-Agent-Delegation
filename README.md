@@ -130,7 +130,7 @@ Everything below is background on how the pipeline works. You don't need any of 
 
 Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
 
-What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. The ladder is placed where a wrong call is expensive, not where tokens are cheap: the top rung plans and accepts, every stage that exercises judgment runs on the mid rung or above, and the bottom rung takes only transcription-grade and zero-judgment work. What it buys is capacity and review that is independent of the work, not a smaller bill. Prices are not a routing input; one measured run's cost is a dated snapshot in the FAQ.
+What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once, one per git worktree. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. The ladder is placed where a wrong call is expensive, not where tokens are cheap: the top rung plans and accepts, every stage that exercises judgment runs on the mid rung or above, and the bottom rung takes only transcription-grade and zero-judgment work. What it buys is capacity and review that is independent of the work, not a smaller bill. Prices are not a routing input; one measured run's cost is a dated snapshot in the FAQ.
 
 One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
@@ -202,13 +202,13 @@ The project manager. Plans work, accepts deliverables, never writes product code
 
 **PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-mechanical`, COMPLEX routes it to `squad-executor-complex`, and STANDARD stays on `squad-executor`.
 
-**ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, and reads the Executor's account only after its own checks and refutations. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
+**ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, and reads the Executor's account only after its own checks and refutations. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS on the plan's last work order archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
 
 Decisions the PM is not allowed to make: anything product-level, irreversible, or cost-bearing, and anything that would change the locked goal. Those get logged as named blockers and go back to the human. Guessing past a blocker is a protocol violation, not initiative.
 
 ### squad-executor, squad-executor-mechanical, and squad-executor-complex
 
-The builder. Reads the full log, then works the PM's task list in order. Exactly what the plan says. No more, no less.
+The builder. Reads the full log, then works the task list of the plan revision and work order the latest Status names, in order. Exactly what the plan says. No more, no less.
 
 If the plan is wrong or impossible, it stops and logs a blocker naming Plan as the stage to re-run. It does not improvise a better design, because an executor that improvises invalidates the acceptance review downstream. A judgment call the plan left open is a plan defect and gets reported as one.
 
@@ -260,7 +260,8 @@ Compute-Squad-Agent-Delegation/
 │   │   ├── grant-gate.sh     # Claude Code only: refuses an executor spawn without a logged grant, and any recon, PM, helper, or executor spawn while a needs-human blocker is open
 │   │   └── usage-ledger.sh   # Claude Code only: appends each stage's model, time, and tokens to compute-squad-archive/usage.jsonl
 │   └── references/
-│       └── audit-prompts.md  # finder and skeptic briefs for audit-grade runs
+│       ├── audit-prompts.md  # finder and skeptic briefs for audit-grade runs
+│       └── resume.md         # next-action table, read only on resume or over a non-empty log
 ├── agents/
 │   ├── squad-recon.md        # mid rung · read-only mapping
 │   ├── squad-pm.md           # top rung · PLAN + ACCEPT modes
@@ -315,10 +316,10 @@ The stages are mandatory. Their length is not. A one-line change gets a three-se
 A full run spawns at least five agents: the intern, Recon, the PM twice, and the Executor; a plan run spawns three. DELEGATE helpers, FAIL re-runs, and an audit fan-out add more. Snapshot 2026-09-24: one measured run of 3.9.2 on an eight-file fixture repo with a top-rung main session billed about 1.6M input and 47k output tokens and cost $3.00 at list prices, two thirds of it in the main session. List prices that day per million input and output tokens: Fable 5.1 $10/$50, Opus 5.5 $4/$20, Sonnet 5 $2/$10, Haiku 4.5 $1/$5. Treat it as one data point, not a quote; the real number tracks the main session's turns, how much each stage reads (re-sent on every later call), and how many stages re-run. On Claude Code, each run's measured usage per stage is in `compute-squad-archive/usage.jsonl`.
 
 **What if I stop a run halfway?**
-Nothing is lost. The log keeps every entry completed so far. Start a new run and Stage 1 archives it before clearing. Or say you want to resume, and the squad picks up from the last logged entry instead of starting over. Resuming never grants execution of a shelved plan.
+Nothing is lost. The log keeps every entry completed so far. Start a new run and the squad asks whether to park it (archive it now, restore it later) or abandon it, or you can start the new goal in a separate git worktree. Or say you want to resume, and the squad picks up from the last logged entry instead of starting over. Before it continues, it checks the working tree for edits no entry explains and re-maps only the files that commits made since the plan touched. Resuming never grants execution of a shelved plan.
 
 **How do I see which agents ran?**
-Read `COMPUTE_SQUAD_LOG.md` during a run, or the timestamped copy in `compute-squad-archive/` after one. Every stage that ran has an entry with a timestamp.
+Read `COMPUTE_SQUAD_LOG.md` during a run, or the timestamped copy in `compute-squad-archive/` after one. Every stage that finished has an entry with a timestamp; a stage interrupted before writing one leaves none, which is why a resume checks the working tree first.
 
 ## License
 

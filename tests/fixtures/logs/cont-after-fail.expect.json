@@ -1,0 +1,26 @@
+{
+  "note": "Finding 9's failure scenario: a FAIL names Plan and the re-spawned PM appends a (cont.) delta that revises one task and adds another, leaving two task lists and no rule for which wins.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-run after a FAIL or a `rerun:` blocker is a new attempt under the plain heading, never `(cont.)`, and complete on its own."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "If a FAIL or a `rerun: Plan` blocker names Plan, append a new, complete `## PM — Plan` entry with the next `Attempt:` and classify it again from scratch."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "cont"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-executor for r1, work order all",
+      "via": "row: `## PM — Plan`"
+    }
+  ]
+}

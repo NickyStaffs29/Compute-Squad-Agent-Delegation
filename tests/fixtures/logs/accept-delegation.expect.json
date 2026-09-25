@@ -21,5 +21,12 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
 }

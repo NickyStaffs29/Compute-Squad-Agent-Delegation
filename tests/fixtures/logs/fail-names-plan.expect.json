@@ -1,0 +1,28 @@
+{
+  "note": "A PM FAIL names Plan, and the re-spawned PM appends a new, complete plan with the next Attempt: (2, so revision r2) that restates every task rather than a delta, and classifies it again. The full-mode grant covers r2, so resuming spawns the executor for r2 at the plan's STANDARD rung: the FAIL named Plan, not Executor, so execution does not escalate.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "If a FAIL or a `rerun: Plan` blocker names Plan, append a new, complete `## PM — Plan` entry with the next `Attempt:` and classify it again from scratch."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Every revision is the complete plan: restate every task and never refer to an earlier revision for any part of it."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-run after a FAIL or a `rerun:` blocker is a new attempt under the plain heading, never `(cont.)`, and complete on its own."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-executor for r2, work order all",
+      "via": "row: `## PM — Plan`"
+    }
+  ]
+}

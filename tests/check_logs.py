@@ -15,14 +15,18 @@ be read from the skill.
 The heading list, the opening entry, the timestamp form, the blocker
 grammar, the Goal template's Attended: field and the re-lock rule are read
 from skills/compute-squad/SKILL.md, so the linter follows the protocol text.
-If that text changes shape, the linter stops with status 2 instead of
-guessing. The grant rule runs the Claude Code grant hook,
+The routing fields each stage entry carries are the table FIELDS below; the
+linter stops unless SKILL.md's fixed-lines rule names every one of them, and
+scripts/verify.sh check 7i holds the stage templates in agents/*.md and
+codex/0*.md to it (--fields prints it). If that text changes shape, the
+linter stops with status 2 instead of guessing. The grant rule runs the Claude Code grant hook,
 skills/compute-squad/hooks/grant-gate.sh, with sh over the log above each
 Executor entry, so a log from either host is held to the rule the hook
 enforces; a denial for an open needs-human: blocker is the needs-human
 rule's to report. Python 3.9 stdlib only.
 """
 import argparse
+import collections
 import datetime
 import json
 import os
@@ -50,6 +54,18 @@ RULES = (
                 " and has a Supersedes: line naming the prior Goal entry's timestamp"),
     ("needs-human", "no entry other than a Status or a Goal follows a needs-human: blocker until a Decision"
                     " records the user's answer"),
+    ("fields", "every stage entry carries its routing fields, one value each, in order directly under its Agent:"
+               " line, and no other line of any entry starts with a routing field (a Status keeps its Plan: line)"),
+    ("attempt", "each Attempt: counts its heading's entries without (cont.) up to and including it: per work order"
+                " for the Executor, over PASS and FAIL for the PM's verdicts (a pending entry takes the next number),"
+                " and a (cont.) entry repeats the attempt it extends"),
+    ("governing-plan", "a Status's Plan: line names the latest plan revision, and an Executor's Plan: line names that"
+                       " revision and the work order the latest Status names (all when none names one)"),
+    ("high-stakes", "no 'High-stakes: no' line follows a 'High-stakes: yes' line"),
+    ("cont", "a (cont.) entry continues its own stage after a BLOCKING DELEGATE: block and the Delegated entry"
+             " answering it"),
+    ("next-line", "a line starting 'Next: ' sits only in a ## Status entry, since squad-mech's open-run guard and the"
+                  " one-active-run rule read the latest such line in the log"),
 )
 
 HEADING_BULLET = "- Log entries use only these headings: "
@@ -59,6 +75,30 @@ GATE = os.path.join("hooks", "grant-gate.sh")   # relative to the skill's direct
 GATE_AGENT = "compute-squad:squad-executor"
 NEEDS_HUMAN_DENIAL = "needs-human blocker unresolved"   # the hook's reason for an open needs-human: blocker
 STATUS_HEADING = "## Status"
+CONT_RULE = ", and only for a stage continuing after its own `BLOCKING` `DELEGATE:` block"
+FIELDS_BULLET = "- Routing values sit on fixed lines at the top of an entry"
+HIGH_STAKES_RULE = "A run is high-stakes once any line in the log reads `High-stakes: yes`; no later entry lowers it."
+# The routing fields of each stage entry, in order under its Agent: line, as
+# (name, template placeholder, value pattern). A (cont.) entry carries its
+# heading's fields. Keep this table and the templates in agents/*.md in step:
+# scripts/verify.sh check 7i compares them.
+ATTEMPT = ("Attempt", "<n>", r"[1-9][0-9]*")
+FIELDS = collections.OrderedDict([
+    ("## Recon", (ATTEMPT,)),
+    ("## PM — Plan", (
+        ATTEMPT,
+        ("Classification", "<MECHANICAL|STANDARD|COMPLEX>", r"MECHANICAL|STANDARD|COMPLEX"),
+        ("High-stakes", "<yes|no>", r"yes|no"),
+    )),
+    ("## Executor", (ATTEMPT, ("Plan", "r<N>, work order <ID or all>", r"r[1-9][0-9]*, work order [A-Za-z0-9][A-Za-z0-9-]*"))),
+    ("## PM — Accept (pending)", (ATTEMPT,)),
+    ("## PM — PASS", (ATTEMPT,)),
+    ("## PM — FAIL", (ATTEMPT, ("Rerun", "<Recon|Plan|Executor>", r"Recon|Plan|Executor"))),
+])
+FIELD_NAMES = sorted({name for fields in FIELDS.values() for name, _, _ in fields})
+PLAN_HEADING = "## PM — Plan"
+VERDICT_HEADINGS = ("## PM — PASS", "## PM — FAIL")
+PENDING_HEADING = "## PM — Accept (pending)"
 
 
 class ProtocolError(Exception):
@@ -86,11 +126,14 @@ def load_protocol(skill_path):
     if len(bullets) != 1:
         raise ProtocolError(f"{skill_path}: expected one line starting {HEADING_BULLET!r}, found {len(bullets)}")
     listed_part, _, rest = bullets[0][len(HEADING_BULLET):].partition(". Only ")
-    cont_part, found, _ = rest.partition(" may add `" + CONT + "`")
+    cont_part, found, after = rest.partition(" may add `" + CONT + "`")
     listed = re.findall(r"`(## [^`]+)`", listed_part)
     cont = re.findall(r"`(## [^`]+)`", cont_part)
-    if not listed or not cont or not found:
-        raise ProtocolError(f"{skill_path}: the heading-list bullet no longer reads '<headings>. Only <headings> may add `{CONT}`.'")
+    if not listed or not cont or not found or not after.startswith(CONT_RULE):
+        raise ProtocolError(
+            f"{skill_path}: the heading-list bullet no longer reads '<headings>. Only <headings> may add "
+            f"`{CONT}`{CONT_RULE}...'"
+        )
     fixed = [heading for heading in listed if "<" not in heading]
     delegated = None
     for heading in listed:
@@ -150,6 +193,20 @@ def load_protocol(skill_path):
 
     if EXECUTOR_HEADING not in fixed or EXECUTOR_HEADING not in cont:
         raise ProtocolError(f"{skill_path}: {EXECUTOR_HEADING!r} is not a listed heading that may add '{CONT}'")
+    unlisted = [heading for heading in FIELDS if heading not in fixed]
+    if unlisted:
+        raise ProtocolError(f"{skill_path}: the routing-field table names headings not on the list: {unlisted!r}")
+    field_bullets = [line for line in lines if line.startswith(FIELDS_BULLET)]
+    if len(field_bullets) != 1:
+        raise ProtocolError(f"{skill_path}: expected one line starting {FIELDS_BULLET!r}, found {len(field_bullets)}")
+    unnamed = [name for name in FIELD_NAMES if "`" + name + ":`" not in field_bullets[0]]
+    if unnamed:
+        raise ProtocolError(f"{skill_path}: the fixed-lines rule no longer names {unnamed!r}; teach tests/check_logs.py the new fields")
+    rerun_values = next(pattern for name, _, pattern in FIELDS["## PM — FAIL"] if name == "Rerun").split("|")
+    if rerun_values != first.group(1).split("|"):
+        raise ProtocolError(f"{skill_path}: the BLOCKER: rerun targets no longer match the FAIL entry's Rerun: values {rerun_values!r}")
+    if HIGH_STAKES_RULE not in " ".join(text.split()):
+        raise ProtocolError(f"{skill_path}: no rule reading {HIGH_STAKES_RULE!r}")
     gate = os.path.join(os.path.dirname(os.path.abspath(skill_path)), GATE)
     if not os.path.isfile(gate):
         raise ProtocolError(f"{gate}: the grant hook the grant rule runs is missing")
@@ -220,7 +277,11 @@ def check_heading(entry, earlier, protocol, report):
             return
     elif protocol.delegated and heading.startswith(protocol.delegated):
         stage = heading[len(protocol.delegated):]
-        requester = next((e for e in reversed(earlier) if not e["heading"].startswith(protocol.delegated)), None)
+        requester = next(
+            (e for e in reversed(earlier)
+             if not e["heading"].startswith(protocol.delegated) and e["heading"] != STATUS_HEADING),
+            None,
+        )
         if requester is None or not any(text.startswith("DELEGATE:") for _, text in requester["body"]):
             report(entry["line"], "heading", f"{heading!r} answers no DELEGATE: block; the entry above it has none")
         elif stage not in stage_names(requester["heading"]):
@@ -389,6 +450,158 @@ def check_grants(lines, entries, protocol, report):
             report(entry["line"], "grant", f"{entry['heading']!r}: the grant hook denies this executor spawn: {reason}")
 
 
+def base_heading(heading):
+    return heading[:-len(CONT)] if heading.endswith(CONT) else heading
+
+
+def check_fields(entry, report):
+    """Check the entry's routing fields and return {name: value} for the ones
+    that read correctly."""
+    heading, body = entry["heading"], entry["body"]
+    fields = FIELDS.get(base_heading(heading), ())
+    values, fixed_at = {}, set()
+    if fields:
+        agent_at = next((i for i, (_, text) in enumerate(body) if text.startswith("Agent: ")), None)
+        if agent_at is None:
+            report(entry["line"], "fields", f"{heading!r} has no Agent: line for its routing fields to sit under")
+        else:
+            for offset, (name, placeholder, pattern) in enumerate(fields):
+                at = agent_at + 1 + offset
+                number, text = body[at] if at < len(body) else (body[agent_at][0], "<end of entry>")
+                match = re.fullmatch(re.escape(name) + ": (" + pattern + ")", text)
+                if not match:
+                    wanted = ", ".join(f"'{n}: {p}'" for n, p, _ in fields)
+                    report(number, "fields", f"{heading!r}: under its Agent: line come {wanted}, in that order; found {text!r}")
+                    break
+                values[name] = match.group(1)
+                fixed_at.add(at)
+    for index, (number, text) in enumerate(body):
+        if index in fixed_at:
+            continue
+        names = FIELD_NAMES if fields else ["Rerun"]
+        stray = next((name for name in names if text.startswith(name + ": ")), None)
+        if stray is not None:
+            report(number, "fields", f"{heading!r}: a line starting '{stray}:' outside the fixed lines under an Agent: line; "
+                                     f"routing and the FAIL count read only those")
+    return values
+
+
+def work_order(plan_value):
+    return plan_value.split(", work order ", 1)[1]
+
+
+def check_attempts(entries, report):
+    """Attempt: counts plain entries per key: the heading, the Executor's work
+    order, or the PM's verdicts, which PASS and FAIL share."""
+    counts = collections.Counter()
+    for entry in entries:
+        heading = entry["heading"]
+        base = base_heading(heading)
+        got = entry["fields"].get("Attempt")
+        if base not in FIELDS or got is None:
+            continue
+        if base == EXECUTOR_HEADING:
+            if "Plan" not in entry["fields"]:
+                continue
+            key = (base, work_order(entry["fields"]["Plan"]))
+            counted = f"the Executor entries without (cont.) for work order {key[1]}"
+        elif base in VERDICT_HEADINGS + (PENDING_HEADING,):
+            key, counted = "verdict", "the PM — PASS and PM — FAIL entries"
+        else:
+            key, counted = base, f"the {base} entries without (cont.)"
+        if heading.endswith(CONT):
+            want, why = counts[key], "a (cont.) entry repeats the attempt it extends"
+        elif base == PENDING_HEADING:
+            want, why = counts[key] + 1, "a pending entry takes the number of the verdict it waits for"
+        else:
+            counts[key] += 1
+            want, why = counts[key], f"it counts {counted}, this one included"
+        if int(got) != want:
+            report(entry["line"], "attempt", f"{heading!r} reads 'Attempt: {got}', expected {want}: {why}")
+
+
+def check_governing_plan(entries, report):
+    plans, status_plan = 0, None
+    for entry in entries:
+        heading = entry["heading"]
+        if heading == PLAN_HEADING:
+            plans += 1
+        elif heading == STATUS_HEADING:
+            value = next((text[len("Plan: "):] for _, text in entry["body"] if text.startswith("Plan: ")), None)
+            if value is not None and value != "none":
+                match = re.fullmatch(r"r([0-9]+), work order (\S+)", value)
+                if not match or int(match.group(1)) != plans:
+                    report(entry["line"], "governing-plan",
+                           f"the Status reads 'Plan: {value}'; the governing plan revision is "
+                           + (f"r{plans}" if plans else "none yet"))
+            status_plan = value
+        elif base_heading(heading) == EXECUTOR_HEADING and "Plan" in entry["fields"]:
+            value = entry["fields"]["Plan"]
+            revision = int(value.split(",", 1)[0][1:])
+            named = status_plan if status_plan not in (None, "none") else None
+            if revision != plans:
+                report(entry["line"], "governing-plan",
+                       f"{heading!r} reads 'Plan: {value}'; the governing plan revision is r{plans}")
+            elif named is not None and value != named:
+                report(entry["line"], "governing-plan",
+                       f"{heading!r} reads 'Plan: {value}'; the latest Status names 'Plan: {named}'")
+            elif named is None and work_order(value) != "all":
+                report(entry["line"], "governing-plan",
+                       f"{heading!r} reads 'Plan: {value}'; with no Status naming a plan it runs work order all")
+
+
+def check_high_stakes(entries, report):
+    yes_at = None
+    for entry in entries:
+        for number, text in entry["body"]:
+            if text == "High-stakes: yes" and yes_at is None:
+                yes_at = number
+            elif text == "High-stakes: no" and yes_at is not None:
+                report(number, "high-stakes", f"'High-stakes: no' after 'High-stakes: yes' at line {yes_at}; "
+                                              "no later entry lowers it")
+
+
+def delegates_blocking(entry):
+    """True when the entry's DELEGATE: block is marked BLOCKING."""
+    inside = False
+    for _, text in entry["body"]:
+        if text.startswith("DELEGATE:"):
+            inside = True
+        elif text.startswith("BLOCKER:"):
+            inside = False
+        if inside and "BLOCKING" in text:
+            return True
+    return False
+
+
+def check_cont(entries, protocol, report):
+    for index, entry in enumerate(entries):
+        heading = entry["heading"]
+        if not heading.endswith(CONT) or base_heading(heading) not in protocol.cont:
+            continue
+        earlier = [e for e in entries[:index] if e["heading"] != STATUS_HEADING]
+        answered = False
+        while earlier and protocol.delegated and earlier[-1]["heading"].startswith(protocol.delegated):
+            earlier.pop()
+            answered = True
+        requester = earlier[-1] if earlier else None
+        if not (answered and requester is not None and base_heading(requester["heading"]) == base_heading(heading)
+                and delegates_blocking(requester)):
+            report(entry["line"], "cont",
+                   f"{heading!r} does not follow a Delegated entry answering its own stage's BLOCKING DELEGATE: "
+                   f"block; any other re-spawn writes a new, complete entry under the plain heading")
+
+
+def check_next_lines(entries, report):
+    for entry in entries:
+        if entry["heading"] == STATUS_HEADING:
+            continue
+        for number, text in entry["body"]:
+            if text.startswith("Next: "):
+                report(number, "next-line", f"{entry['heading']!r}: a 'Next:' line outside a ## Status entry; "
+                                            "squad-mech's open-run guard reads the latest one in the log as the run's")
+
+
 def lint(lines, protocol):
     """Return (number of entries, problems), each problem (line, rule, message)."""
     problems = []
@@ -405,7 +618,13 @@ def lint(lines, protocol):
     for index, entry in enumerate(entries):
         check_heading(entry, entries[:index], protocol, report)
         check_blockers(entry, protocol, report)
+        entry["fields"] = check_fields(entry, report)
     check_timestamps(entries, protocol, report)
+    check_attempts(entries, report)
+    check_governing_plan(entries, report)
+    check_high_stakes(entries, report)
+    check_cont(entries, protocol, report)
+    check_next_lines(entries, report)
     check_grants(lines, entries, protocol, report)
     check_relocks(entries, protocol, report)
     check_needs_human(entries, protocol, report)
@@ -417,11 +636,18 @@ def main(argv=None):
     parser.add_argument("--fenced", action="store_true", help="read entries from ```markdown blocks, as in docs/example-log.md")
     parser.add_argument("--skill", default=SKILL_PATH, help="the SKILL.md to read the grammar from")
     parser.add_argument("--rules", action="store_true", help="print each rule id and what it checks, then exit")
+    parser.add_argument("--fields", action="store_true",
+                        help="print each stage heading's routing fields and their template placeholders as JSON, then exit")
     parser.add_argument("logs", nargs="*", help="log files to lint")
     args = parser.parse_args(argv)
     if args.rules:
         for rule, what in RULES:
             print(f"{rule}\t{what}")
+        return 0
+    if args.fields:
+        print(json.dumps(collections.OrderedDict(
+            (heading, [[name, placeholder] for name, placeholder, _ in fields]) for heading, fields in FIELDS.items()
+        ), ensure_ascii=False))
         return 0
     if not args.logs:
         parser.error("name at least one log")

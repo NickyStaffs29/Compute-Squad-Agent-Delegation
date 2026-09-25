@@ -33,24 +33,37 @@
 #      files; 7c the helper cap; 7d each of the four files with a generated
 #      routing block has one begin and one end marker; 7e the product
 #      description; 7f the ## Status and ## Decision templates in SKILL.md
-#      and codex/README.md; 7i log headings stay on SKILL.md's closed list; 7j the
-#      archive command; 7l protocol text names rungs, not
-#      models, outside the routing block; 7m the three executor bodies are one
+#      and codex/README.md; 7i log headings stay on SKILL.md's closed list,
+#      whose bullet carries the (cont.) rule, and every log template carries
+#      the routing fields the log linter checks; 7j the archive command; 7l
+#      protocol text names rungs, not models, outside the routing block; 7m the three executor bodies are one
 #      protocol apart from each agent's own name and the MECHANICAL stop line;
 #      7o no file names the deleted routing
 #      reference; 7p the shared-span table, whose rows include the blocker
 #      grammar span (7k), the command output forms (7n), the latest-Goal
-#      read, and the rule that changing a criterion's command redefines the
-#      criterion; 7q the agent
+#      read, the rule that changing a criterion's command redefines the
+#      criterion, and finding 9's (cont.), plan-read, verdict-scope,
+#      attempt, routing, and FAIL-count text, and squad-mech's open-run
+#      guard; 7q the agent
 #      description budget; 7r no agent has a tool to spawn agents; 7s
 #      codex/SKILL.md stays a reading copy and both SKILL.md files carry the
 #      no-absorption rule; 7t no file names a renamed executor or the old
 #      escalation wording, and both SKILL.md files carry the FAIL charge rule
 #      and the setup-gap stop; 7u no file under agents/, codex/, or skills/
-#      reads the goal from the entry at the top of the log.
+#      reads the goal from the entry at the top of the log; 7v the resume
+#      table in references/resume.md routes from every stage heading, both
+#      SKILL.md files point a resume at it and carry the one-active-run rule,
+#      and squad-mech's open-run guard is in its body, prompt, and TOML.
 #   8. Behavior without a model, on fixtures under tests/: log grammar,
 #      including the grant hook's verdict on every Executor entry, the
-#      re-lock record, and the stop at a needs-human blocker (8a), the
+#      re-lock record, the stop at a needs-human blocker, and the routing
+#      fields, attempt numbers, governing plan revision, high-stakes line,
+#      and (cont.) rule (8a), the next action references/resume.md gives
+#      for every fixture log under the states its .expect.json names, with
+#      every row, step, and check exercised, each live scenario's repo as
+#      tests/live/run.sh --setup-only builds it giving its static twin's
+#      state and action, and squad-mech's open-run guard agreeing with the
+#      one-active-run rule (8b), the
 #      grant hook's decisions on synthetic PreToolUse JSON and over the live
 #      seed logs, including its hold on every stage agent except squad-mech
 #      while a needs-human blocker is open (8c),
@@ -61,7 +74,8 @@
 #      must hold exact token sums, including a final message written after
 #      the hook starts, and which must print nothing. The live
 #      tier, tests/live/run.sh, spends model tokens, so neither this script
-#      nor CI runs it.
+#      nor CI runs a scenario live; 8b runs only its --list, --dry-run, and
+#      --setup-only modes, which call no model.
 #   9. Staleness: models.conf's reviewed date, or a Snapshot date in README.md
 #      or codex/README.md, older than 90 days prints a warning, never a
 #      failure.
@@ -822,9 +836,14 @@ print(f"PASS: check 7: the ## Status and ## Decision templates are byte-identica
 # <your stage> matches the list's <stage>. Each listed heading, and each
 # "(cont.)" form, must also be written or named verbatim in the agent bodies,
 # the Codex prompts, or SKILL.md outside the list, so a typo in the list
-# fails too.
+# fails too. The bullet also carries the (cont.) rule the log linter's cont
+# rule enforces, word for word.
 HEADING_BULLET = "- Log entries use only these headings: "
 HEADING_BAN = "Any other heading or suffix is a protocol violation."
+CONT_RULE = (
+    ", and only for a stage continuing after its own `BLOCKING` `DELEGATE:` block; that entry covers only the "
+    "remainder and extends the stage's latest attempt."
+)
 CONT = " (cont.)"
 skill_path = "skills/compute-squad/SKILL.md"
 skill_lines = read(skill_path).splitlines()
@@ -838,10 +857,10 @@ if section_at is None or skill_lines[section_at] != "## Hard rules":
 rest = skill_lines[bullet_at][len(HEADING_BULLET):]
 list_part, sep, after = rest.partition(". Only ")
 cont_part, sep2, tail = after.partition(" may add `" + CONT + "`")
-if not sep or not sep2 or tail != ". " + HEADING_BAN:
+if not sep or not sep2 or tail != CONT_RULE + " " + HEADING_BAN:
     fail(
         f"{skill_path}: the heading-list bullet must read {HEADING_BULLET!r}<headings>. Only <headings> "
-        f"may add `{CONT}`. {HEADING_BAN}"
+        f"may add `{CONT}`{CONT_RULE} {HEADING_BAN}"
     )
 
 
@@ -917,9 +936,81 @@ for heading in listed_headings + [h + CONT for h in cont_headings]:
     if heading not in runtime_mentions:
         fail(f"{skill_path}: listed heading {heading!r} is written or named nowhere in agents/, codex/0*.md, or {skill_path}")
 
+# The routing fields (finding 9). tests/check_logs.py holds the table of
+# fixed lines each stage entry carries directly under its Agent: line, and
+# prints it with --fields. Every log template in agents/*.md and codex/0*.md
+# (a cat >> COMPUTE_SQUAD_LOG.md <<'EOF' block) must carry exactly those
+# lines, in order, right under its Agent: line, and no other template line
+# may start with a routing field. Every stage heading in the table needs a
+# template, except the PASS and pending entries, which the PM body derives
+# from the FAIL template by the two sentences named below, so their fields
+# must be the FAIL fields without Rerun. Both SKILL.md files route from the
+# Classification: line and count FAILs from the Rerun: lines.
+HEREDOC_OPEN = "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'"
+DERIVED_FROM_FAIL = {
+    "## PM — PASS": "A PASS uses `## PM — PASS` and has no `Rerun:` line.",
+    "## PM — Accept (pending)": "A pending entry uses `## PM — Accept (pending)`, has no `Rerun:` line,",
+}
+FIELD_ROUTE_RULES = (
+    "`Classification:` line of the governing plan revision",
+    "the number of lines matching `^(Rerun: |- rerun: )`",
+)
+fields_run = subprocess.run([sys.executable, "tests/check_logs.py", "--fields"], capture_output=True, text=True)
+try:
+    field_table = json.loads(fields_run.stdout) if fields_run.returncode == 0 else None
+except ValueError:
+    field_table = None
+if not isinstance(field_table, dict) or "## PM — FAIL" not in field_table:
+    fail(f"tests/check_logs.py --fields exited {fields_run.returncode} without its routing-field table: {fields_run.stderr.strip()}")
+field_names = sorted({name for fields in field_table.values() for name, _ in fields})
+for heading in field_table:
+    if not heading_on_list(heading):
+        fail(f"tests/check_logs.py gives routing fields to {heading!r}, which is not on {skill_path}'s heading list")
+templated = {}
+for path in tracked_files("agents/*.md", "codex/0*.md"):
+    lines = read(path).splitlines()
+    for start in (i for i, line in enumerate(lines) if line == HEREDOC_OPEN):
+        block = []
+        for line in lines[start + 1:]:
+            if line == "EOF":
+                break
+            block.append(line)
+        heading = block[0] if block else ""
+        agent_at = next((i for i, line in enumerate(block) if line.startswith("Agent: ")), None)
+        if not heading.startswith("## ") or agent_at is None:
+            fail(f"{path}:{start + 1}: a log template opens with its heading and carries an Agent: line")
+        expected = [f"{name}: {placeholder}" for name, placeholder in field_table.get(heading, [])]
+        got = block[agent_at + 1:agent_at + 1 + len(expected)]
+        if got != expected:
+            fail(f"{path}:{start + 1}: the {heading} template's lines under Agent: must be {expected!r}, the FIELDS "
+                 f"table in tests/check_logs.py; found {got!r}. Change the template and the table together")
+        stray = [line for index, line in enumerate(block)
+                 if not agent_at < index <= agent_at + len(expected)
+                 and any(line.startswith(name + ": ") for name in field_names)]
+        if stray:
+            fail(f"{path}:{start + 1}: the {heading} template has routing field lines outside its fixed lines: {stray!r}")
+        templated.setdefault(heading, []).append(path)
+fail_fields = [f for f in field_table["## PM — FAIL"] if f[0] != "Rerun"]
+for heading, fields in field_table.items():
+    if heading in templated:
+        continue
+    sentence = DERIVED_FROM_FAIL.get(heading)
+    if sentence is None or fields != fail_fields:
+        fail(f"no log template in agents/*.md carries the routing fields tests/check_logs.py gives {heading!r}")
+    for path in ("agents/squad-pm.md", "codex/05-pm-accept.md"):
+        if sentence not in read(path):
+            fail(f"{path}: must say {sentence!r}, which defines the {heading} entry from the FAIL template")
+for path in (skill_path, "codex/SKILL.md"):
+    flat = " ".join(read(path).split())
+    missing = [rule for rule in FIELD_ROUTE_RULES if rule not in flat]
+    if missing:
+        fail(f"{path}: missing the field routing rules {missing!r}")
+
 print(
     f"PASS: check 7: every log heading the protocol writes or names is on {skill_path}'s closed list "
-    f"({len(listed_headings)} headings, {len(cont_headings)} with (cont.))"
+    f"({len(listed_headings)} headings, {len(cont_headings)} with (cont.)), and the log templates in agents/ and "
+    f"codex/0*.md carry the routing fields tests/check_logs.py lints ("
+    + "; ".join(f"{h}: {', '.join(n for n, _ in f)}" for h, f in field_table.items()) + ")"
 )
 
 # ---- 7j: the archive command. Every archive copy is written by the one
@@ -1174,6 +1265,47 @@ LATEST_GOAL_READ = (
 CRITERION_COMMAND = (
     "Changing a command, test, or check that an acceptance criterion names counts as redefining that criterion."
 )
+# Finding 9: a stage continues under (cont.) only after its own BLOCKING
+# delegation, and every other re-spawn writes a complete entry; executors
+# work the revision and work order the latest Status names; ACCEPT judges
+# only that work order and leaves the log open while another one remains;
+# the main session routes on the Classification: line and counts FAILs from
+# the Rerun: lines.
+EXECUTOR_PLAN_READ = (
+    "Work through the tasks of the plan revision and work order that the latest `## Status` entry names, in order, "
+    "and stop at the end of that work order; with no `## Status`, use the latest `## PM — Plan` entry and all its "
+    "work orders. Earlier revisions are history, not instructions."
+)
+VERDICT_SCOPE = (
+    "Judge only the plan revision and work order that the latest `## Status` entry names. Earlier revisions are "
+    "history, and other work orders are outside this verdict."
+)
+WORK_ORDER_STOP = (
+    "If the governing plan revision has a work order after the one you accepted, stop here: archive nothing, clear "
+    "nothing, and say in your final summary that the run stays open for the next work order."
+)
+PLAN_ATTEMPT = (
+    "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n "
+    "is plan revision r<n>."
+)
+VERDICT_ATTEMPT = (
+    "`Attempt: <n>` counts the `## PM — PASS` and `## PM — FAIL` entries in the log, this one included; a pending "
+    "entry takes the number of the verdict it waits for."
+)
+CLASSIFICATION_ROUTE = (
+    "route by the `Classification:` line of the governing plan revision, never by the PM's final message. A missing "
+    "line, or any value other than these three, routes as COMPLEX:"
+)
+FAIL_COUNT = (
+    "Count FAILs from the log, never from memory: the FAIL total is the number of lines matching "
+    "`^(Rerun: |- rerun: )`, and each such line charges one FAIL to the stage it names."
+)
+# Finding 11: squad-mech refuses to archive a log whose latest Next: line is
+# open, so a second run cannot truncate a live one (check 8b runs the guard).
+OPEN_RUN_GUARD_SPAN = (
+    "When told a new run is starting, first run `grep '^Next: ' COMPUTE_SQUAD_LOG.md | tail -n 1`. If it prints a "
+    "line other than `Next: none`, change nothing and report `ARCHIVE REFUSED: open run` followed by that line."
+)
 
 
 def span_row(name, files, text=None, canon=None, start=None, end=None, mask=None, contains=()):
@@ -1190,9 +1322,10 @@ SHARED_SPANS = [
              start="race can silently drop", end="appended in between"),
     span_row("pointer", BODIES, canon="agents/squad-executor.md",
              start="the spawn prompt is a pointer", end="the log is the record"),
-    span_row("per-spawn", BODIES, canon="agents/squad-executor.md",
-             start="The one-entry rule is per spawn", end="covering only the remainder.",
-             mask=("append a `## ", " (cont.)`")),
+    span_row("per-spawn", BODIES + CODEX_STAGE_PROMPTS, text="The one-entry rule is per spawn."),
+    span_row("cont only after BLOCKING", BODIES + CODEX_STAGE_PROMPTS, canon="agents/squad-executor.md",
+             start="Append `## ", end="any other re-spawn also appends a new, complete entry.",
+             mask=("Append `## ", " (cont.)`")),
     span_row("precedence", BODIES, canon="agents/squad-executor.md",
              start="Your own protocol and the log outrank your spawn prompt", end="name the conflict in your entry."),
     span_row("latest Goal read", BODIES + CODEX_STAGE_PROMPTS, text=LATEST_GOAL_READ),
@@ -1210,11 +1343,20 @@ SHARED_SPANS = [
 ] + [
     span_row(f"ACCEPT read: {part}", PM_FILES, text=command) for part, command in ACCEPT_READS
 ] + [
-    span_row("refused", ["agents/squad-helper.md", "agents/squad-mech.md"], text="REFUSED:"),
+    # The backtick keeps squad-mech's `ARCHIVE REFUSED: open run` report from standing in for the refusal marker.
+    span_row("refused", ["agents/squad-helper.md", "agents/squad-mech.md"], text="`REFUSED:"),
     span_row("refusal route", [SKILL],
              text="If a helper refused a step or reports one that did not run as the procedure says, append that "
                   "report the same way and re-spawn the requesting stage even if its request was not `BLOCKING`"),
     span_row("switchboard", [SKILL], text="no squad agent is given a tool for it"),
+    span_row("executor plan read", EXECUTOR_BODIES + ["codex/04-execute.md"], text=EXECUTOR_PLAN_READ),
+    span_row("verdict scope", PM_FILES, text=VERDICT_SCOPE),
+    span_row("work-order stop", PM_FILES, text=WORK_ORDER_STOP),
+    span_row("plan attempt", ["agents/squad-pm.md", "codex/03-pm-plan.md"], text=PLAN_ATTEMPT),
+    span_row("verdict attempt", PM_FILES, text=VERDICT_ATTEMPT),
+    span_row("classification route", [SKILL], text=CLASSIFICATION_ROUTE),
+    span_row("FAIL count", [SKILL], text=FAIL_COUNT),
+    span_row("open-run guard", ["agents/squad-mech.md", "codex/01-archive.md"], text=OPEN_RUN_GUARD_SPAN),
 ]
 
 
@@ -1461,6 +1603,71 @@ print(
     f"PASS: check 7: no tracked file under agents/, codex/, or skills/ ({len(goal_read_paths)} files) reads the goal "
     f"{STALE_GOAL_READ!r}; every stage reads the latest ## Goal — Locked entry"
 )
+
+# ---- 7v: resume, handoff, and one active run (findings 10 and 11; the
+# report's 7x). references/resume.md is tracked, and its next-action table's
+# first column names every heading on SKILL.md's closed list except ## Status
+# and ## Delegated — <stage>, the two it never routes from. Both SKILL.md
+# files send a resume to it and carry the one-active-run rule; SKILL.md,
+# codex/SKILL.md, and codex/README.md stop Stage 1 on ARCHIVE REFUSED;
+# SKILL.md's Status rule lets resume.md's steps 2 and 3 stop without a
+# Status, so S7b's log stays unchanged; and
+# squad-mech's open-run guard, which check 8b runs, is in its body, the
+# generated Codex prompt, and its TOML. Text is compared with whitespace
+# collapsed. Check 8b drives the table itself.
+RESUME = "skills/compute-squad/references/resume.md"
+if RESUME not in tracked_files(RESUME):
+    fail(f"{RESUME} is not tracked, so the plugin would ship without the resume table")
+resume_lines = read(RESUME).splitlines()
+try:
+    table_at = resume_lines.index("| Last entry | Next action |")
+except ValueError:
+    fail(f"{RESUME}: no '| Last entry | Next action |' table")
+first_column = []
+for line in resume_lines[table_at + 2:]:
+    if not line.startswith("|"):
+        break
+    first_column.append(line.strip("|").split(" | ")[0].strip())
+# The one placeholder heading on the list is ## Delegated — <stage>.
+routed = [h for h in listed_headings if h != "## Status" and "<" not in h]
+unrouted = [h for h in routed if not any(cell.startswith("`" + h + "`") for cell in first_column)]
+if unrouted:
+    fail(f"{RESUME}: the next-action table has no row whose first column names {unrouted!r}")
+RESUME_RULES = {
+    SKILL: (
+        "read `references/resume.md` and route by it before any spawn",
+        "first recompute `Next:` from `references/resume.md`",
+        "then revalidate, execute it, accept it, and stop.",
+        "One active run per worktree.",
+        "If it reports `ARCHIVE FAILED` or `ARCHIVE REFUSED`, append nothing",
+        "and a resume stop whose state the latest `## Status` already records (`references/resume.md` steps 2 and 3).",
+        "The latest `## Status` is the handoff record.",
+    ),
+    "codex/SKILL.md": (
+        "read `skills/compute-squad/references/resume.md`",
+        "first recompute `Next:` from `skills/compute-squad/references/resume.md`",
+        "One active run per worktree.",
+        "If it reports `ARCHIVE FAILED` or `ARCHIVE REFUSED`, append nothing",
+        "The latest `## Status` is the handoff record.",
+    ),
+    "codex/README.md": ("`ARCHIVE FAILED` or `ARCHIVE REFUSED`", "references/resume.md"),
+}
+OPEN_RUN_GUARD = (
+    "When told a new run is starting, first run `grep '^Next: ' COMPUTE_SQUAD_LOG.md | tail -n 1`. If it prints a "
+    "line other than `Next: none`, change nothing and report `ARCHIVE REFUSED: open run` followed by that line."
+)
+for path in ("agents/squad-mech.md", "codex/01-archive.md", "codex/agents/squad-mech.toml"):
+    RESUME_RULES[path] = (OPEN_RUN_GUARD,)
+for path, rules in RESUME_RULES.items():
+    flat = " ".join(read(path).split())
+    missing = [rule for rule in rules if rule not in flat]
+    if missing:
+        fail(f"{path}: missing the resume and one-active-run text {missing!r}")
+
+print(
+    f"PASS: check 7: {RESUME}'s next-action table routes from {', '.join(routed)}; both SKILL.md files send a resume "
+    f"to it and carry the one-active-run rule, and squad-mech's open-run guard is in its body, prompt, and TOML"
+)
 PYEOF
 
 # ---------------------------------------------------------------------------
@@ -1506,7 +1713,9 @@ def read(path):
 # runs the grant hook (8c) over the log above every Executor entry, its
 # re-lock rule holds every later Goal entry to a re-lock Decision directly
 # above it, and its needs-human rule lets no stage entry follow a needs-human
-# blocker until a Decision. The example
+# blocker until a Decision. Its fields, attempt, governing-plan, high-stakes,
+# and cont rules hold the routing lines finding 9 fixes under each stage
+# entry's Agent: line (check 7i holds the templates to the same table). The example
 # log must lint clean. Each fixture tests/fixtures/logs/<name>.log.md has a
 # <name>.expect.json that cites the protocol text it tests (each cited text
 # must still be in the cited file) and says whether the linter passes it or
@@ -1597,6 +1806,282 @@ print(
     f"with exactly their expected rules; every linter rule has a failing fixture ({', '.join(linter_rules)})"
 )
 
+# ---- 8b: the resume table. tests/resume_next.py models
+# skills/compute-squad/references/resume.md: its steps, its next-action table
+# (read from that file, so a changed row stops the model with status 2 until
+# the model changes with it), the tree and base checks before an executor
+# spawn, and SKILL.md's one-active-run rule for a new goal over the log.
+# Every fixture log's .expect.json carries resume cases, each a state (what
+# the session sees besides the log: the request, the host, HEAD and the
+# paths moved since Base:, the dirty paths) with the next action and the
+# step or row the model must give for it. Every row, step, and check must
+# be exercised by a fixture that lints clean. The section 6 scenarios whose
+# static twin is 8b must map to the case named below, with the action the
+# scenario asserts. Every live scenario in tests/live/run.sh is the live half
+# of one of those twins, seeded with the twin's fixture: run.sh's --list,
+# --dry-run, and --setup-only run for every scenario with CI set and a claude
+# stub that must never be called, and in each repo --setup-only builds, HEAD
+# and git status against the seeded Base: must give the twin's state, and the
+# model over the seeded log must give the twin's action with the repo's own
+# commits in it. Where node is installed, each repo's npm test script passes,
+# so no live scenario starts on a broken tree. squad-mech's open-run guard,
+# the command its archive procedure runs before the archive command, runs
+# with sh (and dash and bash where installed) over every fixture log, and
+# must refuse the archive for exactly the logs the one-active-run rule
+# refuses.
+RESUME_MODEL = "tests/resume_next.py"
+RESUME_TABLE = "skills/compute-squad/references/resume.md"
+MECH = "agents/squad-mech.md"
+for path in (RESUME_MODEL, RESUME_TABLE):
+    if path not in tracked_set:
+        fail(f"{path} is not tracked")
+sys.dont_write_bytecode = True
+sys.path.insert(0, "tests")
+import resume_next  # noqa: E402
+
+try:
+    resume_rows = resume_next.load_rows()
+except (OSError, resume_next.ProtocolError) as e:
+    fail(f"{RESUME_MODEL} cannot model the resume table: {e}")
+# The DELEGATE row's refusal case (a helper's REFUSED: or not run: step)
+# reports its own source, so a fixture must exercise it too.
+RESUME_SOURCES = ["row: " + first for first, _ in resume_rows] + [
+    "row: " + resume_next.ROWS[1][0] + resume_next.REFUSED_SOURCE,
+    "step 1", "step 2", "step 3", "step 4: perform Next", "step 5: accept", "tree check",
+    "base check: re-map", "base check: continue", "new run: empty log", "new run: refuse", "new run: archive",
+]
+# (scenario, fixture, state, step or row, a phrase the action contains, a
+# phrase it must not contain)
+EXECUTOR_SPAWN = "squad-executor"
+RESUME_TWINS = [
+    ("S1", "plan-shelved", {}, "step 4: perform Next", "await a grant", EXECUTOR_SPAWN),
+    ("S1 turn 1", "s1", {"request": "new-goal"}, "new run: empty log", "run Stage 1", None),
+    ("S2", "s2", {}, "step 4: perform Next", EXECUTOR_SPAWN, None),
+    ("S2b", "s2b", {}, "row: `## PM — Plan`", "awaits a grant for r2", EXECUTOR_SPAWN),
+    ("S2c", "s2c", {"dirty": ["src/server/auth/reset.service.js", "src/server/auth/__tests__/reset.routes.test.js"]},
+     "row: `## PM — PASS` in a high-stakes run", "await a grant", EXECUTOR_SPAWN),
+    ("S3a", "s3", {"head": "b7e41d2", "moved": ["src/server/db/store.js"]}, "base check: re-map",
+     "spawn squad-recon to re-map src/server/db/store.js", EXECUTOR_SPAWN),
+    ("S3b", "s3", {"head": "b7e41d2", "moved": ["docs/notes.md"]}, "base check: continue", EXECUTOR_SPAWN,
+     "squad-recon"),
+    ("S4", "s4", {"head": "c3a9f05", "moved": ["src/server/auth/reset.service.js",
+                                              "src/server/auth/__tests__/reset.routes.test.js"]},
+     "step 5: accept", "review git diff 4f2c9a1 against c3a9f05", EXECUTOR_SPAWN),
+    ("S4b", "s4", {"head": "c3a9f05", "moved": ["src/server/auth/reset.service.js",
+                                               "src/server/auth/__tests__/reset.routes.test.js",
+                                               "src/server/log.js"]},
+     "step 5: accept", "review git diff 4f2c9a1 against c3a9f05", EXECUTOR_SPAWN),
+    ("S7b", "s7b", {}, "step 2", "three FAILs", "append"),
+    ("second run", "s2", {"request": "new-goal"}, "new run: refuse", "park, or abandon", "Stage 1"),
+]
+
+
+def sources_of(via):
+    if via.startswith("row: "):
+        return ["row: " + part for part in via[len("row: "):].split(" / ")]
+    return [via]
+
+
+resume_cases, resume_covered = {}, set()
+clean_fixtures = set(passing)
+for log in logs:
+    name = os.path.basename(log)[:-len(".log.md")]
+    expect_path = log[:-len(".log.md")] + ".expect.json"
+    cases = json.loads(read(expect_path)).get("resume")
+    if not isinstance(cases, list) or not cases:
+        fail(f"{expect_path}: needs a 'resume' list of cases, each {{'state', 'next', 'via'}}")
+    lines = [(n, t) for n, t in enumerate(read(log).splitlines(), 1)]
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != {"state", "next", "via"} or not isinstance(case["state"], dict):
+            fail(f"{expect_path}: each resume case is {{'state': {{...}}, 'next': ..., 'via': ...}}; got {case!r}")
+        try:
+            got = resume_next.next_action(lines, case["state"])
+        except resume_next.ProtocolError as e:
+            fail(f"{expect_path}: {e}")
+        if list(got) != [case["next"], case["via"]]:
+            fail(f"{log} with state {json.dumps(case['state'])}: the resume table gives {got[0]!r} [{got[1]}], "
+                 f"the fixture expects {case['next']!r} [{case['via']}]")
+        resume_cases.setdefault(name, []).append(case)
+        if log in clean_fixtures:
+            resume_covered.update(sources_of(case["via"]))
+missing = [s for s in RESUME_SOURCES if s not in resume_covered]
+if missing:
+    fail(f"no fixture that lints clean exercises these parts of {RESUME_TABLE}: {missing!r}")
+twin_cases = {}
+for scenario, name, state, via, phrase, banned in RESUME_TWINS:
+    case = next((c for c in resume_cases.get(name, []) if c["state"] == state), None)
+    if case is None:
+        fail(f"8b is the static twin of {scenario}: {FIXTURES}{name}.expect.json needs a resume case with state {state!r}")
+    if case["via"] != via or phrase not in case["next"] or (banned and banned in case["next"]):
+        fail(f"{scenario}'s static twin ({name}, {state!r}) must come from {via!r} and name {phrase!r}"
+             + (f" but not {banned!r}" if banned else "") + f"; got {case['next']!r} [{case['via']}]")
+    twin_cases[scenario] = case
+
+# The live tier: each tests/live/run.sh scenario and the RESUME_TWINS row it
+# is the live half of.
+LIVE_RUN = "tests/live/run.sh"
+LIVE_CHECK = "tests/live/check_live.py"
+LIVE_TWINS = {
+    "s1": "S1 turn 1", "s1n": "S1 turn 1", "s2": "S2", "s2b": "S2b", "s2c": "S2c", "s2o": "second run",
+    "s3a": "S3a", "s3b": "S3b", "s4": "S4", "s4b": "S4b", "s7b": "S7b",
+}
+GIT_STATE = ("head", "moved", "dirty")
+for path in (LIVE_RUN, LIVE_CHECK):
+    if path not in tracked_set:
+        fail(f"{path} is not tracked")
+sys.path.insert(0, "tests/live")
+import check_live  # noqa: E402
+
+twin_rows = {row[0]: row for row in RESUME_TWINS}
+unknown_twins = sorted(set(LIVE_TWINS.values()) - set(twin_rows))
+if unknown_twins:
+    fail(f"LIVE_TWINS names rows RESUME_TWINS lacks: {unknown_twins!r}")
+
+
+def porcelain_paths(text):
+    """The paths git status --porcelain -z lists (a rename's source skipped)."""
+    paths, parts = [], text.split("\0")
+    index = 0
+    while index < len(parts):
+        entry = parts[index]
+        index += 1
+        if len(entry) > 3:
+            paths.append(entry[3:])
+            if entry[0] in "RC":
+                index += 1
+    return sorted(paths)
+
+
+live_repos = live_tests = 0
+with tempfile.TemporaryDirectory() as tmp:
+    claude_stub = os.path.join(tmp, "claude")
+    with open(claude_stub, "w", encoding="utf-8") as handle:
+        handle.write('#!/bin/sh\n: > "$0.called"\nexit 3\n')
+    os.chmod(claude_stub, 0o755)
+    live_env = dict(os.environ, CI="1", CLAUDE_BIN=claude_stub, PYTHON=sys.executable)
+
+    def run_live(*args):
+        return subprocess.run(["bash", LIVE_RUN, *args], capture_output=True, text=True, env=live_env, timeout=600)
+
+    listing = run_live("--list")
+    if listing.returncode != 0:
+        fail(f"{LIVE_RUN} --list exited {listing.returncode}: {listing.stderr.strip()}")
+    scenarios = re.findall(r"^(\S+) +\S.*\n +seed tests/fixtures/logs/(\S+)\.log\.md(?:, [^;\n]*)?; turns: (.+)$",
+                           listing.stdout, re.MULTILINE)
+    if sorted(s[0] for s in scenarios) != sorted(LIVE_TWINS):
+        fail(f"{LIVE_RUN} --list names the scenarios {[s[0] for s in scenarios]!r}; each needs a static twin in "
+             f"LIVE_TWINS, which names {sorted(LIVE_TWINS)!r}")
+    turn_checks = set()
+    for name, seed, turns in scenarios:
+        twin = twin_rows[LIVE_TWINS[name]]
+        if seed != twin[1]:
+            fail(f"{LIVE_RUN} seeds {name} with {FIXTURES}{seed}.log.md, but its static twin {twin[0]} reads "
+                 f"{FIXTURES}{twin[1]}.log.md")
+        for turn in turns.split():
+            if turn not in check_live.CHECKS:
+                fail(f"{LIVE_RUN} runs check {turn!r} for {name}; {LIVE_CHECK} has no such check")
+            turn_checks.add(turn)
+    unused = [c for c in check_live.CHECKS if c not in turn_checks]
+    if unused:
+        fail(f"{LIVE_CHECK} has checks no scenario in {LIVE_RUN} runs: {unused!r}")
+
+    dry = run_live("--dry-run", "all")
+    if dry.returncode != 0:
+        fail(f"{LIVE_RUN} --dry-run all exited {dry.returncode}: {dry.stderr.strip()}")
+    for name, _, turns in scenarios:
+        wanted = [f"== {name} (run 1 of 1)"] + [f"turn {i}, check {turn}:" for i, turn in enumerate(turns.split(), 1)]
+        if any(line not in dry.stdout for line in wanted):
+            fail(f"{LIVE_RUN} --dry-run all does not print {name}'s setup and every turn's claude command")
+
+    out = os.path.join(tmp, "out")
+    node = shutil.which("node")
+    for name, seed, _ in scenarios:
+        setup = run_live("--setup-only", "--out", out, name)
+        if setup.returncode != 0:
+            fail(f"{LIVE_RUN} --setup-only {name} exited {setup.returncode}: {setup.stderr.strip()}\n"
+                 f"{setup.stdout[-1500:]}")
+        if os.path.exists(claude_stub + ".called"):
+            fail(f"{LIVE_RUN} called the claude CLI under --dry-run or --setup-only")
+        label = LIVE_TWINS[name]
+        state, via = twin_rows[label][2], twin_rows[label][3]
+        repo = os.path.join(out, name + "-1", "repo")
+        try:
+            roots = check_live.git(repo, "rev-list", "--max-parents=0", "HEAD").split()
+            head = check_live.git(repo, "rev-parse", "HEAD").strip()
+            moved = check_live.git(repo, "diff", "--name-only", "-z", roots[0], "HEAD").split("\0")
+            moved = sorted(p for p in moved if p)
+            dirty = porcelain_paths(check_live.git(repo, "status", "--porcelain", "-z", "--untracked-files=all"))
+        except check_live.SetupError as e:
+            fail(f"{LIVE_RUN} --setup-only built no usable repo for {name}: {e}")
+        base = roots[0]
+        found = {}
+        if head != base:
+            found["head"], found["moved"] = head[:7], moved
+        if dirty:
+            found["dirty"] = dirty
+        wanted = {k: (sorted(v) if isinstance(v, list) else v) for k, v in state.items() if k in GIT_STATE}
+        if set(found) != set(wanted) or any(found[k] != wanted[k] for k in ("moved", "dirty") if k in found):
+            fail(f"{LIVE_RUN} {name}: the repo --setup-only builds shows {found!r} against base A, but its static twin "
+                 f"{label} ({FIXTURES}{seed}.expect.json) reads {wanted!r}")
+        # The live session sees the repo's own HEAD, moved or not.
+        live_state = dict(state, head=head[:7])
+        seeded = os.path.join(repo, "COMPUTE_SQUAD_LOG.md")
+        try:
+            got = resume_next.next_action(list(enumerate(read(seeded).splitlines(), 1)), live_state)
+        except resume_next.ProtocolError as e:
+            fail(f"{LIVE_RUN} {name}: {e}")
+        expected = twin_cases[label]["next"].replace(check_live.SEED_BASE, base[:7])
+        expected = expected.replace(check_live.SEED_WORKTREE, repo)
+        if "head" in state:
+            expected = expected.replace(state["head"], head[:7])
+        if list(got) != [expected, via]:
+            fail(f"{LIVE_RUN} {name}: over the seeded repo the resume table gives {got[0]!r} [{got[1]}], but its "
+                 f"static twin {label} gives {expected!r} [{via}]")
+        live_repos += 1
+        if node:
+            script = json.loads(read(os.path.join(repo, "package.json"))).get("scripts", {}).get("test")
+            if not script:
+                fail(f"{LIVE_RUN} {name}: the fixture's package.json has no test script")
+            test = subprocess.run(["sh", "-c", script], cwd=repo, capture_output=True, text=True, timeout=300)
+            if test.returncode != 0:
+                fail(f"{LIVE_RUN} {name}: npm test's script ({script}) fails on the tree --setup-only builds, so the "
+                     f"live scenario would start broken:\n{(test.stdout + test.stderr)[-1500:]}")
+            live_tests += 1
+
+guard = re.search(r"first run `([^`]+)`\. If it prints a line other than `Next: none`, change nothing and report "
+                  r"`ARCHIVE REFUSED: open run` followed by that line\.", read(MECH))
+if not guard:
+    fail(f"{MECH}: no open-run guard reading \"first run `<command>`. If it prints a line other than `Next: none`, "
+         f"change nothing and report `ARCHIVE REFUSED: open run` followed by that line.\"")
+guard_shells = [sh for sh in ("sh", "dash", "bash") if shutil.which(sh)]
+guard_checked = 0
+with tempfile.TemporaryDirectory() as tmp:
+    for log in logs:
+        shutil.copyfile(log, os.path.join(tmp, "COMPUTE_SQUAD_LOG.md"))
+        lines = [(n, t) for n, t in enumerate(read(log).splitlines(), 1)]
+        _, source = resume_next.new_run(lines)
+        for shell in guard_shells:
+            run = subprocess.run([shell, "-c", guard.group(1)], cwd=tmp, capture_output=True, text=True, timeout=60)
+            printed = run.stdout.strip()
+            refuses = bool(printed) and printed != "Next: none"
+            guard_checked += 1
+            if run.stderr or refuses != (source == "new run: refuse"):
+                fail(f"{MECH}'s open-run guard under {shell} over {log} printed {printed!r}"
+                     f"{' and ' + run.stderr.strip() if run.stderr else ''}; the one-active-run rule gives {source!r}")
+
+print(
+    f"PASS: check 8: {RESUME_MODEL} reads the {len(resume_rows)} rows of {RESUME_TABLE} and gives the expected next "
+    f"action for {sum(len(c) for c in resume_cases.values())} resume cases over {len(resume_cases)} fixture logs, "
+    f"covering every row, step, and check on logs that lint clean and the static twins of "
+    f"{', '.join(t[0] for t in RESUME_TWINS)}; {LIVE_RUN} --list, --dry-run, and --setup-only work for its "
+    f"{live_repos} scenarios without calling claude, and each repo --setup-only builds gives its twin's state and "
+    f"next action"
+    + (f", with npm test's script passing in all {live_tests}" if live_tests else " (node is not installed, so their "
+       "npm test did not run)")
+    + f"; squad-mech's open-run guard agrees with the one-active-run rule "
+    f"over every fixture log ({guard_checked} runs under {', '.join(guard_shells)})"
+)
+
 # ---- 8c: the grant hook. skills/compute-squad/hooks/grant-gate.sh runs on
 # Claude Code's PreToolUse event for the spawn tool, wired inline under the
 # hooks key of .claude-plugin/plugin.json with a matcher for both of its
@@ -1616,8 +2101,14 @@ print(
 # squad-recon. A Decision releases the hold; a later needs-human: blocker
 # holds again, and so does a later rerun: blocker, which cannot resolve it.
 # Every other agent, and input the script cannot read, is allowed silently.
-# Over the live seeds in tests/fixtures/logs/ that tests/live/run.sh uses,
-# every executor is denied for s1 and s2b and allowed for s2 and s2c.
+# Over the live seeds in tests/fixtures/logs/ that tests/live/run.sh uses
+# (8b reads them from run.sh --list, and each needs a verdict here), every
+# executor is denied for s1, s2b, and s4 and allowed for s2, s2c, s3, and
+# s7b. The hook and the plan's Attempt: line name the same revision
+# (finding 9): a plan whose Attempt: line is wrong does not move the hook's
+# count, and over the fixtures with a (cont.) plan or two revisions, a grant
+# for the latest plan's Attempt: number allows and a grant for any other
+# revision denies.
 # An allow prints nothing; a deny prints one PreToolUse decision, whose
 # reason names ## Status for a missing grant and the open blocker for a hold.
 GATE = "skills/compute-squad/hooks/grant-gate.sh"
@@ -1671,6 +2162,7 @@ def status(grant):
 GOAL = "## Goal — Locked\nTimestamp: 2026-09-01T09:00:00Z\n\nGoal: g\n\n"
 PLAN = "## PM — Plan\nTimestamp: 2026-09-01T09:05:00Z\n\nTasks.\n\n"
 PLAN_CONT = "## PM — Plan (cont.)\nTimestamp: 2026-09-01T09:06:00Z\n\nMore tasks.\n\n"
+PLAN_ATTEMPT_2 = PLAN.replace("\n\nTasks.", "\nAgent: squad-pm (m)\nAttempt: 2\n\nTasks.")
 DECISION = '## Decision\nTimestamp: 2026-09-01T09:07:00Z\nType: grant\nCovers: r1, work order all\nUser\'s words: "go"\n\n'
 R1 = "r1 all, per Decision 2026-09-01T09:07:00Z"
 R2 = "r2 WO-1, per Decision 2026-09-01T09:07:00Z"
@@ -1689,12 +2181,19 @@ GATE_CASES = [
     ("r1 over eleven plans", GOAL + PLAN * 11 + status(R1), "deny"),
     ("r11 over eleven plans", GOAL + PLAN * 11 + status("r11 all, per Decision 2026-09-01T09:07:00Z"), "allow"),
     ("r11 over one plan", GOAL + PLAN + status("r11 all, per Decision 2026-09-01T09:07:00Z"), "deny"),
+    ("r2 over one plan whose Attempt: line reads 2", GOAL + status("none") + PLAN_ATTEMPT_2 + status(R2), "deny"),
+    ("r1 over one plan whose Attempt: line reads 2", GOAL + status("none") + PLAN_ATTEMPT_2 + status(R1), "allow"),
     ("a Grant line outside a Status entry", GOAL + status("none") + PLAN.replace("Tasks.", "Tasks.\nGrant: " + ALL), "deny"),
     ("a grant Decision with no Status after it", GOAL + status("none") + PLAN + DECISION, "deny"),
     ("a later Status that revokes", GOAL + status(ALL) + PLAN + status("none"), "deny"),
     ("a later Status that grants", GOAL + status("none") + PLAN + status(ALL), "allow"),
 ]
-SEED_VERDICTS = [("s1", "deny"), ("s2", "allow"), ("s2b", "deny"), ("s2c", "allow")]
+SEED_VERDICTS = [("s1", "deny"), ("s2", "allow"), ("s2b", "deny"), ("s2c", "allow"), ("s3", "allow"),
+                 ("s4", "deny"), ("s7b", "allow")]
+unjudged = sorted(set(seed for _, seed, _ in scenarios) - set(seed for seed, _ in SEED_VERDICTS))
+if unjudged:
+    fail(f"check 8c needs the grant hook's verdict over every live seed {LIVE_RUN} uses; none for {unjudged!r}")
+ATTEMPT_SEEDS = ["plan-cont", "fail-reruns", "s2b"]
 for seed, _ in SEED_VERDICTS:
     if FIXTURES + seed + ".log.md" not in tracked_set:
         fail(f"check 8c needs the tracked live seed {FIXTURES}{seed}.log.md")
@@ -1809,9 +2308,12 @@ with tempfile.TemporaryDirectory() as tmp:
                     if gate(shell, payload(form, repo), tmp) != "allow":
                         fail(f"{GATE} under {shell}: {form} with {name}: a spawn that is not an executor must pass")
     # The live seeds of section 6 (tests/live/run.sh) as they stand: S1's
-    # empty log and S2b's grant for r1 under plan r2 deny, S2's r1 WO-1 grant
-    # allows. S2c allows too: its zero spawns rest on the work-order scope of
-    # a grant, which this hook does not check, so 8b covers S2c.
+    # empty log, S2b's grant for r1 under plan r2, and S4's Grant: none deny,
+    # S2's r1 WO-1 grant allows. S2c allows too: its zero spawns rest on the
+    # work-order scope of a grant, which this hook does not check, so 8b
+    # covers S2c. S3's r1 WO-1 grant allows before the base check, which is
+    # 8b's, and S7b's allows too: the three-FAIL stop is the main session's,
+    # so 8b covers it.
     for seed, expected in SEED_VERDICTS:
         with open(log, "w", encoding="utf-8") as handle:
             handle.write(read(FIXTURES + seed + ".log.md"))
@@ -1822,6 +2324,24 @@ with tempfile.TemporaryDirectory() as tmp:
                 if got != expected:
                     fail(f"{GATE} under {shell}: compute-squad:{agent} over the live seed {FIXTURES}{seed}.log.md: "
                          f"expected {expected}, got {got}")
+    # The hook's revision is the latest plan's Attempt: number.
+    for seed in ATTEMPT_SEEDS:
+        seed_text = read(FIXTURES + seed + ".log.md")
+        plan_attempts = re.findall(r"^## PM — Plan\nTimestamp: [^\n]*\nAgent: [^\n]*\nAttempt: ([0-9]+)$", seed_text, re.M)
+        if not plan_attempts:
+            fail(f"check 8c: {FIXTURES}{seed}.log.md has no ## PM — Plan entry with an Attempt: line")
+        latest = int(plan_attempts[-1])
+        for revision in range(1, latest + 2):
+            grant = f"r{revision} all, per Decision 2026-09-01T09:07:00Z"
+            expected = "allow" if revision == latest else "deny"
+            with open(log, "w", encoding="utf-8") as handle:
+                handle.write(seed_text.rstrip("\n") + "\n\n" + status(grant))
+            for shell in shells:
+                got = gate(shell, payload("compute-squad:" + executors[0], repo), tmp)
+                checked += 1
+                if got != expected:
+                    fail(f"{GATE} under {shell}: {FIXTURES}{seed}.log.md, whose latest plan reads 'Attempt: "
+                         f"{latest}', with a grant for r{revision}: expected {expected}, got {got}")
     # A needs-human: blocker with no ## Decision after it holds every stage.
     for name, text, for_executor, for_held in HOLD_CASES:
         with open(log, "w", encoding="utf-8") as handle:
@@ -1865,7 +2385,8 @@ print(
     f"PASS: check 8: {GATE} is wired once in {CLAUDE_PLUGIN} for Agent and Task and made {checked} decisions as "
     f"specified under {', '.join(shells)}: {', '.join(executors)} denied without a grant for the current plan "
     f"revision, with and without the compute-squad: prefix, and over the live seeds "
-    f"{', '.join(f'{seed} {verdict}' for seed, verdict in SEED_VERDICTS)}; {', '.join(executors + held)} held while a "
+    f"{', '.join(f'{seed} {verdict}' for seed, verdict in SEED_VERDICTS)}; allowed only for the latest plan's "
+    f"Attempt: number over {', '.join(ATTEMPT_SEEDS)}; {', '.join(executors + held)} held while a "
     f"needs-human: blocker has no ## Decision after it; and {HOLD_EXEMPT} always allowed"
 )
 

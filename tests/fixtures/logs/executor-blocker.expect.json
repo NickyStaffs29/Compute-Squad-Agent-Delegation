@@ -13,5 +13,12 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-run Plan (squad-pm in PLAN mode), then every later stage",
+      "via": "row: Ends in a `BLOCKER:` block"
+    }
+  ]
 }

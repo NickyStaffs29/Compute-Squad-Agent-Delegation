@@ -57,8 +57,9 @@ SEED_WORKTREE = "/home/dev/app"   # placeholder repo path in the seeds
 PLUGIN_PREFIX = "compute-squad:"
 LEDGER_TOLERANCE = 0.01
 
-# S2's seed plan (tests/fixtures/logs/s2.log.md) lists these files for WO-1;
-# WO-2 adds the reset_cooldown_hit event and touches src/server/log.js.
+# The S2 and S3 seed plans (tests/fixtures/logs/s2.log.md and s3.log.md, the
+# same plan r1) list these files for WO-1; WO-2 adds the reset_cooldown_hit
+# event and touches src/server/log.js.
 S2_WO1_FILES = (
     "src/server/auth/reset.service.js",
     "src/server/auth/__tests__/reset.routes.test.js",
@@ -303,6 +304,11 @@ def expect_log_kept(ctx, report):
     report.ok(not ctx.cleared, f"the active {LOG} is not cleared")
 
 
+def expect_no_new_archive(ctx, report):
+    fresh = sorted(name for name in ctx.after["archives"] if name not in ctx.before["archives"])
+    report.ok(not fresh, f"no new archive in {ARCHIVE_DIR}/ (a work order remains, finding 9)", ", ".join(fresh))
+
+
 def expect_waiting_for_grant(ctx, report):
     report.ok(ctx.status.get("Grant") == "none", "the latest ## Status reads 'Grant: none'", f"Grant: {ctx.status.get('Grant')}")
     report.ok("grant" in ctx.status.get("Next", "").lower(), "the latest ## Status's Next: awaits a grant",
@@ -320,12 +326,34 @@ def expect_no_new_grant(ctx, report):
 
 
 def expect_no_work_order(ctx, report, work_order):
+    """No new entry runs, covers, or grants work_order. A new Status may
+    name it on its Plan: line as the next work order, which Stage 5 and the
+    resume table require after a PASS on an earlier one; its Grant: line
+    still may not cover it."""
     named = []
     for entry in ctx.new_entries:
         for number, text in entry["body"]:
+            if entry["heading"] == check_logs.STATUS_HEADING and text.startswith("Plan: "):
+                continue
             if re.match(r"(Plan|Covers|Grant): ", text) and re.search(r"\b" + re.escape(work_order) + r"\b", text):
                 named.append(f"line {number}: {text}")
     report.ok(not named, f"no new entry runs, covers, or grants {work_order}", "; ".join(named))
+
+
+def expect_log_unchanged(ctx, report):
+    report.ok(ctx.after["log"] == ctx.before["log"],
+              f"{LOG} is byte for byte the log this call found (sha256 unchanged)")
+
+
+def changed_during_call(ctx):
+    """Product paths whose content this call changed (the scenario's own
+    commits before the call are not counted)."""
+    return sorted(p for p in set(ctx.before["product"]) | set(ctx.after["product"])
+                  if ctx.before["product"].get(p) != ctx.after["product"].get(p))
+
+
+def result_text(ctx):
+    return str(ctx.result.get("result") or "")
 
 
 def check_s1_plan(ctx, report, protocol):
@@ -379,6 +407,8 @@ def check_s2(ctx, report, protocol):
     verdicts = [e["heading"] for e in ctx.new_entries if e["heading"] in ("## PM — PASS", "## PM — FAIL")]
     report.ok(verdicts == ["## PM — PASS"], "one new PM verdict, a PASS", f"got {verdicts}")
     report.ok(not ctx.new("## PM — Plan"), "no new ## PM — Plan entry")
+    expect_log_kept(ctx, report)
+    expect_no_new_archive(ctx, report)
     expect_no_new_grant(ctx, report)
     expect_no_work_order(ctx, report, "WO-2")
 
@@ -398,8 +428,116 @@ def check_s2c(ctx, report, protocol):
     expect_by_type(ctx, report, {}, "0 spawns")
     report.ok(not ctx.new("## Executor"), "no new ## Executor entry")
     expect_product_unchanged(ctx, report)
+    expect_log_kept(ctx, report)
+    expect_no_new_archive(ctx, report)
     expect_no_new_grant(ctx, report)
     expect_no_work_order(ctx, report, "WO-2")
+
+
+def check_s2o(ctx, report, protocol):
+    """Second run: /squad <another goal> over S2's open run (finding 11)."""
+    expect_by_type(ctx, report, {}, "0 spawns: no squad-mech archive over an open run")
+    expect_log_unchanged(ctx, report)
+    expect_no_new_archive(ctx, report)
+    expect_product_unchanged(ctx, report)
+    text = result_text(ctx).lower()
+    report.ok(any(word in text for word in ("park", "abandon", "worktree")),
+              "the final message offers to park or abandon the open run, or a separate worktree",
+              result_text(ctx)[:300])
+
+
+def new_plan_attempts(ctx):
+    return [fields(e).get("Attempt") for e in ctx.new_entries if e["heading"] == "## PM — Plan"]
+
+
+def named_sources(ctx, entry):
+    """The tracked src/ files an entry names, by path or by file name."""
+    text = "\n".join(t for _, t in entry["body"])
+    files = [p for p in git(ctx.repo, "ls-files", "src").splitlines() if p]
+    return sorted(p for p in files if p in text or os.path.basename(p) in text)
+
+
+def check_s3a(ctx, report, protocol):
+    """S3a: commit B edits src/server/db/store.js, which the plan names."""
+    expect_no_executor(ctx, report)
+    report.ok("squad-recon" in ctx.by_type and "squad-pm" in ctx.by_type,
+              "a squad-recon and a squad-pm spawn (scoped re-map, then a new plan attempt)", f"got {ctx.by_type}")
+    got = ctx.stage_sequence()
+    report.ok(got == ["## Recon", "## PM — Plan"], "the new stage entries run ## Recon → ## PM — Plan", f"got {got}")
+    recon = ctx.new("## Recon")
+    report.ok(bool(recon) and "store.js" in "\n".join(t for _, t in recon[-1]["body"]),
+              "the new ## Recon entry re-maps src/server/db/store.js, the path commit B changed")
+    seed = [e for e in entries_of(ctx.before_lines) if e["heading"] == "## Recon"]
+    if recon and seed:
+        mapped, scoped = named_sources(ctx, seed[0]), named_sources(ctx, recon[-1])
+        report.ok(len(scoped) < len(mapped),
+                  f"the new ## Recon entry names fewer src/ files than the seed's full map ({len(mapped)}), so it "
+                  f"re-maps only what commit B moved", f"it names {scoped}")
+    report.ok(new_plan_attempts(ctx) == ["2"], "the new plan is attempt 2, revision r2", f"got {new_plan_attempts(ctx)}")
+    report.ok(not changed_during_call(ctx), "no product file changed during this call", ", ".join(changed_during_call(ctx)))
+    expect_log_kept(ctx, report)
+    expect_no_new_grant(ctx, report)
+    expect_gate_denies(ctx, report, protocol)
+
+
+def check_s3b(ctx, report, protocol):
+    """S3b: commit B adds docs/notes.md, which the plan does not name."""
+    classification = seed_classification(ctx)
+    executor = executor_routes()[classification]
+    expect_by_type(ctx, report, {executor: 1, "squad-pm": 1}, f"one {executor} for {classification}, one PM, no Recon")
+    head = ctx.before["head"]
+    order = [e["heading"] for e in ctx.new_entries
+             if e["heading"] == "## Executor"
+             or (e["heading"] == check_logs.STATUS_HEADING and len(fields(e).get("Base", "")) >= 7
+                 and head.startswith(fields(e).get("Base", "")))]
+    report.ok(bool(order) and order[0] == check_logs.STATUS_HEADING and "## Executor" in order,
+              f"a new ## Status records Base: {head[:7]} (commit B) before the new ## Executor entry", f"got {order}")
+    changed = changed_during_call(ctx)
+    outside = [p for p in changed if p not in S2_WO1_FILES]
+    report.ok(bool(changed) and not outside, f"the files this call changed are within WO-1's list", f"changed {changed}")
+    verdicts = [e["heading"] for e in ctx.new_entries if e["heading"] in ("## PM — PASS", "## PM — FAIL")]
+    report.ok(verdicts == ["## PM — PASS"], "one new PM verdict, a PASS", f"got {verdicts}")
+    expect_log_kept(ctx, report)
+    expect_no_new_archive(ctx, report)
+    expect_no_work_order(ctx, report, "WO-2")
+
+
+def check_accept_only(ctx, report, verdict):
+    expect_by_type(ctx, report, {"squad-pm": 1}, "pm 1: no executor and no next work order")
+    report.ok(not ctx.new("## Executor"), "no new ## Executor entry")
+    verdicts = [e["heading"] for e in ctx.new_entries if e["heading"] in ("## PM — PASS", "## PM — FAIL")]
+    report.ok(verdicts == [verdict], f"one new PM verdict, a {verdict[len('## PM — '):]}", f"got {verdicts}")
+    report.ok(not changed_during_call(ctx), "no product file changed during this call", ", ".join(changed_during_call(ctx)))
+    expect_log_kept(ctx, report)
+    expect_no_new_archive(ctx, report)
+    expect_no_new_grant(ctx, report)
+    report.note("the verdict's Tested: line naming C and plan r1 is WO-3e's (finding 2); not asserted")
+
+
+def check_s4(ctx, report, protocol):
+    """S4: the external implementation of WO-1 is commit C; accept it."""
+    check_accept_only(ctx, report, "## PM — PASS")
+    expect_no_work_order(ctx, report, "WO-2")
+
+
+def check_s4b(ctx, report, protocol):
+    """S4b: commit C also adds WO-2's event code to src/server/log.js."""
+    check_accept_only(ctx, report, "## PM — FAIL")
+    fails = ctx.new("## PM — FAIL")
+    body = "\n".join(t for _, t in fails[-1]["body"]) if fails else ""
+    report.ok("log.js" in body or "WO-2" in body, "the FAIL cites the out-of-scope WO-2 change in src/server/log.js",
+              body[:300])
+
+
+def check_s7b(ctx, report, protocol):
+    """S7b: three FAILs are logged; "Resume the squad run."."""
+    expect_by_type(ctx, report, {}, "0 spawns")
+    expect_log_unchanged(ctx, report)
+    expect_no_new_archive(ctx, report)
+    expect_product_unchanged(ctx, report)
+    text = result_text(ctx)
+    report.ok(re.search(r"\b(three|3)\b", text, re.IGNORECASE) is not None and "fail" in text.lower(),
+              "the final message names the three-FAIL stop", text[:300])
 
 
 CHECKS = collections.OrderedDict([
@@ -408,6 +546,12 @@ CHECKS = collections.OrderedDict([
     ("s2", check_s2),
     ("s2b", check_s2b),
     ("s2c", check_s2c),
+    ("s2o", check_s2o),
+    ("s3a", check_s3a),
+    ("s3b", check_s3b),
+    ("s4", check_s4),
+    ("s4b", check_s4b),
+    ("s7b", check_s7b),
 ])
 
 

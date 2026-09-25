@@ -23,6 +23,7 @@ Stop: after the closing archive
 ## Recon
 Timestamp: 2026-09-03T08:04:41Z
 Agent: squad-recon (claude-opus-5-5)
+Attempt: 1
 
 The endpoint is POST /api/auth/reset-request in src/server/auth/routes.js
 (lines 12-40), calling requestReset() in src/server/auth/reset.service.js

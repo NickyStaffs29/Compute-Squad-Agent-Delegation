@@ -21,5 +21,19 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "run Stage 1: the log is empty",
+      "via": "new run: empty log"
+    }
+  ]
 }

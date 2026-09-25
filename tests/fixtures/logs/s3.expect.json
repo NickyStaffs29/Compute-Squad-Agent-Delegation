@@ -1,0 +1,81 @@
+{
+  "note": "Live seed for section 6, S3a and S3b, in tests/live/run.sh: the run stands where S2's does, at base A (Recon maps the files at Base 4f2c9a1, plan r1 splits the work into WO-1 and WO-2, and the user granted r1 WO-1). run.sh then commits B on top of A, so HEAD moves past the latest Status's Base:. S3a's commit B edits src/server/db/store.js, which plan r1's Must NOT change list names: the base check re-maps that path and asks for plan attempt 2, which needs its own grant. S3b's commit B adds docs/notes.md, which no plan text names: the base check records the new Base and WO-1 runs. It is kept apart from s2.log.md so that a change to S2's seed cannot move S3.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Before any executor spawn, run the tree check and the base check below."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Base check, when `Base:` names a commit that differs from `git rev-parse HEAD`: run `git diff --name-only <Base> HEAD`."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "If no listed path is in the governing plan's must-NOT-change list or among the files and tests of the work order about to run, append a `## Status` with the new `Base:` and continue."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "If any is, spawn `squad-recon` to re-map those paths only, in a new attempt that names the earlier Recon attempt as the map for every other path, then `squad-pm` in PLAN mode for a complete new plan attempt, which needs its own grant unless the mode is `full`."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Base: <commit SHA the governing plan was mapped against>"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A new plan revision voids a grant made for an earlier one, except in `full` mode."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: spawn squad-executor (STANDARD) for WO-1",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "head": "b7e41d2",
+        "moved": [
+          "src/server/db/store.js"
+        ]
+      },
+      "next": "spawn squad-recon to re-map src/server/db/store.js, then squad-pm in PLAN mode for plan attempt 2, which needs its own grant",
+      "via": "base check: re-map"
+    },
+    {
+      "state": {
+        "head": "b7e41d2",
+        "moved": [
+          "docs/notes.md"
+        ]
+      },
+      "next": "append a Status with Base: b7e41d2, then perform Next: spawn squad-executor (STANDARD) for WO-1",
+      "via": "base check: continue"
+    },
+    {
+      "state": {
+        "head": "b7e41d2",
+        "moved": [
+          "docs/notes.md",
+          "src/server/db/store.js"
+        ]
+      },
+      "next": "spawn squad-recon to re-map src/server/db/store.js, then squad-pm in PLAN mode for plan attempt 2, which needs its own grant",
+      "via": "base check: re-map"
+    },
+    {
+      "state": {
+        "head": "b7e41d2",
+        "moved": [
+          "src/server/auth/__tests__/reset.routes.test.js"
+        ]
+      },
+      "next": "spawn squad-recon to re-map src/server/auth/__tests__/reset.routes.test.js, then squad-pm in PLAN mode for plan attempt 2, which needs its own grant",
+      "via": "base check: re-map"
+    }
+  ]
+}

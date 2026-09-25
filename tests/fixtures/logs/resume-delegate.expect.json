@@ -1,0 +1,28 @@
+{
+  "note": "The PM's plan ends in a BLOCKING DELEGATE: block, the helper's result is logged under Delegated, and the session stopped before re-spawning the PM. Resuming re-spawns the PM for its (cont.) entry.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Otherwise recompute `Next:` from the last entry that is neither a `## Status` nor a `## Delegated — <stage>` entry"
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Then, if the block is `BLOCKING`, re-spawn that stage to finish (a `(cont.)` entry, or the verdict after a pending entry)."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-spawn squad-pm in PLAN mode for a (cont.) entry",
+      "via": "row: Ends in a `DELEGATE:` block"
+    }
+  ]
+}

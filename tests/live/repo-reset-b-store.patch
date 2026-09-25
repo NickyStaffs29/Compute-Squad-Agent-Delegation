@@ -1,0 +1,20 @@
+diff --git a/src/server/db/store.js b/src/server/db/store.js
+index 40dad4a..bf1cfe9 100644
+--- a/src/server/db/store.js
++++ b/src/server/db/store.js
+@@ -25,6 +25,15 @@ function createStore(accounts = []) {
+         .filter((row) => row.accountId === accountId)
+         .sort((a, b) => a.createdAt - b.createdAt || a.id - b.id);
+     },
++
++    // Removes every token row of one account, for account deletion.
++    deleteResetTokens(accountId) {
++      for (let i = passwordResetTokens.length - 1; i >= 0; i -= 1) {
++        if (passwordResetTokens[i].accountId === accountId) {
++          passwordResetTokens.splice(i, 1);
++        }
++      }
++    },
+   };
+ }
+ 

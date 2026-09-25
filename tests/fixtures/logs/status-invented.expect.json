@@ -15,5 +15,12 @@
     "rules": [
       "heading"
     ]
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "stop: no row for '## Status — Plan approved, run SHELVED'; show the entry to the user",
+      "via": "row: no row"
+    }
+  ]
 }

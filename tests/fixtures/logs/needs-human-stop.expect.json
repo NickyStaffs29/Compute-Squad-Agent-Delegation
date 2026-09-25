@@ -13,5 +13,12 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: re-spawn squad-recon once a Decision records the user's answer",
+      "via": "step 4: perform Next"
+    }
+  ]
 }

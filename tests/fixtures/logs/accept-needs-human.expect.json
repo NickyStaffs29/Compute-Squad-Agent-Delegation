@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "agents/squad-pm.md",
-      "text": "A pending entry uses `## PM — Accept (pending)` and ends with its `DELEGATE:` or `BLOCKER:` block."
+      "text": "A pending entry uses `## PM — Accept (pending)`, has no `Rerun:` line, and ends with its `DELEGATE:` or `BLOCKER:` block."
     },
     {
       "file": "skills/compute-squad/SKILL.md",
@@ -13,5 +13,12 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: needs-human: whether re-encoding stored avatars on read is acceptable or the goal must exclude it",
+      "via": "row: Ends in a `BLOCKER:` block"
+    }
+  ]
 }

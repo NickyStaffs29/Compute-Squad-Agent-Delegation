@@ -28,8 +28,10 @@ Run `bash scripts/verify.sh` before you push. It's the same gate CI runs
 (`.github/workflows/ci.yml`), and it enforces most of the sync rule above mechanically: JSON/YAML
 validity, the version numbers below, the CHANGELOG heading, the packaged `dist/` artifact, the
 generated Codex agents, a handful of blocks and facts that must read identically across files,
-and check 8, which runs the log linter, the grant hook, the usage ledger hook and codex/update.sh
-against fixtures in tests/ without a model.
+and check 8, which runs the log linter, the resume table, the grant hook, the usage ledger hook and
+codex/update.sh against fixtures in tests/ without a model. It also builds every live scenario's
+repo with `tests/live/run.sh --setup-only` and holds it to that scenario's static twin; the live
+scenarios themselves spend model tokens, so run them by hand before a release.
 
 ## Before you commit
 

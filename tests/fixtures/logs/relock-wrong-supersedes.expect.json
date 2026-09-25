@@ -11,5 +11,12 @@
     "rules": [
       "re-lock"
     ]
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-spawn squad-recon",
+      "via": "row: `## Goal — Locked`"
+    }
+  ]
 }

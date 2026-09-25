@@ -1,0 +1,24 @@
+{
+  "note": "The user's grant Decision is logged, and the session stopped before the Status it implies. Resuming appends that Status and spawns the executor for the granted work order.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Append the `## Status` it implies, then perform that `Next:`."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Only the main session writes `## Status` and `## Decision`."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "append the Status the grant implies, then spawn squad-executor for r1, work order WO-1",
+      "via": "row: `## Decision`"
+    }
+  ]
+}

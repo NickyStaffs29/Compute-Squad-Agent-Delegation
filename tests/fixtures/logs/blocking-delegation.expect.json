@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. A re-spawned stage appends a `## <Stage> (cont.)` entry covering only the remainder of its work"
+      "text": "If the requesting stage said it needs the results to finish (marked `BLOCKING`), re-spawn that stage. The stage then appends a `(cont.)` entry covering only the remainder of its work (Hard rules)"
     },
     {
       "file": "agents/squad-helper.md",
@@ -17,5 +17,12 @@
   "lint": {
     "result": "pass",
     "rules": []
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
 }

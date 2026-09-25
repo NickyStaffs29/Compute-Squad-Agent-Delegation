@@ -15,5 +15,12 @@
     "rules": [
       "needs-human"
     ]
-  }
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    }
+  ]
 }
