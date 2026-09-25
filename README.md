@@ -22,19 +22,19 @@ Or from inside a Claude Code session:
 
 That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
-**Codex.** Prerequisites: Codex CLI 0.144 or newer, a working `git`, `/bin/bash`, a logged-in Codex CLI, and access on your Codex account to the three Codex models in the routing table below, one per rung with no fallback. `codex debug models` lists what your CLI resolves, and `codex/update.sh` refuses to install a model that list lacks. The first two commands install the native plugin; a checkout is also required because the updater copies the seven named agent TOMLs and generates the four Codex V2 profile files:
+**Codex.** Prerequisites: Codex CLI 0.144 or newer, a working `git`, `python3`, `/bin/bash`, and a logged-in Codex CLI. Install from a clean checkout, in a terminal:
 
 ```bash
-codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
-codex plugin add compute-squad@compute-squad
 mkdir -p "$HOME/src"
 git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME/src/compute-squad"
 bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-If `$HOME/src/compute-squad` already exists, do not run `git clone` into it again. Use a clean checkout of this repository on `main`, or choose another empty directory; the updater fast-forwards whichever branch is currently checked out.
+On its first run the updater shows the models your account's catalog (`codex debug models`) lists, then asks which model and reasoning effort fills each tier (top, mid, bottom) and which effort the main session uses. Enter keeps the value shown, which on first setup is the release default from the routing table below. It saves nothing until you type `yes`, and it rejects a model the catalog hides or retires, an effort the model lacks, and one model on two tiers. Your choices live in `$CODEX_HOME/compute-squad/choices.conf`, outside the checkout, so no update overwrites them. The updater then renders one build of this checkout with your models, installs the plugin from it (`compute-squad@compute-squad-local`), and copies the seven agents and four profiles from the same build. Change the models later with `bash "$HOME/src/compute-squad/codex/update.sh" --review-models`.
 
-The updater also refreshes the configured marketplace and plugin. The plugin commands do not copy the repository's agent TOMLs by themselves. Start a new Codex session after installation so the plugin skill is loaded. Full Codex setup, routing table, update command, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
+If `$HOME/src/compute-squad` already exists, do not run `git clone` into it again. Use a clean checkout of this repository on `main`, or choose another empty directory; the updater fast-forwards whichever branch is currently checked out and stops if the checkout has uncommitted changes, because the plugin installs from it.
+
+If an earlier release installed `compute-squad@compute-squad` from the GitHub marketplace, the updater removes that copy after installing the local build, so only one copy of the skill loads. Any other installed copy, such as one from a personal marketplace, stops the update before it changes anything and prints the `codex plugin remove` command for it. Start a new Codex session after installation so the plugin skill is loaded. Full Codex setup, routing table, update command, and a manual-prompt fallback for older Codex versions are in [`codex/README.md`](codex/README.md).
 
 ## 2. Run it
 
@@ -82,7 +82,7 @@ scheduled task. For local-project runs, keep the computer on and the Codex
 desktop app available.
 ```
 
-The updater runs `git pull --ff-only`, then checks every pinned model against `codex debug models` and stops with nothing installed if the check fails, then runs `codex plugin marketplace upgrade compute-squad` and `codex plugin add compute-squad@compute-squad` and refreshes the agents and Codex V2 profile files. There is no `codex plugin update` command; the top-level `codex update` updates the CLI itself, not this plugin. Start a new Codex session after a plugin update.
+Run the updater once in a terminal first, so your model choices are saved: a scheduled run cannot ask, so with no saved choices it exits 3 and reports the setup gap instead of installing release defaults. After that, each run does `git pull --ff-only`, then checks your saved models against `codex debug models` and stops with nothing installed if one is retired, missing, or lacks its effort, then renders the build and installs the plugin, agents, and Codex V2 profile files from it. When the catalog has changed since you chose, a scheduled run warns and keeps your choices; a run in a terminal asks whether to review them. Nothing changes a model mid-run: a running session keeps the skill and agents it loaded, and a run resumed in a new session uses the new models from its next stage. There is no `codex plugin update` command; the top-level `codex update` updates the CLI itself, not this plugin. Start a new Codex session after a plugin update.
 
 Prefer manual updates? In Claude Code, run these whenever you like (marketplace first — it refreshes the source, then the plugin update pulls the new version):
 
@@ -278,9 +278,9 @@ Compute-Squad-Agent-Delegation/
 │   ├── README.md             # Codex install, routing, and manual fallback
 │   ├── SKILL.md              # reading copy with Codex model names; no host loads it
 │   ├── agents/*.toml         # generated Codex agent definitions
-│   ├── build-agents.py       # writes model lines, TOMLs, profiles, routing blocks, and 01-05*.md
+│   ├── build-agents.py       # writes model lines, TOMLs, profiles, routing blocks, 01-05*.md, and the Codex build
 │   ├── profiles.toml         # generated Codex V2 profile reference
-│   ├── update.sh             # installs/refreshes the native Codex plugin
+│   ├── update.sh             # asks for Codex model choices; installs plugin, agents, profiles from one build
 │   └── 01-05*.md             # manual-session fallback prompts (generated)
 ├── docs/example-log.md       # a complete worked run
 ├── scripts/
@@ -303,7 +303,7 @@ Compute-Squad-Agent-Delegation/
 Subagents run headless. They cannot ask you anything, and clarifying gaps with the human is the entire point of Stage 0. So strategy lives in the skill and executes in your top-tier main session.
 
 **Do the models auto-upgrade?**
-Within a family, on Claude Code: each agent carries the alias `models.conf` assigns, and an alias resolves to its family's newest model. Everything else is one edit to `models.conf`, including every Codex change, because Codex agents pin exact model IDs. The procedure is under Changing models in CONTRIBUTING.md, and `codex/update.sh` refuses to install a Codex model your account's catalog does not list.
+Within a family, on Claude Code: each agent carries the alias `models.conf` assigns, and an alias resolves to its family's newest model; changing that is one edit to `models.conf`, under Changing models in CONTRIBUTING.md. On Codex, never: agents pin exact model IDs, and you choose them per tier with `codex/update.sh --review-models`. An update keeps your choices, warns when your account's catalog changes, and stops before installing a saved model the catalog retires or drops.
 
 **Why is bottom-rung execution safe?**
 Only MECHANICAL, transcription-grade work runs there, and the plan carries the intelligence. Acceptance runs on the top rung, never below the work and a rung above it by default. When execution reaches the top rung (COMPLEX work, or escalation), execution and acceptance share it, and Stage 5 of the skill names the controls that replace the missing rung.

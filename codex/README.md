@@ -4,16 +4,10 @@ The repository ships a native Codex plugin plus five prompt files for older Code
 
 ## Native Codex install
 
-Requires Codex CLI 0.144 or newer, a working `git`, `/bin/bash`, and access on your Codex account
-to the three models in the generated routing table under How to run it, one per rung with no
-fallback. A stage whose model your account cannot use stops the run and reports the setup gap.
-
-```bash
-codex plugin marketplace add https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation
-codex plugin add compute-squad@compute-squad
-```
-
-Install the generated agent definitions into the user agent directory:
+Requires Codex CLI 0.144 or newer, a working `git`, `python3`, `/bin/bash`, and a logged-in Codex
+CLI. Each tier (top, mid, bottom) runs one model with no fallback: the one you choose from your
+account's catalog. A stage whose model your account cannot use stops the run and reports the setup
+gap. Install from a clean checkout, in a terminal:
 
 ```bash
 mkdir -p "$HOME/src"
@@ -21,9 +15,11 @@ git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME
 bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The update script pulls the clone, refreshes the configured marketplace, installs the plugin, copies all seven agents, removes any retired agent TOMLs the repo no longer ships, and writes the four current Codex V2 profile files. Before it installs anything, it checks every pinned model and reasoning effort against `codex debug models`, and it stops with the installed setup unchanged if a model is missing, retired, or lacks that effort. The native plugin manifest supplies the skill and command; this updater supplies the separate agent TOMLs and profile files. It expects `codex` and `git` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME` to absolute paths; use an absolute path to the updater script as well.
+On its first run the updater reads `codex debug models` and lists every model your account's catalog lists, with the efforts each supports and whether the catalog marks it superseded or retiring. A listing is availability, not a recommendation. It then asks for the top, mid, and bottom tier's model and reasoning effort, then the main session's effort. Enter keeps the value shown: your saved choice, or on first setup the release default from the generated table under How to run it. It rejects a model the catalog hides or has retired, an effort the model lacks, and a model another tier already holds, and asks again. It prints every role's resulting model and effort, and the four profiles, with the changes, and saves only when you type `yes`; anything else, end of input, or Ctrl-C cancels with nothing changed. Nothing picks, ranks, or substitutes a model for you. Your choices are saved in `$CODEX_HOME/compute-squad/choices.conf`, outside the checkout, with a fingerprint of the catalog they were made against. `models.conf` stays the release default and the checkout is never written. Rerun the questions any time with `bash "$HOME/src/compute-squad/codex/update.sh" --review-models`.
 
-`codex/profiles.toml` is the repository reference for those V2 profile files, not a file to copy verbatim into `$CODEX_HOME/config.toml`. Current Codex loads a selected profile from `$CODEX_HOME/<profile>.config.toml`; the updater extracts each `[profiles.<name>]` table into that format. The `compute-squad` profile is the one selected by the quick-start command and controls the top-level session. Native named agents use the `model` and `model_reasoning_effort` fields in their own TOMLs; the other three profiles are for manual or fallback launches. Each agent TOML also pins its worker model's `model_reasoning_effort` to `max`.
+The updater then renders one build into `$CODEX_HOME/compute-squad/build`: this checkout's plugin (`.codex-plugin/` and `skills/`, with the skill's routing block naming your models), the seven agent TOMLs, and the four Codex V2 profile files, all from one render. It installs the plugin from that directory as the local marketplace `compute-squad-local` (`codex plugin marketplace add`, then `codex plugin add compute-squad@compute-squad-local`), copies the agents and profiles from the same build, removes any retired agent TOMLs the repo no longer ships, and, if an earlier release installed `compute-squad@compute-squad` from the GitHub marketplace, removes that copy so only one skill loads (your marketplace entry stays). Any other installed and enabled copy, such as `compute-squad@personal`, stops the update before it changes anything, with the `codex plugin remove` command for it; the updater never removes a copy you installed yourself. Before it installs anything it checks your models and efforts against the catalog, and it stops with the installed setup unchanged if a model is missing, retired, or lacks that effort. It also stops if the checkout has uncommitted changes to tracked files, because the plugin installs from it, and if another update holds `$CODEX_HOME/compute-squad.lock`. It takes that lock before it reads the checkout, the installed plugins, or your saved choices and holds it until the install ends, so a review and a scheduled update never interleave: whichever starts second stops with nothing saved or installed. It expects `codex`, `git`, and `python3` on `PATH` for an interactive install. For a scheduler, set `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME` to absolute paths, put `python3` on the scheduler's `PATH`, and use an absolute path to the updater script as well.
+
+`codex/profiles.toml` is the repository reference for those V2 profile files with the release default models, not a file to copy verbatim into `$CODEX_HOME/config.toml`. Current Codex loads a selected profile from `$CODEX_HOME/<profile>.config.toml`; the updater writes each one from your choices in that format. The `compute-squad` profile is the one selected by the quick-start command and controls the top-level session. Native named agents use the `model` and `model_reasoning_effort` fields in their own TOMLs; the other three profiles are for manual or fallback launches. Each installed agent TOML pins its tier's model and `model_reasoning_effort`; the release defaults pin `max`.
 
 Codex injects `AGENTS.md` into a session by itself, and no squad stage reads project instruction files. If your project keeps its rules only in `CLAUDE.md`, add `project_doc_fallback_filenames = ["CLAUDE.md"]` to `$CODEX_HOME/config.toml`. Codex loads one instruction file per directory, so a directory that has both files contributes only `AGENTS.md`.
 
@@ -46,7 +42,9 @@ CODEX_BIN="$(command -v codex)" GIT_BIN="$(command -v git)" \
   bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-The updater refreshes the local clone with `git pull --ff-only` first, then checks every pinned model against `codex debug models` and stops with `$CODEX_HOME` unchanged if the check fails, then runs `codex plugin marketplace upgrade compute-squad`, then `codex plugin add compute-squad@compute-squad`, then copies the agent definitions and profile values. There is no separate `codex plugin update` command. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute paths to the updater, `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME`; schedulers do not reliably inherit an interactive shell's `PATH`. If `CODEX_BIN` is a runtime shim, include its interpreter's directory in that `PATH`. The model check runs `python3` from that `PATH`; without it, the updater checks model names only and warns that reasoning efforts were not validated. On macOS, put these values in the LaunchAgent's `EnvironmentVariables` dictionary, use a per-user LaunchAgent, and do not place shell assignments or `$HOME` in launchd's `ProgramArguments`. Use the scheduler's native stdout/stderr log settings. The updater does not create a schedule itself.
+The updater refreshes the local clone with `git pull --ff-only` first and stops if the checkout has uncommitted changes. It then reads `codex debug models`. With no saved choices it asks for them on a terminal; with no terminal, as under a scheduler, it exits 3 with `setup gap: no Codex model choices saved` and the `--review-models` command, and installs nothing. It never falls back to the release defaults on its own. With saved choices, when the catalog has changed since you chose, it asks on a terminal whether to review them and warns under a scheduler, keeping them either way. It then checks your models against the catalog and stops with `$CODEX_HOME` unchanged if one is retired, missing, or lacks its effort, naming it. Last it renders the build and installs the plugin, agents, and profiles from it, and prints each tier's model. Nothing switches a model mid-run: a running session keeps the skill and agents it loaded, and a run resumed in a new session uses the new models from its next stage. There is no separate `codex plugin update` command. For launchd, cron, or Task Scheduler, invoke `/bin/bash` with absolute paths to the updater, `CODEX_BIN`, `GIT_BIN`, and `CODEX_HOME`; schedulers do not reliably inherit an interactive shell's `PATH`. If `CODEX_BIN` is a runtime shim, include its interpreter's directory in that `PATH`, along with `python3`'s. On macOS, put these values in the LaunchAgent's `EnvironmentVariables` dictionary, use a per-user LaunchAgent, and do not place shell assignments or `$HOME` in launchd's `ProgramArguments`. Use the scheduler's native stdout/stderr log settings. The updater does not create a schedule itself.
+
+The first update from a 4.5.0 install still runs that release's updater, because `bash` keeps reading the script `git pull` replaced: it installs `compute-squad@compute-squad` from the GitHub marketplace with the release models, as before. The next run uses the flow above. Run it once in a terminal (`--review-models` works too) so a scheduled run finds your choices.
 
 ## Bottom-rung subagent fallback
 
@@ -91,7 +89,9 @@ Then run the sessions in order:
 | 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | `gpt-5.6-sol` max (top) |
 <!-- routing:end -->
 
-The fallback has one execute prompt file, not three; you pick the model per run. The native plugin's
+The table shows the release defaults; if you saved model choices with the updater, use your models
+instead (`$CODEX_HOME/compute-squad/choices.conf` lists them by tier). The fallback has one execute
+prompt file, not three; you pick the model per run. The native plugin's
 generated TOMLs preserve the three routing variants (`squad-executor-mechanical`, `squad-executor`, and
 `squad-executor-complex`) with fixed Codex model IDs.
 

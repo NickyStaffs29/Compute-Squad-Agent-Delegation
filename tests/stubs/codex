@@ -1,12 +1,96 @@
 #!/bin/sh
-# Stand-in for codex in scripts/verify.sh check 8e. `codex debug models`
-# prints the model catalog in the file STUB_CATALOG names; every other call
-# does nothing and exits 0. When STUB_LOG is set, it appends one line per
-# call to that file: the name it was called by, then its arguments.
+# Stand-in for codex and git in scripts/verify.sh check 8e; it acts as the
+# command it was called as. When STUB_LOG is set, every call appends one line
+# to that file: the name it was called by, then its arguments.
+#
+# As git: `status --porcelain` prints STUB_GIT_STATUS (empty means clean),
+# `ls-files` runs the real git named by STUB_REAL_GIT, and every other call
+# does nothing and exits 0.
+#
+# As codex: `debug models` prints the catalog file STUB_CATALOG names. The
+# plugin commands keep their state under STUB_STATE, outside CODEX_HOME:
+# `plugin marketplace add DIR` records DIR under the name its
+# .agents/plugins/marketplace.json gives, and refuses a name already added
+# from another directory, as Codex 0.157.0 does; `plugin add PLUGIN@MARKET` copies
+# that marketplace's plugins/PLUGIN into
+# $CODEX_HOME/plugins/cache/MARKET/PLUGIN/VERSION, replacing what was there,
+# as Codex 0.157.0 does (when STUB_PAUSE_DIR is set, it first creates
+# $STUB_PAUSE_DIR/paused and waits until $STUB_PAUSE_DIR/go exists, so a test
+# can hold an update mid-install); `plugin list --json` prints the installed plugins in
+# Codex's shape, or fails when STUB_FAIL_PLUGIN_LIST is set, as Codex does
+# when any configured marketplace cannot load; `plugin remove PLUGIN@MARKET`
+# deletes the plugin and its cache. Every other call does nothing and exits 0.
 if [ -n "${STUB_LOG:-}" ]; then
   printf '%s %s\n' "${0##*/}" "$*" >> "$STUB_LOG"
 fi
-if [ "${1:-}" = debug ] && [ "${2:-}" = models ]; then
-  exec cat "${STUB_CATALOG:?STUB_CATALOG names no catalog file}"
+
+if [ "${0##*/}" = git ]; then
+  command="${1:-}"
+  [ "$command" = -C ] && command="${3:-}"
+  case "$command" in
+    status) printf '%s' "${STUB_GIT_STATUS:-}" ;;
+    ls-files) exec "${STUB_REAL_GIT:?STUB_REAL_GIT names no git}" "$@" ;;
+  esac
+  exit 0
 fi
+
+state="${STUB_STATE:-}"
+case "${1:-} ${2:-} ${3:-}" in
+  "debug models "*)
+    exec cat "${STUB_CATALOG:?STUB_CATALOG names no catalog file}"
+    ;;
+  "plugin marketplace add")
+    dir="$4"
+    name="$(sed -n 's/^  "name": "\(.*\)",$/\1/p' "$dir/.agents/plugins/marketplace.json" | head -n 1)"
+    [ -n "$name" ] || { echo "stub codex: no marketplace name in $dir" >&2; exit 1; }
+    mkdir -p "${state:?STUB_STATE names no directory}/marketplaces"
+    if [ -f "$state/marketplaces/$name" ] && [ "$(cat "$state/marketplaces/$name")" != "$dir" ]; then
+      echo "stub codex: marketplace '$name' is already added from a different source" >&2
+      exit 1
+    fi
+    printf '%s\n' "$dir" > "$state/marketplaces/$name"
+    ;;
+  "plugin add "*)
+    if [ -n "${STUB_PAUSE_DIR:-}" ]; then
+      : > "$STUB_PAUSE_DIR/paused"
+      waited=0
+      until [ -e "$STUB_PAUSE_DIR/go" ]; do
+        waited=$((waited + 1))
+        [ "$waited" -le 1200 ] || { echo "stub codex: $STUB_PAUSE_DIR/go never appeared" >&2; exit 1; }
+        sleep 0.1
+      done
+    fi
+    plugin="${3%@*}"
+    market="${3#*@}"
+    root="$(cat "${state:?STUB_STATE names no directory}/marketplaces/$market" 2>/dev/null)" \
+      || { echo "stub codex: no marketplace $market" >&2; exit 1; }
+    source="$root/plugins/$plugin"
+    version="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$source/.codex-plugin/plugin.json")"
+    cache="${CODEX_HOME:?CODEX_HOME is not set}/plugins/cache/$market/$plugin/$version"
+    rm -rf "$cache"
+    mkdir -p "$cache" "$state/installed"
+    cp -R "$source/." "$cache/"
+    printf '%s\n' "$version" > "$state/installed/$3"
+    ;;
+  "plugin list --json")
+    if [ -n "${STUB_FAIL_PLUGIN_LIST:-}" ]; then
+      echo "Error: failed to load configured marketplace snapshot(s)" >&2
+      exit 1
+    fi
+    printf '{"installed": ['
+    sep=""
+    for f in "${state:?STUB_STATE names no directory}"/installed/*; do
+      [ -e "$f" ] || continue
+      id="${f##*/}"
+      printf '%s{"pluginId": "%s", "name": "%s", "marketplaceName": "%s", "version": "%s", "installed": true, "enabled": true}' \
+        "$sep" "$id" "${id%@*}" "${id#*@}" "$(cat "$f")"
+      sep=", "
+    done
+    printf '], "available": []}\n'
+    ;;
+  "plugin remove "*)
+    rm -f "${state:?STUB_STATE names no directory}/installed/$3"
+    rm -rf "${CODEX_HOME:?CODEX_HOME is not set}/plugins/cache/${3#*@}/${3%@*}"
+    ;;
+esac
 exit 0

@@ -108,9 +108,12 @@
 #      high-stakes review, whose entry the archive then holds, with the S6a
 #      seed closing only once its review is appended and the S6b seed's
 #      colliding archive changing nothing (8d),
-#      codex/update.sh with stubs (8e), which must refuse a model the
-#      stub catalog lacks and leave CODEX_HOME unchanged, and whose catalog
-#      validator must apply its effort, retirement, upgrade, and format rules,
+#      codex/update.sh with stubs (8e), which must install the plugin,
+#      agents, and profiles from one build that carries the account's saved
+#      Codex model choices, ask for choices only on a terminal, reject a model
+#      the catalog does not offer, change nothing in CODEX_HOME when it stops,
+#      and whose catalog validator must apply its effort, retirement,
+#      upgrade, and format rules,
 #      and the usage ledger hook on synthetic transcripts (8f), whose records
 #      must hold exact token sums, including a final message written after
 #      the hook starts, and which must print nothing. The live
@@ -3559,21 +3562,36 @@ print(
     f"colliding archive changes no file ({s6b_refused} runs)"
 )
 
-# ---- 8e: codex/update.sh with stubs. The updater runs with stub git
-# (tests/stubs/ok) and a stub codex (tests/stubs/codex, whose `debug models`
-# prints a stub catalog), both recording their calls, against a temp
-# CODEX_HOME seeded with the five retired agents, a stale squad-pm.toml, a
-# stale profile, and files that belong to the user. First the stub catalog
-# lacks one pinned model: the updater must exit 1 after git pull and
-# `codex debug models`, name that model, and leave CODEX_HOME byte for byte
-# as it was. Then the catalog lists every pinned model and effort: it must
-# exit 0, call git pull, `codex debug models`, and the two codex plugin
-# commands, remove the retired agents, install the tracked
-# codex/agents/*.toml byte for byte, write each profile in
-# codex/profiles.toml, and leave the user's files untouched. Last,
-# codex/build-agents.py --validate-catalog runs on its own against stub
-# catalogs, one per remaining rule: a missing effort, a past or near
-# retirement, an upgrade target, and a format it cannot read.
+# ---- 8e: codex/update.sh with stubs. The updater runs with
+# tests/stubs/codex standing in for both git and codex (it acts as the name
+# it is called by and records every call), in a temp CODEX_HOME seeded with
+# the five retired agents, a stale squad-pm.toml, a stale profile, files that
+# belong to the user, and the remote compute-squad@compute-squad plugin that
+# earlier releases installed. The stub catalog lists the release pins, three
+# models to choose (stub-top, stub-mid, stub-low), one hidden and one
+# retired model. The scenarios run in order on one CODEX_HOME and are named
+# in the PASS line: the refusals before anything is chosen (--review-models
+# or no saved choices without a terminal, a dirty checkout, a failed plugin
+# list, another installed copy of the plugin); the chooser (Enter keeps the
+# release defaults, labelled as such; each rejection with its reason; `no`
+# and end of input cancel); first setup; routine updates (same catalog, a
+# failed or unreadable catalog, a leftover build.new, a held lock); two
+# overlapping updates (a review while a scheduled update installs, and a
+# scheduled update while a review waits for answers), driven in lockstep by
+# the stub's pause point, where the second must stop at the lock with the
+# saved choices byte for byte; the catalog fingerprint; a changed catalog without and with a terminal;
+# unreadable saved choices; and a saved model the catalog retires or drops.
+# Every install must put the plugin, agents, and profiles from one build that
+# carries the saved choices, remove the remote plugin, prune the retired
+# agents, and leave the user's files and this checkout as they were. Every
+# cancelled, refused, or stopped run must leave CODEX_HOME byte for byte as
+# it was and make no codex plugin call beyond `plugin list`. Every run has a
+# timeout. Last, codex/build-agents.py --validate-catalog runs on its own
+# against stub catalogs, one per remaining rule.
+import pty  # noqa: E402
+import signal  # noqa: E402
+import termios  # noqa: E402
+
 RETIRED = (
     "squad-design.toml",
     "squad-manager.toml",
@@ -3593,8 +3611,8 @@ for name, body in re.findall(r"^\[profiles\.([^\]]+)\]\n(.*?)(?=^\[|\Z)", profil
 if not profiles:
     fail("codex/profiles.toml has no [profiles.*] section")
 
-# The stub catalog, in the shape `codex debug models` prints: every pinned
-# model with its pinned efforts, plus one listed model nothing pins.
+# The release pins: every model and effort the committed TOMLs and profiles
+# name. The validator cases below use them.
 pinned = {}
 for text in [read(p).split("developer_instructions", 1)[0] for p in agent_tomls] + list(profiles.values()):
     model = re.search(r'^model\s*=\s*"([^"]+)"', text, re.MULTILINE)
@@ -3603,17 +3621,23 @@ for text in [read(p).split("developer_instructions", 1)[0] for p in agent_tomls]
         fail(f"a codex/agents TOML or codex/profiles.toml table has no model or effort line:\n{text}")
     pinned.setdefault(model.group(1), set()).add(effort.group(1))
 
+STUB_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+PAST = "2000-01-01T00:00:00Z"
 
-def stub_catalog(models):
-    entries = [
-        {
-            "slug": model,
-            "visibility": "list",
-            "supported_reasoning_levels": [{"effort": e} for e in sorted(pinned.get(model, {"medium"}))],
-            "upgrade": None,
-        }
-        for model in models
-    ]
+
+def stub_entry(model, efforts=None, visibility="list", upgrade=None, **extra):
+    entry = {
+        "slug": model,
+        "visibility": visibility,
+        "supported_reasoning_levels": [{"effort": e} for e in sorted(efforts or pinned.get(model, {"medium"}))],
+        "upgrade": upgrade,
+    }
+    entry.update(extra)
+    return entry
+
+
+def stub_catalog(models, extra=()):
+    entries = [stub_entry(model) for model in models] + list(extra)
     return json.dumps({"models": entries}, indent=2) + "\n"
 
 
@@ -3628,17 +3652,41 @@ def snapshot(root):
     return state
 
 
-absent = sorted(pinned)[0]
+def changed_paths(before, after):
+    return sorted(p for p in set(before) | set(after) if before.get(p, 0) != after.get(p, 0))
+
+
+CHOOSE = [stub_entry(m, STUB_EFFORTS) for m in ("stub-top", "stub-mid", "stub-low")]
+HIDDEN = stub_entry("stub-hidden", STUB_EFFORTS, visibility="hide")
+RETIRING = stub_entry("stub-retired", STUB_EFFORTS, upgrade={"model": None, "retirement_at": PAST})
+BASE_ENTRIES = [stub_entry(m) for m in sorted(pinned)] + CHOOSE + [HIDDEN, RETIRING]
+CHOSEN = {"top": ("stub-top", "max"), "mid": ("stub-mid", "xhigh"), "bottom": ("stub-low", "max")}
+MAIN_EFFORT = "high"
+REPO = os.getcwd()
+real_git = shutil.which("git")
+repo_status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, timeout=120).stdout
+
+
+def write_catalog(path, entries):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"models": entries}, f, indent=2)
+
+
 with tempfile.TemporaryDirectory() as tmp:
     bin_dir = os.path.join(tmp, "bin")
     codex_home = os.path.join(tmp, "codex-home")
     agents_dir = os.path.join(codex_home, "agents")
+    stub_state = os.path.join(tmp, "stub-state")
     stub_log = os.path.join(tmp, "stub-calls.txt")
     catalog_path = os.path.join(tmp, "catalog.json")
-    for d in (bin_dir, agents_dir, os.path.join(tmp, "home")):
+    choices_path = os.path.join(codex_home, "compute-squad", "choices.conf")
+    build_dir = os.path.join(codex_home, "compute-squad", "build")
+    remote_cache = os.path.join(codex_home, "plugins", "cache", "compute-squad", "compute-squad")
+    for d in (bin_dir, agents_dir, os.path.join(tmp, "home"), os.path.join(stub_state, "installed"),
+              os.path.join(remote_cache, "4.4.0")):
         os.makedirs(d)
-    for tool, stub in (("git", "tests/stubs/ok"), ("codex", "tests/stubs/codex")):
-        shutil.copyfile(stub, os.path.join(bin_dir, tool))
+    for tool in ("git", "codex"):
+        shutil.copyfile("tests/stubs/codex", os.path.join(bin_dir, tool))
         os.chmod(os.path.join(bin_dir, tool), 0o755)
     seeded = {name: f"# retired agent {name}\n" for name in RETIRED}
     seeded["squad-pm.toml"] = 'name = "squad-pm"\nmodel = "stale"\n'
@@ -3654,6 +3702,10 @@ with tempfile.TemporaryDirectory() as tmp:
     for path, content in user_files.items():
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
+    with open(os.path.join(remote_cache, "4.4.0", "SKILL.md"), "w", encoding="utf-8") as f:
+        f.write("remote release copy\n")
+    with open(os.path.join(stub_state, "installed", "compute-squad@compute-squad"), "w", encoding="utf-8") as f:
+        f.write("4.4.0\n")
 
     env = dict(
         os.environ,
@@ -3663,63 +3715,465 @@ with tempfile.TemporaryDirectory() as tmp:
         CODEX_BIN=os.path.join(bin_dir, "codex"),
         STUB_LOG=stub_log,
         STUB_CATALOG=catalog_path,
+        STUB_STATE=stub_state,
+        STUB_REAL_GIT=real_git or "git",
     )
+    env.pop("STUB_GIT_STATUS", None)
 
-    def run_update(models):
-        with open(catalog_path, "w", encoding="utf-8") as f:
-            f.write(stub_catalog(models))
-        if os.path.exists(stub_log):
-            os.remove(stub_log)
-        run = subprocess.run(["bash", "codex/update.sh"], env=env, capture_output=True, text=True)
-        calls = read(stub_log).splitlines() if os.path.exists(stub_log) else []
+    runs = []
+
+    def start_update(label, args=(), terminal=False, extra_env=None, log=None):
+        """Start codex/update.sh in its own session, its output going to
+        files, so a check can start a second update while this one runs. With
+        terminal, its stdin is a pty the answers are typed into later."""
+        log = log or stub_log
+        if os.path.exists(log):
+            os.remove(log)
+        runs.append(label)
+        out_path = os.path.join(tmp, f"run-{len(runs)}.out")
+        err_path = os.path.join(tmp, f"run-{len(runs)}.err")
+        master = None
+        if terminal:
+            master, stdin = pty.openpty()
+            attrs = termios.tcgetattr(stdin)
+            attrs[3] &= ~termios.ECHO
+            termios.tcsetattr(stdin, termios.TCSANOW, attrs)
+        else:
+            stdin = subprocess.DEVNULL
+        with open(out_path, "w", encoding="utf-8") as out_f, open(err_path, "w", encoding="utf-8") as err_f:
+            proc = subprocess.Popen(["bash", "codex/update.sh", *args], env=dict(env, STUB_LOG=log, **(extra_env or {})),
+                                    stdin=stdin, stdout=out_f, stderr=err_f, start_new_session=True)
+        if master is not None:
+            os.close(stdin)
+        return {"label": label, "proc": proc, "master": master, "out": out_path, "err": err_path, "log": log}
+
+    def finish_update(run, answers=None):
+        """Type the answers, if any, and wait for the run. A timeout kills the
+        updater and every process it started (a chooser waiting for input
+        would otherwise hang this check)."""
+        try:
+            if answers is not None:
+                os.write(run["master"], answers.encode("utf-8"))
+            run["proc"].wait(timeout=120)
+        except subprocess.TimeoutExpired:
+            os.killpg(run["proc"].pid, signal.SIGKILL)
+            run["proc"].wait()
+            fail(f"codex/update.sh ({run['label']}) did not finish within 120 seconds:\n"
+                 f"{read(run['out'])}{read(run['err'])}")
+        finally:
+            if run["master"] is not None:
+                os.close(run["master"])
+        calls = read(run["log"]).splitlines() if os.path.exists(run["log"]) else []
+        return run["proc"].returncode, read(run["out"]), read(run["err"]), calls
+
+    def run_update(label, args=(), answers=None, extra_env=None):
+        """Run codex/update.sh; answers, when given, are typed on a terminal."""
+        return finish_update(start_update(label, args, answers is not None, extra_env), answers)
+
+    def wait_for(what, ready, run):
+        """Wait until ready() holds while run is still going."""
+        deadline = time.monotonic() + 60
+        while not ready():
+            if run["proc"].poll() is not None or time.monotonic() > deadline:
+                if run["proc"].poll() is None:
+                    os.killpg(run["proc"].pid, signal.SIGKILL)
+                    run["proc"].wait()
+                fail(f"codex/update.sh ({run['label']}): waited for {what}; it exited {run['proc'].returncode}:\n"
+                     f"{read(run['out'])}{read(run['err'])}")
+            time.sleep(0.05)
+
+    def expect(label, cond, what, rc, out, err, calls):
+        if not cond:
+            fail(f"codex/update.sh ({label}): {what}; it exited {rc}, calls {calls!r}:\n{out}{err}")
+
+    def expect_untouched(label, before, rc, out, err, calls):
+        after = snapshot(codex_home)
+        expect(label, after == before, f"CODEX_HOME changed: {changed_paths(before, after)!r}", rc, out, err, calls)
+        mutating = [c for c in calls if c.startswith("codex plugin") and c != "codex plugin list --json"]
+        expect(label, not mutating, f"it made codex plugin calls {mutating!r}", rc, out, err, calls)
+
+    def expect_pull_first(label, rc, out, err, calls):
         git_call = re.fullmatch(r"git -C (.+) pull --ff-only", calls[0]) if calls else None
-        if not git_call or os.path.realpath(git_call.group(1)) != os.path.realpath(os.getcwd()):
-            fail(f"codex/update.sh should first call git pull on this repo; calls were {calls!r}")
-        return run, calls[1:]
+        expect(label, git_call and os.path.realpath(git_call.group(1)) == os.path.realpath(REPO),
+               "its first call should be git pull on this repo", rc, out, err, calls)
 
+    def saved_choices():
+        text = read(choices_path)
+        tiers = dict((m.group(1), (m.group(2), m.group(3))) for m in re.finditer(
+            r"^(top|mid|bottom)\s+(\S+)\s+(\S+)$", text, re.MULTILINE))
+        main = re.search(r"^main_effort (\S+)$", text, re.MULTILINE)
+        fingerprint = re.search(r"^catalog ([0-9a-f]{64})$", text, re.MULTILINE)
+        return text, tiers, main and main.group(1), fingerprint and fingerprint.group(1)
+
+    def catalog_status():
+        run = subprocess.run([sys.executable, "codex/build-agents.py", "--catalog-status", catalog_path, choices_path],
+                             capture_output=True, text=True, timeout=120)
+        if run.returncode != 0:
+            fail(f"codex/build-agents.py --catalog-status exited {run.returncode}:\n{run.stdout}{run.stderr}")
+        return run.stdout.strip()
+
+    def expect_installed(label, rc, out, err, calls):
+        """The plugin, agents, and profiles all come from the one build, which
+        carries the saved choices, and the remote plugin is gone."""
+        _text, tiers, main, _fp = saved_choices()
+        version = json.loads(read(".codex-plugin/plugin.json"))["version"]
+        cache = os.path.join(codex_home, "plugins", "cache", "compute-squad-local", "compute-squad", version)
+        built = os.path.join(build_dir, "plugins", "compute-squad")
+        expect(label, os.path.isdir(cache) and snapshot(cache) == snapshot(built),
+               "the cached plugin should equal the rendered build's plugin", rc, out, err, calls)
+        payload = sorted(tracked_files(".codex-plugin", "skills"))
+        executables = [line.split("\t", 1)[1] for line in subprocess.run(
+            ["git", "ls-files", "-s", "--", "skills"], capture_output=True, text=True, timeout=120
+        ).stdout.splitlines() if line.startswith("100755 ")]
+        not_executable = [p for p in executables if not os.access(os.path.join(cache, p), os.X_OK)]
+        expect(label, executables and not not_executable, f"the cached plugin should keep the exec bit on "
+               f"{executables!r}; it does not on {not_executable!r}", rc, out, err, calls)
+        expect(label, sorted(p for p in snapshot(built) if not p.endswith("/")) == payload,
+               f"the build's plugin should hold exactly the tracked {payload!r}", rc, out, err, calls)
+        skill = read(os.path.join(cache, "skills", "compute-squad", "SKILL.md"))
+        manifest = json.loads(subprocess.run([sys.executable, "codex/build-agents.py", "--parse-manifest", "models.conf"],
+                                             capture_output=True, text=True, timeout=120).stdout)
+        rungs_line = "Rungs (Claude alias, Codex ID): " + "; ".join(
+            f"{rung} `{manifest['rungs'][rung]['claude']}`, `{tiers[rung][0]}`" for rung in ("top", "mid", "bottom")
+        ) + "."
+        expect(label, rungs_line in skill.splitlines() and "chose on" in skill,
+               f"the cached skill's routing block should read {rungs_line!r} and say the models were chosen",
+               rc, out, err, calls)
+        roles = manifest["roles"]
+        for path in agent_tomls:
+            name = os.path.basename(path)
+            installed = os.path.join(agents_dir, name)
+            role = roles[name[:-len(".toml")]]
+            model, effort = tiers[role["codex_rung"]]
+            expect(label, os.path.exists(installed) and read(installed) == read(os.path.join(build_dir, "agents", name)),
+                   f"CODEX_HOME/agents/{name} should equal the build's copy", rc, out, err, calls)
+            body = read(installed).split("developer_instructions", 1)[0]
+            expect(label, f'model = "{model}"\n' in body and f'model_reasoning_effort = "{effort}"\n' in body,
+                   f"CODEX_HOME/agents/{name} should pin {model} at {effort}", rc, out, err, calls)
+            expect(label, read(installed).split("developer_instructions", 1)[1] == read(path).split(
+                "developer_instructions", 1)[1], f"CODEX_HOME/agents/{name} should keep the release body",
+                rc, out, err, calls)
+        for name in profiles:
+            role = {"compute-squad": "strategy", "compute-squad-pm": "squad-pm",
+                    "compute-squad-execution": "squad-executor",
+                    "compute-squad-mechanical": "squad-executor-mechanical"}[name]
+            model = tiers[roles[role]["codex_rung"]][0]
+            effort = main if role == "strategy" else tiers[roles[role]["codex_rung"]][1]
+            want = f'model = "{model}"\nmodel_reasoning_effort = "{effort}"\n'
+            path = os.path.join(codex_home, f"{name}.config.toml")
+            expect(label, os.path.exists(path) and read(path) == want, f"CODEX_HOME/{name}.config.toml should hold {want!r}",
+                   rc, out, err, calls)
+        left = [name for name in RETIRED if os.path.exists(os.path.join(agents_dir, name))]
+        expect(label, not left, f"it left retired agents {left!r}", rc, out, err, calls)
+        installed_agents = sorted(os.listdir(agents_dir))
+        wanted = sorted([os.path.basename(p) for p in agent_tomls] + ["my-reviewer.toml"])
+        expect(label, installed_agents == wanted, f"CODEX_HOME/agents holds {installed_agents!r}, not {wanted!r}",
+               rc, out, err, calls)
+        plugins = sorted(os.listdir(os.path.join(stub_state, "installed")))
+        expect(label, plugins == ["compute-squad@compute-squad-local"] and not os.path.exists(remote_cache),
+               f"only compute-squad@compute-squad-local should stay installed; found {plugins!r}", rc, out, err, calls)
+        for path, content in user_files.items():
+            expect(label, read(path) == content, f"it changed the user's file {os.path.relpath(path, codex_home)}",
+                   rc, out, err, calls)
+        now_status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, timeout=120).stdout
+        expect(label, now_status == repo_status, "it changed this checkout's git status", rc, out, err, calls)
+        expect(label, "Start a new Codex session." in out, "it should end by asking for a new Codex session",
+               rc, out, err, calls)
+
+    typed_choices = "stub-top\nmax\nstub-mid\nxhigh\nstub-low\nmax\nhigh\n"
+    write_catalog(catalog_path, BASE_ENTRIES)
+    ran = []
+    release = json.loads(subprocess.run([sys.executable, "codex/build-agents.py", "--parse-manifest", "models.conf"],
+                                        capture_output=True, text=True, timeout=120).stdout)
+    release_tiers = {}
+    for rung in ("top", "mid", "bottom"):
+        effort = next(row["codex_effort"] for role, row in release["roles"].items()
+                      if role != "strategy" and row["codex_rung"] == rung)
+        release_tiers[rung] = (release["rungs"][rung]["codex"], effort)
+    release_main = release["roles"]["strategy"]["codex_effort"]
+
+    # --review-models needs a terminal; an unknown argument is refused.
     before = snapshot(codex_home)
-    run, calls = run_update(sorted(set(pinned) - {absent}) + ["stub-model-not-pinned"])
-    if run.returncode != 1 or absent not in run.stderr:
-        fail(
-            f"codex/update.sh should exit 1 and name {absent}, which the stub catalog lacks; it exited "
-            f"{run.returncode}:\n{run.stdout}{run.stderr}"
-        )
-    if calls != ["codex debug models"]:
-        fail(f"codex/update.sh should stop after `codex debug models` when the catalog lacks a model; calls were {calls!r}")
-    after = snapshot(codex_home)
-    if after != before:
-        changed = sorted(p for p in set(before) | set(after) if before.get(p, 0) != after.get(p, 0))
-        fail(f"codex/update.sh refused {absent} but changed CODEX_HOME: {changed!r}")
+    rc, out, err, calls = run_update("--review-models without a terminal", ["--review-models"])
+    expect("--review-models without a terminal", rc == 2 and "needs a terminal" in err and not calls,
+           "it should exit 2 before any call", rc, out, err, calls)
+    expect_untouched("--review-models without a terminal", before, rc, out, err, calls)
+    rc, out, err, calls = run_update("an unknown argument", ["--check"])
+    expect("an unknown argument", rc == 2 and "usage:" in err and not calls, "it should exit 2 with the usage line",
+           rc, out, err, calls)
+    ran.append("--review-models without a terminal exits 2")
 
-    run, calls = run_update(sorted(pinned) + ["stub-model-not-pinned"])
-    if run.returncode != 0:
-        fail(f"codex/update.sh with stub git and codex exited {run.returncode}:\n{run.stdout}{run.stderr}")
-    expected_calls = [
+    # The setup gap.
+    rc, out, err, calls = run_update("no saved choices, no terminal")
+    expect("no saved choices, no terminal", rc == 3 and "setup gap: no Codex model choices saved" in err
+           and "--review-models" in err, "it should exit 3 with the setup-gap line", rc, out, err, calls)
+    expect_pull_first("no saved choices, no terminal", rc, out, err, calls)
+    expect_untouched("no saved choices, no terminal", before, rc, out, err, calls)
+    ran.append("no choices and no terminal exits 3")
+
+    # A dirty checkout.
+    rc, out, err, calls = run_update("a dirty checkout", answers=typed_choices + "yes\n",
+                                     extra_env={"STUB_GIT_STATUS": " M README.md\n"})
+    expect("a dirty checkout", rc == 1 and "uncommitted changes" in err and len(calls) == 2
+           and calls[1].endswith("status --porcelain --untracked-files=no"),
+           "it should stop after git pull and a git status that ignores untracked files", rc, out, err, calls)
+    expect_untouched("a dirty checkout", before, rc, out, err, calls)
+    ran.append("a dirty checkout stops")
+
+    # A plugin list Codex cannot produce stops before anything changes.
+    rc, out, err, calls = run_update("a failed plugin list", answers=typed_choices + "yes\n",
+                                     extra_env={"STUB_FAIL_PLUGIN_LIST": "1"})
+    expect("a failed plugin list", rc == 1 and "codex plugin list --json failed" in err
+           and "listing is availability" not in out, "it should stop before choosing", rc, out, err, calls)
+    expect_untouched("a failed plugin list", before, rc, out, err, calls)
+    ran.append("a failed plugin list stops")
+
+    # Another installed copy of the plugin would load a second skill.
+    personal = os.path.join(stub_state, "installed", "compute-squad@personal")
+    with open(personal, "w", encoding="utf-8") as f:
+        f.write("4.5.0\n")
+    rc, out, err, calls = run_update("another installed copy", answers=typed_choices + "yes\n")
+    expect("another installed copy", rc == 1 and "codex plugin remove compute-squad@personal" in err
+           and "listing is availability" not in out, "it should stop before choosing and name the remove command",
+           rc, out, err, calls)
+    expect_untouched("another installed copy", before, rc, out, err, calls)
+    os.remove(personal)
+    ran.append("another installed copy stops")
+
+    # Enter on every prompt keeps the release pins, labelled as such; nothing
+    # is picked for the user. `no` cancels.
+    rc, out, err, calls = run_update("Enter keeps the release defaults", answers="\n" * 7 + "no\n")
+    for rung, (model, effort) in release_tiers.items():
+        expect("Enter keeps the release defaults", f"{rung} tier model [{model}, release default]" in out
+               and f"  {rung}: unchanged ({model} {effort})" in out,
+               f"the {rung} tier should offer and keep the release pin {model} {effort}", rc, out, err, calls)
+    expect("Enter keeps the release defaults", f"main session effort: unchanged ({release_main})" in out
+           and rc == 1 and "cancelled; nothing changed" in out and not os.path.exists(choices_path),
+           "the main session should keep the release effort, and `no` should cancel", rc, out, err, calls)
+    expect_untouched("Enter keeps the release defaults", before, rc, out, err, calls)
+    ran.append("Enter keeps the release defaults")
+
+    # Rejections, then `no` at the final prompt.
+    rejections = (
+        ("stub-nosuch\n", "stub-nosuch is not in this account's model catalog"),
+        ("stub-hidden\n", "stub-hidden is hidden in the catalog"),
+        ("stub-retired\n", f"stub-retired was retired at {PAST}"),
+    )
+    answers = "".join(a for a, _ in rejections) + "stub-top\nultra\nmax\nstub-top\nstub-mid\nxhigh\nstub-low\nmax\nhigh\nno\n"
+    rc, out, err, calls = run_update("rejections, then no", answers=answers)
+    for _answer, reason in rejections + (
+        ("", "stub-top does not support reasoning effort 'ultra'"),
+        ("", "stub-top is already the top tier's model"),
+    ):
+        expect("rejections, then no", f"rejected: {reason}" in out, f"it should reject with {reason!r}",
+               rc, out, err, calls)
+    expect("rejections, then no", "listing is availability, not a recommendation" in out,
+           "the chooser should head its list as availability", rc, out, err, calls)
+    expect("rejections, then no", rc == 1 and "cancelled; nothing changed" in out and not os.path.exists(choices_path),
+           "`no` should cancel with nothing saved", rc, out, err, calls)
+    expect_untouched("rejections, then no", before, rc, out, err, calls)
+    ran.append("unknown, hidden, and retired models, an unsupported effort, and a taken model are rejected")
+
+    # End of input at the final prompt.
+    rc, out, err, calls = run_update("end of input", answers=typed_choices + "\x04")
+    expect("end of input", rc == 1 and "cancelled; nothing changed" in out and not os.path.exists(choices_path),
+           "end of input should cancel with nothing saved", rc, out, err, calls)
+    expect_untouched("end of input", before, rc, out, err, calls)
+    ran.append("end of input cancels")
+
+    # First setup.
+    rc, out, err, calls = run_update("first setup", answers=typed_choices + "yes\n")
+    expect("first setup", rc == 0, "it should succeed", rc, out, err, calls)
+    expect_pull_first("first setup", rc, out, err, calls)
+    want_calls = [
+        "codex plugin list --json",
         "codex debug models",
-        "codex plugin marketplace upgrade compute-squad",
-        "codex plugin add compute-squad@compute-squad",
+        f"codex plugin marketplace add {build_dir}",
+        "codex plugin add compute-squad@compute-squad-local",
+        "codex plugin remove compute-squad@compute-squad",
     ]
-    if calls != expected_calls:
-        fail(f"codex/update.sh should call git pull, then {expected_calls!r}; after git pull the calls were {calls!r}")
+    expect("first setup", [c for c in calls if c.startswith("codex")] == want_calls,
+           f"its codex calls should be {want_calls!r}", rc, out, err, calls)
+    first_text, tiers, main, fingerprint = saved_choices()
+    expect("first setup", tiers == CHOSEN and main == MAIN_EFFORT, f"it saved {tiers!r} and {main!r}",
+           rc, out, err, calls)
+    expect("first setup", catalog_status() == "current", "the saved fingerprint should match the catalog",
+           rc, out, err, calls)
+    expect_installed("first setup", rc, out, err, calls)
+    sync = subprocess.run([sys.executable, "codex/build-agents.py", "--check"], capture_output=True, text=True,
+                          timeout=120)
+    expect("first setup", sync.returncode == 0, f"build-agents.py --check should still pass:\n{sync.stdout}",
+           rc, out, err, calls)
+    ran.append("first setup saves the choices and installs one build")
 
-    left = [name for name in RETIRED if os.path.exists(os.path.join(agents_dir, name))]
-    if left:
-        fail(f"codex/update.sh left retired agents in CODEX_HOME/agents: {left!r}")
-    installed = sorted(os.listdir(agents_dir))
-    wanted = sorted([os.path.basename(p) for p in agent_tomls] + ["my-reviewer.toml"])
-    if installed != wanted:
-        fail(f"CODEX_HOME/agents holds {installed!r} after the update; expected {wanted!r}")
-    for path in agent_tomls:
-        with open(path, "rb") as f, open(os.path.join(agents_dir, os.path.basename(path)), "rb") as g:
-            if f.read() != g.read():
-                fail(f"CODEX_HOME/agents/{os.path.basename(path)} differs from {path}")
-    for name, values in profiles.items():
-        path = os.path.join(codex_home, f"{name}.config.toml")
-        if not os.path.exists(path) or read(path) != values:
-            fail(f"CODEX_HOME/{name}.config.toml should hold {values!r} from codex/profiles.toml")
-    for path, content in user_files.items():
-        if read(path) != content:
-            fail(f"codex/update.sh changed the user's file {os.path.relpath(path, codex_home)}")
+    # A routine update with the same catalog asks and warns nothing, even on a
+    # terminal, and clears a build.new an interrupted run left.
+    os.makedirs(build_dir + ".new")
+    with open(os.path.join(build_dir + ".new", "leftover"), "w", encoding="utf-8") as f:
+        f.write("from an interrupted run\n")
+    rc, out, err, calls = run_update("a routine update", answers="N\n")
+    expect("a routine update", not os.path.exists(build_dir + ".new"), "it should clear the leftover build.new",
+           rc, out, err, calls)
+    expect("a routine update", rc == 0 and "Review them now" not in out and "listing is availability" not in out
+           and "catalog changed" not in err, "it should succeed without asking or warning", rc, out, err, calls)
+    expect("a routine update", read(choices_path) == first_text, "the choices should stay byte for byte",
+           rc, out, err, calls)
+    expect_installed("a routine update", rc, out, err, calls)
+    ran.append("a routine update asks nothing and keeps the choices")
+
+    # A routine update whose `codex debug models` fails warns and installs
+    # the saved choices.
+    rc, out, err, calls = run_update("a failed catalog", extra_env={"STUB_CATALOG": os.path.join(tmp, "missing.json")})
+    expect("a failed catalog", rc == 0 and "were not checked against the catalog" in err
+           and read(choices_path) == first_text, "it should warn and install the saved choices", rc, out, err, calls)
+    expect_installed("a failed catalog", rc, out, err, calls)
+    ran.append("a failed catalog read warns and installs the saved choices")
+
+    # A catalog in a format this updater does not read warns the same way.
+    write_catalog(catalog_path, [])
+    with open(catalog_path, "w", encoding="utf-8") as f:
+        json.dump({"data": BASE_ENTRIES}, f)
+    rc, out, err, calls = run_update("an unreadable catalog format")
+    expect("an unreadable catalog format", rc == 0 and "catalog format this updater does not read" in err
+           and read(choices_path) == first_text, "it should warn and install the saved choices", rc, out, err, calls)
+    expect_installed("an unreadable catalog format", rc, out, err, calls)
+    write_catalog(catalog_path, BASE_ENTRIES)
+    ran.append("an unreadable catalog format warns and installs the saved choices")
+
+    # A second update while one holds the lock installs nothing.
+    lock = os.path.join(codex_home, "compute-squad.lock")
+    os.makedirs(lock)
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("a held lock")
+    expect("a held lock", rc == 1 and "another update is running" in err, "it should stop", rc, out, err, calls)
+    expect_untouched("a held lock", before, rc, out, err, calls)
+    os.rmdir(lock)
+    ran.append("a held lock stops")
+
+    # The lock covers every write of the saved choices through validation,
+    # rendering, and installation, so a review and a scheduled update never
+    # interleave. First a scheduled update, paused by the stub inside
+    # `codex plugin add` while it installs the build rendered from the saved
+    # choices: a review that would change them stops at the lock before it
+    # asks anything, the choices stay byte for byte, and the scheduled update
+    # finishes with them.
+    pause = os.path.join(tmp, "pause")
+    os.makedirs(pause)
+    other_log = os.path.join(tmp, "stub-calls-other.txt")
+    new_mid = "stub-top\nmax\nstub-mid\nmax\nstub-low\nmax\nhigh\nyes\n"
+    scheduled = start_update("a scheduled update installing", extra_env={"STUB_PAUSE_DIR": pause}, log=other_log)
+    wait_for("the stub to pause it inside codex plugin add", lambda: os.path.exists(os.path.join(pause, "paused")),
+             scheduled)
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("a review during a scheduled install", ["--review-models"], answers=new_mid)
+    expect("a review during a scheduled install", rc == 1 and "another update is running" in err
+           and "listing is availability" not in out and read(choices_path) == first_text,
+           "it should stop at the lock before asking, with the saved choices byte for byte", rc, out, err, calls)
+    expect_untouched("a review during a scheduled install", before, rc, out, err, calls)
+    with open(os.path.join(pause, "go"), "w", encoding="utf-8"):
+        pass
+    rc, out, err, calls = finish_update(scheduled)
+    expect("a scheduled update installing", rc == 0 and read(choices_path) == first_text and not os.path.exists(lock),
+           "it should finish with the saved choices and release the lock", rc, out, err, calls)
+    expect_installed("a scheduled update installing", rc, out, err, calls)
+    ran.append("a review cannot save choices while a scheduled update installs")
+
+    # Then a review waiting at the chooser holds the lock: a scheduled update
+    # stops at it and changes nothing, and the review saves and installs its
+    # new choices.
+    review = start_update("a review waiting for answers", ["--review-models"], terminal=True, log=other_log)
+    wait_for("the chooser to ask for the top tier's model", lambda: "top tier model [" in read(review["out"]), review)
+    if not os.path.isdir(lock):
+        os.killpg(review["proc"].pid, signal.SIGKILL)
+        review["proc"].wait()
+        fail("codex/update.sh (a review waiting for answers): it should hold the update lock while it asks, so no "
+             "other update can install from choices it is about to replace")
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("a scheduled update during a review")
+    expect("a scheduled update during a review", rc == 1 and "another update is running" in err,
+           "it should stop at the lock", rc, out, err, calls)
+    expect_untouched("a scheduled update during a review", before, rc, out, err, calls)
+    rc, out, err, calls = finish_update(review, new_mid)
+    _text, tiers, main, _fp = saved_choices()
+    expect("a review waiting for answers", rc == 0 and tiers == dict(CHOSEN, mid=("stub-mid", "max"))
+           and main == MAIN_EFFORT and not os.path.exists(lock),
+           "it should save and install its new choices and release the lock", rc, out, err, calls)
+    expect_installed("a review waiting for answers", rc, out, err, calls)
+    with open(choices_path, "w", encoding="utf-8") as f:
+        f.write(first_text)
+    ran.append("a scheduled update cannot install while a review holds the lock")
+
+    # What the fingerprint ignores and what it notices. An odd entry for a
+    # model nobody chose does not block the status.
+    write_catalog(catalog_path, list(reversed(BASE_ENTRIES)))
+    shuffled = catalog_status()
+    write_catalog(catalog_path, [dict(e, display_name="renamed", priority=9) for e in BASE_ENTRIES])
+    relabelled = catalog_status()
+    write_catalog(catalog_path, BASE_ENTRIES + [stub_entry("stub-new", STUB_EFFORTS)])
+    added = catalog_status()
+    odd = {"slug": "stub-odd", "visibility": "list"}
+    write_catalog(catalog_path, BASE_ENTRIES + [stub_entry("stub-new", STUB_EFFORTS), odd])
+    with_odd = catalog_status()
+    write_catalog(catalog_path, BASE_ENTRIES + [stub_entry("stub-new", STUB_EFFORTS)])
+    if (shuffled, relabelled, added, with_odd) != ("current", "current", "changed", "changed"):
+        fail(f"the catalog fingerprint should ignore order and unrelated metadata, notice a new model, and read an "
+             f"entry with missing keys; --catalog-status gave {shuffled}, {relabelled}, {added}, {with_odd}")
+    ran.append("the fingerprint ignores order and metadata")
+
+    # A changed catalog with no terminal.
+    rc, out, err, calls = run_update("a changed catalog, no terminal")
+    expect("a changed catalog, no terminal", rc == 0 and "catalog changed since your choices were saved" in err
+           and "--review-models" in err, "it should warn and install", rc, out, err, calls)
+    expect("a changed catalog, no terminal", read(choices_path) == first_text, "the choices should stay",
+           rc, out, err, calls)
+    expect_installed("a changed catalog, no terminal", rc, out, err, calls)
+    ran.append("a changed catalog warns under a scheduler")
+
+    # A changed catalog on a terminal: N, then y.
+    rc, out, err, calls = run_update("a changed catalog, N", answers="N\n")
+    expect("a changed catalog, N", rc == 0 and "Review them now? [y/N]" in out and "listing is availability" not in out
+           and read(choices_path) == first_text, "N should keep the choices", rc, out, err, calls)
+    rc, out, err, calls = run_update("a changed catalog, y", answers="y\n" + "\n" * 7 + "yes\n")
+    _text, tiers, main, new_fingerprint = saved_choices()
+    expect("a changed catalog, y", rc == 0 and "listing is availability" in out and "[stub-top, saved]" in out
+           and tiers == CHOSEN and main == MAIN_EFFORT and new_fingerprint != fingerprint
+           and catalog_status() == "current", "y should run the chooser, keep the entered values, and save the new "
+           "fingerprint", rc, out, err, calls)
+    expect_installed("a changed catalog, y", rc, out, err, calls)
+    ran.append("a changed catalog on a terminal: N keeps, y reviews")
+
+    # Unreadable saved choices stop a routine update with the way out, and
+    # --review-models shows the release defaults in their place.
+    good_text = read(choices_path)
+    with open(choices_path, "w", encoding="utf-8") as f:
+        f.write(good_text.replace("stub-mid", "stub-top"))
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("unreadable choices")
+    expect("unreadable choices", rc == 1 and "each tier needs its own model" in err and "--review-models" in err,
+           "it should stop and give the review command", rc, out, err, calls)
+    expect_untouched("unreadable choices", before, rc, out, err, calls)
+    rc, out, err, calls = run_update("unreadable choices, review", ["--review-models"], answers="\n" * 7 + "no\n")
+    expect("unreadable choices, review", rc == 1 and "cannot be read" in out and "release default" in out,
+           "the review should show the release defaults in place of the unreadable file", rc, out, err, calls)
+    expect_untouched("unreadable choices, review", before, rc, out, err, calls)
+    with open(choices_path, "w", encoding="utf-8") as f:
+        f.write(good_text)
+    ran.append("unreadable choices stop and can be reviewed")
+
+    # A saved model the catalog retires, then drops.
+    for label, entries in (
+        ("a retired saved model", [e for e in BASE_ENTRIES if e["slug"] != "stub-mid"]
+         + [stub_entry("stub-mid", STUB_EFFORTS, upgrade={"model": None, "retirement_at": PAST})]),
+        ("a saved model the catalog dropped", [e for e in BASE_ENTRIES if e["slug"] != "stub-mid"]),
+    ):
+        write_catalog(catalog_path, entries)
+        before = snapshot(codex_home)
+        rc, out, err, calls = run_update(label)
+        expect(label, rc == 1 and "stub-mid" in err and "--review-models" in err,
+               "it should stop, name stub-mid, and give the review command", rc, out, err, calls)
+        expect_untouched(label, before, rc, out, err, calls)
+    ran.append("a saved model the catalog retires or drops stops")
+
 
 # The validator's other rules, run directly on a stub catalog that lists
 # every pinned model. Each case changes one key of one entry (DROP removes
@@ -3764,11 +4218,12 @@ with tempfile.TemporaryDirectory() as tmp:
                 )
 
 print(
-    f"PASS: check 8: codex/update.sh with stub git and codex refuses a catalog that lacks {absent} and leaves "
-    f"CODEX_HOME unchanged; with every pinned model listed it prunes the retired agents ({', '.join(RETIRED)}), "
-    f"installs the {len(agent_tomls)} codex/agents TOMLs byte for byte, writes {len(profiles)} profiles, "
-    f"and leaves the user's files in CODEX_HOME untouched; --validate-catalog handles {len(validator_cases)} "
-    f"more stub catalogs ({', '.join(case[0] for case in validator_cases)}) as specified, with and without --strict"
+    f"PASS: check 8: codex/update.sh with stub git and codex ran {len(ran)} scenarios ({'; '.join(ran)}); every "
+    f"install put the plugin, the {len(agent_tomls)} agents, and {len(profiles)} profiles from one build that carries "
+    f"the saved choices, removed the remote plugin, pruned the retired agents ({', '.join(RETIRED)}), and left the "
+    f"user's files and this checkout untouched, and every stop left CODEX_HOME unchanged; --validate-catalog "
+    f"handles {len(validator_cases)} more stub catalogs ({', '.join(case[0] for case in validator_cases)}) as "
+    f"specified, with and without --strict"
 )
 
 # ---- 8f: the usage ledger. skills/compute-squad/hooks/usage-ledger.sh runs
