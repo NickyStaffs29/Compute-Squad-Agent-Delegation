@@ -1,0 +1,22 @@
+{
+  "note": "Independent review regression: decision",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Type: <grant | plan-approved | waiver | resolution | re-lock | park | abandon>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "decision"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "append the Status the invented Decision implies",
+      "via": "row: `## Decision`"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "note": "Independent review regression: audit-intent",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Audit: <yes|no>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "audit-intent"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the locked Goal has no Audit intent; record a re-lock before resuming",
+      "via": "step 1"
+    }
+  ]
+}

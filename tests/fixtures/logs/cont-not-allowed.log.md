@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T10:00:12Z
+Audit: no
 
 Goal: Add a --dry-run flag to the export command that prints the files it would write and writes nothing.
 Acceptance criteria:

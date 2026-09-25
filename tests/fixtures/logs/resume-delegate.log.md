@@ -2,6 +2,7 @@
 Timestamp: 2026-09-04T12:00:05Z
 Run: 2026-09-04-release-notes
 Attended: yes
+Audit: no
 Goal: Add release notes for 2.4.0 that list every public function whose body changed since v2.3.0.
 Acceptance criteria:
 - AC1: docs/release-notes/2.4.0.md lists exactly the exports from src/index.js whose files changed since v2.3.0.

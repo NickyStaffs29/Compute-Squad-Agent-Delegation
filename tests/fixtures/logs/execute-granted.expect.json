@@ -19,13 +19,6 @@
       "state": {},
       "next": "spawn squad-pm in ACCEPT mode",
       "via": "row: `## Executor`"
-    },
-    {
-      "state": {
-        "audit": true
-      },
-      "next": "run the audit procedure and append its ## Audit Findings entry",
-      "via": "row: `## Executor`"
     }
   ]
 }

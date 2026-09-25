@@ -1,6 +1,6 @@
 # Compute Squad: Codex reading copy
 
-Version: 4.4.0
+Version: 4.5.0
 No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
@@ -53,13 +53,14 @@ Do this directly in the main session; never delegate it:
    needs the user: a `## Decision` entry of Type re-lock quoting their words,
    then a new full `## Goal — Locked` entry with a `Supersedes:` line naming
    the prior entry's timestamp. The latest one governs.
-5. Compose this mandatory first log entry for Stage 1 to append:
+5. Set `Audit: yes` for a requested audit, adversarial review, or "be thorough"; otherwise `Audit: no`. Preserve it on re-lock. Compose this mandatory first log entry for Stage 1 to append:
 
 ```markdown
 ## Goal — Locked
 Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
 Run: <UTC date and a slug: lowercase letters, digits, hyphens>
 Attended: <yes|no>
+Audit: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
 - AC1: <concrete, verifiable item>
@@ -296,7 +297,9 @@ scope, which only a `## Decision` quoting the user approves. It appends a
 `Result:` line reads `upheld` (every risk ruled out, every decision approved),
 `overturned` (a defect, with a `Rerun:` line naming the earliest stage that
 must fix it), or `held` (an open risk or unapproved decision, no defect), then
-a `## Status`. On `upheld` it spawns `squad-mech` to close the run: the
+a `## Status`. On `upheld`, if another work order remains, it records that
+work order and applies the grant boundary, leaving the log open. Only after
+the final work order does it spawn `squad-mech` to close the run: the
 archive copies the log with the review in it, verifies it with `cmp`, and
 clears the log. `overturned` counts as a FAIL and re-runs the named stage and
 every later stage; `held` leaves the log intact for the user. Nothing is ever
@@ -380,7 +383,10 @@ BLOCKER:
 - Anything that changes the locked goal, criteria, or assumptions returns to
   Stage 0 and the user. A `needs-human:` blocker stops the pipeline: spawn or
   continue no stage until it is resolved. With the user present, resolve it
-  with them, record the re-lock, and re-spawn the stage that raised it.
+  with them: re-lock only changed locked facts, use waiver for a waived criterion,
+  or resolution for any other answer. A resolution names the pending heading and
+  Timestamp in Covers, preserves the grant, and re-spawns the blocked stage
+  subject to the grant rule; it never grants execution.
   Unattended, do not resolve it yourself: append a `## Status` entry whose
   `Stop:` quotes the blocker and whose `Next:` names the stage to re-spawn,
   leave the log intact, and end the run. Never tell a stage the run is
@@ -388,7 +394,7 @@ BLOCKER:
 
 ## Audit-grade runs
 
-When the user asks for an audit or says `be thorough`, after execution fan out
+When the locked Goal reads `Audit: yes`, after execution fan out
 parallel mid-rung finders across runtime integrity, security/privacy, dead code,
 accessibility, and docs drift, then one fresh top-rung skeptic per finding, for
 at most 10 findings; the rest are UNREVIEWED. Follow the procedure in
@@ -403,6 +409,8 @@ finding only by showing the guard; otherwise it ends a pending entry with a
 `needs-human:` blocker, which stops the pipeline.
 
 ## Hard rules
+
+Transcript-derived output is a lower bound. Report the output budget as unverified unless an authoritative host upper bound proves the ceiling.
 
 No stage skips within a mode. No executor acceptance. No PM product-code edits.
 No intern judgment calls. The orchestrating session spawns the named agent for

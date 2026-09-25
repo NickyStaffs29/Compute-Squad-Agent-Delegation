@@ -5,13 +5,15 @@
 # squad-recon, squad-pm, squad-helper, or executor spawn while a needs-human:
 # BLOCKER in the log has no ## Decision after it.
 input=$(cat)
-agent=$(printf '%s' "$input" | sed -n 's/.*"subagent_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+reader="$(dirname "$0")/json-field.awk"
+field() { printf '%s' "$input" | LC_ALL=C awk -v key="$1" -f "$reader"; }
+agent=$(field subagent_type)
 case "${agent#compute-squad:}" in
   squad-executor|squad-executor-mechanical|squad-executor-complex) executor=yes ;;
   squad-recon|squad-pm|squad-helper) executor=no ;;
   *) exit 0 ;;
 esac
-cwd=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+cwd=$(field cwd)
 root=$(git -C "${cwd:-.}" rev-parse --show-toplevel 2>/dev/null || printf '%s' "${cwd:-.}")
 log="$root/COMPUTE_SQUAD_LOG.md"
 deny() {

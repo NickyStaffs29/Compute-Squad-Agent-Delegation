@@ -1,5 +1,34 @@
 # Changelog
 
+## 4.5.0 — 2026-09-25
+
+### Fixed
+
+- Persist audit intent in the locked Goal and require a human re-lock before
+  resuming a legacy log that lacks it. Human environment/fact answers use a
+  scoped `resolution` Decision; re-lock and waiver retain their distinct roles,
+  and a resolution never supplies an execution grant.
+- Reject unknown Decision types and stale grant Decisions in the static tools;
+  apply tree/base/grant checks to the documented cross-host execute handoff.
+- Re-read affected paths after a moved base while emitting one complete current
+  Recon map. Update the live checker to require the retained complete map.
+- Decode JSON-escaped hook paths with a shared POSIX awk reader, including Unicode.
+  The ledger waits for an initial flush and stable closed turn, skips special
+  files, stays silent on destination errors, and has a ten-second host timeout.
+- Treat transcript output as a lower bound. The output-budget check stays
+  unverified unless a host total provides an upper bound within the ceiling.
+- Test archive integrity by corrupting the destination before real cmp, and
+  emit a useful diagnostic on a PM archive-name collision while retaining both
+  files. Correct the Codex early-work-order closure mirror and the example's
+  missing main-session verification command.
+
+### Verification
+
+- Add independent behavioral regressions for the review findings to the full
+  verifier; regenerate Codex mirrors and rebuild the packaged plugin.
+- Paid live scenarios and actual model-routing/cost acceptance are not part of
+  this fix pass. Existing model pins and real installations are unchanged.
+
 ## 4.4.0 — 2026-09-25
 
 Lands work order WO-3f of the 3.9.2 analysis: orchestrator economy, delegation, and audits (the rest

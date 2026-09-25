@@ -134,7 +134,7 @@ Verdict:
 
 ```bash
 run=$(sed -n 's/^Run: //p' COMPUTE_SQUAD_LOG.md | head -n 1); t="compute-squad-archive/COMPUTE_SQUAD_LOG_$(date -u +%Y-%m-%d_%H%M%S)_${run:-norun}.md"
-test ! -e "$t" && echo "Archive target: $t" >> COMPUTE_SQUAD_LOG.md && mkdir -p compute-squad-archive && (set -C; cat COMPUTE_SQUAD_LOG.md > "$t") && cmp COMPUTE_SQUAD_LOG.md "$t" && : > COMPUTE_SQUAD_LOG.md && echo "archived and cleared: $t"
+{ test ! -e "$t" || { echo "ARCHIVE FAILED: destination exists: $t" >&2; false; }; } && echo "Archive target: $t" >> COMPUTE_SQUAD_LOG.md && mkdir -p compute-squad-archive && (set -C; cat COMPUTE_SQUAD_LOG.md > "$t") && cmp COMPUTE_SQUAD_LOG.md "$t" && : > COMPUTE_SQUAD_LOG.md && echo "archived and cleared: $t"
 ```
 
 Never clear on FAIL. Never clear a high-stakes log yourself.

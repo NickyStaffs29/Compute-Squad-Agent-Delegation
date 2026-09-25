@@ -2,6 +2,7 @@
 Timestamp: 2026-09-05T09:00:04Z
 Run: 2026-09-05-deprecation-report
 Attended: yes
+Audit: no
 Goal: Add docs/deprecations.md listing every exported function marked @deprecated in the six packages under packages/.
 Acceptance criteria:
 - AC1: docs/deprecations.md lists exactly the exports whose JSDoc carries @deprecated, one line each with its package.

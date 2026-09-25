@@ -7,7 +7,7 @@
     },
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "Type: <grant | plan-approved | waiver | re-lock | park | abandon>"
+      "text": "Type: <grant | plan-approved | waiver | resolution | re-lock | park | abandon>"
     }
   ],
   "lint": {

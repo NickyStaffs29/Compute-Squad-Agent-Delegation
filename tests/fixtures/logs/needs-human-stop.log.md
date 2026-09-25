@@ -2,6 +2,7 @@
 Timestamp: 2026-09-03T08:00:05Z
 Run: 2026-09-03-reset-cooldown
 Attended: no
+Audit: no
 Goal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.
 Acceptance criteria:
 - AC1: A second reset request for the same account within 60 seconds sends no email.

@@ -64,6 +64,8 @@ SKILL_PATH = os.path.join(REPO_ROOT, "skills", "compute-squad", "SKILL.md")
 # Rule ids and what each one checks. scripts/verify.sh requires a failing
 # fixture under tests/fixtures/logs/ for every rule listed here.
 RULES = (
+    ("decision", "Decision types are closed; a resolution quotes the user and identifies the pending blocker or held review"),
+    ("audit-intent", "each Goal records Audit: yes or no and a re-lock preserves that intent"),
     ("goal-first", "the log opens with the Goal entry, with no text before it"),
     ("heading", "every '## ' line is on the closed heading list, only the listed headings add"
                 " ' (cont.)', and a Delegated entry names the stage whose DELEGATE: block it answers"),
@@ -319,7 +321,7 @@ def load_protocol(skill_path):
         if line == "```":
             break
         template.append(line)
-    attended = [m for m in (re.fullmatch(r"([A-Za-z]+): <([a-z]+)\|[a-z]+>", line) for line in template) if m]
+    attended = [m for m in (re.fullmatch(r"(Attended): <(yes)\|no>", line) for line in template) if m]
     if len(attended) != 1 or attended[0].group(1) != "Attended":
         raise ProtocolError(f"{skill_path}: the {goal.group(1)!r} template needs one 'Attended: <yes|no>' line")
     if STATUS_HEADING not in fixed:
@@ -330,6 +332,10 @@ def load_protocol(skill_path):
         "attended": f"{attended[0].group(1)}: {attended[0].group(2)}",
         "supersedes": relock.group(4) + ": ",
     }
+    decision_types = re.search(r"^Type: <([^>]+)>$", text, re.M)
+    if not decision_types or "Audit: <yes|no>" not in template:
+        raise ProtocolError(f"{skill_path}: missing Decision types or Goal Audit field")
+    relock["decision_types"] = {value.strip() for value in decision_types.group(1).split("|")}
 
     if EXECUTOR_HEADING not in fixed or EXECUTOR_HEADING not in cont:
         raise ProtocolError(f"{skill_path}: {EXECUTOR_HEADING!r} is not a listed heading that may add '{CONT}'")
@@ -608,6 +614,7 @@ def check_relocks(entries, protocol, report):
                 f"a later {protocol.goal!r} must directly follow a {rule['decision']!r} entry with {rule['type']!r}; "
                 f"the entry above it is {before['heading']!r} at line {before['line']}",
             )
+
         if rule["attended"] not in body:
             report(entry["line"], "re-lock", f"a re-lock needs the user, so its {protocol.goal!r} entry says {rule['attended']!r}")
         stamp = timestamp_of(prior)
@@ -617,6 +624,59 @@ def check_relocks(entries, protocol, report):
                 entry["line"], "re-lock",
                 f"a re-lock's {protocol.goal!r} entry needs {wanted!r}, naming the Goal entry at line {prior['line']}",
             )
+
+
+def resolution_target(entries, index):
+    """The unanswered blocker or current held review, identified by Covers."""
+    pending = None
+    for entry in entries[:index]:
+        body = dict(text.split(": ", 1) for _, text in entry["body"] if ": " in text)
+        if needs_human_line(entry) or (entry["heading"] == REVIEW_HEADING and body.get("Result") == "held"):
+            pending = entry
+        elif pending and pending["heading"] == REVIEW_HEADING:
+            # A held review can need several separately recorded answers.
+            # Only a new stage/review or a closed run supersedes it.
+            if entry["heading"] not in (STATUS_HEADING, DECISION_HEADING) or body.get("Type") in ("park", "abandon"):
+                pending = None
+        elif entry["heading"] == DECISION_HEADING and body.get("Type") in ("resolution", "waiver", "re-lock"):
+            pending = None
+    covers = next((text[8:] for _, text in entries[index]["body"] if text.startswith("Covers: ")), "")
+    if pending and covers == pending["heading"] + ", Timestamp: " + (timestamp_of(pending) or ""):
+        return pending
+    return None
+
+
+def check_decisions(entries, protocol, report):
+    for index, entry in enumerate(entries):
+        if entry["heading"] != DECISION_HEADING:
+            continue
+        fields = {}
+        for name in ("Type", "Covers", "User's words"):
+            values = [text[len(name) + 2:] for _, text in entry["body"] if text.startswith(name + ": ")]
+            if len(values) != 1 or not values[0]:
+                report(entry["line"], "decision", f"a Decision needs exactly one nonempty {name}: line")
+            fields[name] = values[0] if len(values) == 1 else ""
+        if fields["Type"] not in protocol.relock["decision_types"]:
+            report(entry["line"], "decision", f"unknown Decision Type: {fields['Type']!r}")
+        if fields["Type"] == "resolution" and resolution_target(entries, index) is None:
+            report(entry["line"], "decision", "a resolution's Covers must name the pending blocker or held review by heading and Timestamp")
+        if not re.fullmatch(r'".+"', fields["User's words"]):
+            report(entry["line"], "decision", "a Decision quotes the user's words")
+
+
+def check_audit_intent(entries, protocol, report):
+    previous = None
+    goals = [entry for entry in entries if entry["heading"] == protocol.goal]
+    for index, entry in enumerate(goals):
+        values = [text[7:] for _, text in entry["body"] if text.startswith("Audit: ")]
+        if not values and index < len(goals) - 1:
+            continue  # an appended user re-lock can supply legacy missing intent
+        if len(values) != 1 or values[0] not in ("yes", "no"):
+            report(entry["line"], "audit-intent", "a Goal needs exactly one Audit: yes or Audit: no")
+        elif previous is not None and values[0] != previous:
+            report(entry["line"], "audit-intent", "a re-lock preserves the run's Audit intent")
+        else:
+            previous = values[0]
 
 
 def needs_human_line(entry):
@@ -1382,6 +1442,8 @@ def lint(lines, protocol):
     check_next_lines(entries, report)
     check_grants(lines, entries, protocol, report)
     check_relocks(entries, protocol, report)
+    check_decisions(entries, protocol, report)
+    check_audit_intent(entries, protocol, report)
     check_needs_human(entries, protocol, report)
     check_criteria(entries, protocol, report)
     check_labels(entries, protocol, report)
