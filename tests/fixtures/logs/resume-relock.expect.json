@@ -7,7 +7,7 @@
     },
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "record the answer as a re-lock (Stage 0 step 4), and re-spawn the stage that raised it."
+      "text": "record a re-lock only if locked goal, criteria, or assumptions change (Stage 0 step 4), a waiver for an explicitly waived criterion, or a resolution for any other answer, and re-spawn the stage that raised it."
     }
   ],
   "lint": {

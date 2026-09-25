@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T12:00:12Z
+Audit: no
 Run: 2026-09-01-release-notes
 
 Goal: List every changed public function in the release notes for 2.4.0.

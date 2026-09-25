@@ -1,5 +1,5 @@
 {
- "note": "Cases for the live S8 check (tests/live/check_live.py, work order WO-3f), which check 8b runs through the same rules: the hook log a reference run could leave and the usage ledger's lines for it. Stage 0 may read the skill, the log, the README and the instruction files, and make one listing; before its first squad-recon spawn the main session reads no other tracked file of the fixture repo, by a Read, a Grep, or a Bash command that prints, searches, or counts one, and runs no test or build command. A subagent's calls, and the main session's calls after that spawn (the high-stakes review reads the diff and re-runs the tests), are outside the bound. Every main-session spawn of a squad stage carries the five-line pointer and nothing else, in at most 400 characters, except a helper spawned for a DELEGATE: subtask: squad-helper, or squad-mech with a prompt that does not open with Stage:, spawned after a stage that writes entries and before a high-stakes review; squad-mech's Stage 1 and closing archives stay held to the pointer. The session's main-session running total, its ledger line with the most calls, must stay within 756,000 billed input and 12,400 output tokens, the after model's estimate for the orchestrating session in the 3.9.2 analysis (section 5), which is WO-3f's acceptance.",
+ "note": "Cases for the live S8 check (tests/live/check_live.py, work order WO-3f), which check 8b runs through the same rules: the hook log a reference run could leave and the usage ledger's lines for it. Stage 0 may read the skill, the log, the README and the instruction files, and make one listing; before its first squad-recon spawn the main session reads no other tracked file of the fixture repo, by a Read, a Grep, or a Bash command that prints, searches, or counts one, and runs no test or build command. A subagent's calls, and the main session's calls after that spawn (the high-stakes review reads the diff and re-runs the tests), are outside the bound. Every main-session spawn of a squad stage carries the five-line pointer and nothing else, in at most 400 characters, except a helper spawned for a DELEGATE: subtask: squad-helper, or squad-mech with a prompt that does not open with Stage:, spawned after a stage that writes entries and before a high-stakes review; squad-mech's Stage 1 and closing archives stay held to the pointer. The session's main-session running total, its ledger line with the most calls, must stay within 756,000 billed input and 12,400 output tokens, the after model's estimate for the orchestrating session in the 3.9.2 analysis (section 5), which is WO-3f's acceptance. Transcript output is a lower bound. A host total at or below the ceiling proves main output is within it; a missing or larger host total leaves the output budget unverified.",
  "cites": [
   {
    "file": "skills/compute-squad/SKILL.md",
@@ -229,10 +229,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "the spawn tool under its other name, Task",
@@ -435,10 +436,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "a subagent's read of product source before Recon is not the main session's",
@@ -651,10 +653,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "a Grep over the repo for Markdown only reaches the instruction files",
@@ -866,13 +869,14 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
-   "note": "usage exactly at the budget",
+   "note": "main billed input and host-wide output upper bound exactly at their ceilings",
    "live": "pass",
    "session": "5c1f0e2a-live",
    "events": [
@@ -1072,10 +1076,11 @@
      "cache_write": 100000,
      "cache_write_1h": 100000,
      "cache_read": 656000,
-     "output": 12400,
+     "output": 5200,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12400
   },
   {
    "note": "another session's larger main-session line does not count",
@@ -1278,7 +1283,7 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     },
     {
@@ -1299,7 +1304,8 @@
      "output": 20000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 prints the README and searches the instruction files and the log in Bash, which the bound allows",
@@ -1510,10 +1516,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Recon's intern DELEGATE: squad-mech gets the subtask's exact procedure, copied from the log, which the pointer rule exempts like squad-helper",
@@ -1763,10 +1770,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "squad-mech's closing archive after an upheld high-stakes review, in the pointer with Mode: close",
@@ -1988,10 +1996,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 reads a product source file",
@@ -2202,10 +2211,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 reads package.json, which the bound does not list",
@@ -2416,10 +2426,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 reads product source by a relative path",
@@ -2630,10 +2641,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 greps the whole repo",
@@ -2844,10 +2856,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 greps under src",
@@ -3059,10 +3072,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 runs the test suite",
@@ -3273,10 +3287,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 runs node's test runner after a cd",
@@ -3487,10 +3502,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "no squad-recon spawn in the hook log",
@@ -3638,10 +3654,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "billed input one token over the budget",
@@ -3844,10 +3861,11 @@
      "cache_write": 100000,
      "cache_write_1h": 100000,
      "cache_read": 656000,
-     "output": 12000,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "output one token over the budget",
@@ -4053,7 +4071,8 @@
      "output": 12401,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 19601
   },
   {
    "note": "no main-session ledger line for this session",
@@ -4205,7 +4224,8 @@
      "output": 400,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 400
   },
   {
    "note": "an earlier running total written last does not hide the larger final one",
@@ -4354,7 +4374,7 @@
      "cache_write": 200000,
      "cache_write_1h": 200000,
      "cache_read": 600000,
-     "output": 12000,
+     "output": 5000,
      "entries": ""
     },
     {
@@ -4411,7 +4431,8 @@
      "output": 6800,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 prints a product source file with cat",
@@ -4622,10 +4643,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 prints part of a product source file with sed",
@@ -4836,10 +4858,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 searches src with grep -r",
@@ -5050,10 +5073,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 runs the tests through yarn's jest",
@@ -5264,10 +5288,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Stage 0 runs make test",
@@ -5478,10 +5503,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "Recon's spawn prompt adds the goal after the pointer lines",
@@ -5684,10 +5710,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "a spawn prompt over the pointer's 400 characters",
@@ -5890,10 +5917,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "squad-mech's Stage 1 archive spawn is not the pointer: no stage has written an entry yet, so it is no DELEGATE helper",
@@ -6096,10 +6124,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   },
   {
    "note": "squad-mech's closing archive after an upheld high-stakes review is not the pointer, although a DELEGATE helper ran earlier in the run",
@@ -6368,10 +6397,11 @@
      "cache_write": 90000,
      "cache_write_1h": 90000,
      "cache_read": 610000,
-     "output": 11800,
+     "output": 5000,
      "entries": ""
     }
-   ]
+   ],
+   "host_output": 12200
   }
  ]
 }

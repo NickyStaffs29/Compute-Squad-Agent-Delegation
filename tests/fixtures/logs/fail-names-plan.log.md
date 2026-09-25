@@ -2,6 +2,7 @@
 Timestamp: 2026-09-04T10:00:12Z
 Run: 2026-09-04-export-dry-run
 Attended: yes
+Audit: no
 Goal: Add a --dry-run flag to the export command that prints the files it would write and writes nothing.
 Acceptance criteria:
 - AC1: export --dry-run writes no file and exits 0.

@@ -15,7 +15,7 @@
     },
     {
       "file": "skills/compute-squad/references/resume.md",
-      "text": "If any is, spawn `squad-recon` to re-map those paths only, in a new attempt that names the earlier Recon attempt as the map for every other path, then `squad-pm` in PLAN mode for a complete new plan attempt, which needs its own grant unless the mode is `full`."
+      "text": "If any is, spawn `squad-recon` to re-read those paths and affected dependencies, then append a complete updated map, copying unchanged parts from its earlier entry; only the new entry governs, then `squad-pm` in PLAN mode for a complete new plan attempt, which needs its own grant unless the mode is `full`."
     },
     {
       "file": "skills/compute-squad/SKILL.md",

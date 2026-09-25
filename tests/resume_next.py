@@ -18,8 +18,6 @@ session sees besides the log, as a JSON object whose keys are all optional:
               Status's Base:, so the base has not moved)
     moved     the paths git diff --name-only <Base> HEAD lists
     dirty     the paths git status --porcelain lists
-    audit     true for an audit-grade run, whose Executor entry is followed
-              by the audit and its ## Audit Findings entry (default false)
     continuable
               true when this session spawned the agent that wrote the last
               entry and can still message it, so a BLOCKING DELEGATE: block
@@ -434,9 +432,22 @@ def heading_row(run, index):
         if kind == "grant":
             covers = field(entry, "Covers") or ""
             match = re.fullmatch(r"r([0-9]+), work order (\S+)", covers)
-            work_order = match.group(2) if match else run.work_order()
+            if not match or int(match.group(1)) != run.revision:
+                return f"await a grant for r{run.revision} {run.work_order()}, and stop", first, None
+            work_order = match.group(2)
             action, extra = run.run_executor(work_order)
             return "append the Status the grant implies, then " + action, first, extra
+        if kind == "resolution":
+            target = check_logs.resolution_target(run.entries, index)
+            if target is None:
+                return "stop: resolution names no pending blocker or held review", first, None
+            if target["heading"] == REVIEW:
+                action, extra = "run a new high-stakes review", None
+            elif base_heading(target["heading"]) == EXECUTOR:
+                action, extra = run.grant_rule(run.work_order())
+            else:
+                action, extra = "re-spawn " + stage_spawn(target["heading"]), None
+            return "append a Status preserving the current grant, then " + action, first, extra
         if kind == "plan-approved":
             return "append a Status awaiting a grant, and stop", first, None
         if kind in ("park", "abandon"):
@@ -461,7 +472,7 @@ def heading_row(run, index):
             action = "append a Status that awaits " + action[len("await "):]
         return action, first, extra
     if base == EXECUTOR:
-        if run.state.get("audit"):
+        if field(run.goal, "Audit") == "yes":
             return "run the audit procedure and append its ## Audit Findings entry", ROWS[6][0], None
         return "spawn squad-pm in ACCEPT mode", ROWS[6][0], None
     if base == AUDIT:
@@ -516,7 +527,7 @@ def new_run(lines):
 def next_action(lines, state=None):
     """Return (action, source): the next action and the step or row that gave it."""
     state = dict(state or {})
-    unknown = set(state) - {"request", "host", "handed", "head", "moved", "dirty", "audit", "continuable"}
+    unknown = set(state) - {"request", "host", "handed", "head", "moved", "dirty", "continuable"}
     if unknown:
         raise ProtocolError(f"unknown state keys {sorted(unknown)!r}")
     if state.get("request", "resume") == "new-goal":
@@ -524,6 +535,8 @@ def next_action(lines, state=None):
     run = Run(lines, state)
     if run.goal is None or run.status is None:
         return "ask the user: the log has no Goal or no Status entry", "step 1"
+    if field(run.goal, "Audit") not in ("yes", "no"):
+        return "ask the user: the locked Goal has no Audit intent; record a re-lock before resuming", "step 1"
     fails = [i for i, text in enumerate(run.lines) if FAIL_LINE.match(text)]
     if len(fails) >= 3:
         third = fails[2]
@@ -538,7 +551,9 @@ def next_action(lines, state=None):
         return f"stop: Next: hands this action to {hosts[0]}", "step 3"
     after = run.entries[run.status_at + 1:]
     if not after:
-        if re.search(r"\bsquad-executor", following):
+        if re.search(r"\bsquad-executor|^execute\b|^re-run Executor\b", following):
+            if not run.granted(run.work_order()):
+                return run.grant_rule(run.work_order())[0], "step 4: grant"
             action, extra = run.executor_spawn("perform Next: " + following, run.work_order())
             return action, extra or "step 4: perform Next"
         if run.mode() == "accept" or following.startswith("accept"):

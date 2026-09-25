@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T11:00:12Z
+Audit: no
 Run: 2026-09-01-avatar-size
 
 Goal: Store uploaded avatars at most 512 pixels on the long side.

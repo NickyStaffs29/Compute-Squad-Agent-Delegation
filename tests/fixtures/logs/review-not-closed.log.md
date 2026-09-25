@@ -2,6 +2,7 @@
 Timestamp: 2026-09-10T09:00:12Z
 Run: 2026-09-10-invoice-owner
 Attended: yes
+Audit: no
 Goal: Only the account that owns an invoice may download its PDF.
 Acceptance criteria:
 - AC1: GET /api/invoices/:id/pdf answers 404 to any account other than the invoice's owner.

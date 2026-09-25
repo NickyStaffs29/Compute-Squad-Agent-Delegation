@@ -104,6 +104,7 @@ After session 1 (`01-archive.md`) reports an archive path or an already-empty lo
 Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
 Run: <UTC date and a slug: lowercase letters, digits, hyphens>
 Attended: <yes|no>
+Audit: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
 - AC1: <concrete, verifiable item>
@@ -132,8 +133,8 @@ Stop: <where this invocation ends>
 ```markdown
 ## Decision
 Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
-Type: <grant | plan-approved | waiver | re-lock | park | abandon>
-Covers: <plan revision and work order, or criterion ID>
+Type: <grant | plan-approved | waiver | resolution | re-lock | park | abandon>
+Covers: <plan revision and work order, criterion ID, or pending heading and Timestamp>
 User's words: "<verbatim>"
 ```
 

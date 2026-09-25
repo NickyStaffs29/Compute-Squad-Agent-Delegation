@@ -52,11 +52,12 @@ the agent_id and agent_type of a subagent's call (a main-session call has
 neither), the tool, and the inputs the checks read, each string cut to 4,000
 characters (a spawn prompt keeps its full length in prompt_chars). It prints
 nothing and always exits 0, so it never blocks or changes a call. verify
---tools reads the file. Two checks rest on it (work order WO-3f): S8, the
+--tools reads the file. S3a checks fresh Recon reads on a moved base; S8, the
 reference run, holds the main session to SKILL.md's Stage 0 bound (no Read
 or Grep of tracked product source and no test or build command before the
-first squad-recon spawn) and its billed input and output, from the ledger's
-main-session line, to 756,000 and 12,400 tokens; S9 holds the audit to its
+first squad-recon spawn) and its billed input and output to 756,000 and
+12,400 tokens. Input uses the ledger's main-session line; output needs an
+authoritative host upper bound within the ceiling. S9 holds the audit to its
 skeptic cap (at most 10 skeptic spawns, the other findings UNREVIEWED in
 the ## Audit Findings entry). Check 8b runs the same rules over the cases in
 tests/fixtures/live/.
@@ -494,13 +495,14 @@ def covered_paths(word, cwd, repo, product, recursive):
     return []
 
 
-def bash_reads(command, cwd, repo, product):
+def bash_reads(command, cwd, repo, product, include_searches=True):
     """The product files a Bash command reads, heredoc bodies aside: a
     READ_PROGRAMS command's file arguments, a recursive search over a directory
     that holds product files (grep -r, rg, and git grep search the working
     directory when they name no path), an input redirection, or a git show
     <rev>:<path>. A cd earlier in the command moves where later paths
-    resolve. product holds repo-relative paths (product_source)."""
+    resolve. product holds repo-relative paths (product_source).
+    include_searches=False excludes caller lookups from S3a's fresh reads."""
     reached = []
     for kept, inputs in simple_commands(strip_heredocs(command)):
         for word in inputs:
@@ -520,6 +522,8 @@ def bash_reads(command, cwd, repo, product):
                         for p in covered_paths(arg.split(":", 1)[1], repo, repo, product, False)]
             continue
         search = program in SEARCH_PROGRAMS or (program == "git" and args[:1] == ["grep"])
+        if search and not include_searches:
+            continue
         if program == "git" and args[:1] == ["grep"]:
             args = args[1:]
         elif program not in READ_PROGRAMS:
@@ -682,16 +686,25 @@ def main_usage(records, session):
             "models": last.get("models") or "model unknown"}
 
 
-def budget_judgment(records, session):
+def budget_judgment(records, session, host_output=None):
     """S8's budget rule (WO-3f acceptance): the main session's billed input and
     output stay at or below MAIN_BUDGET_INPUT and MAIN_BUDGET_OUTPUT.
     Returns (ok, what it found)."""
     usage = main_usage(records, session)
     if usage is None:
         return False, f"{LEDGER} has no main-session line for session {session}"
-    ok = usage["billed"] <= MAIN_BUDGET_INPUT and usage["output"] <= MAIN_BUDGET_OUTPUT
-    return ok, (f"main session ({usage['models']}, {usage['calls']} calls): billed input {usage['billed']:,} against "
-                f"{MAIN_BUDGET_INPUT:,}, output {usage['output']:,} against {MAIN_BUDGET_OUTPUT:,}")
+    detail = (f"main session ({usage['models']}, {usage['calls']} calls): billed input {usage['billed']:,} against "
+              f"{MAIN_BUDGET_INPUT:,}, transcript output lower bound {usage['output']:,} against {MAIN_BUDGET_OUTPUT:,}")
+    if usage["billed"] > MAIN_BUDGET_INPUT or usage["output"] > MAIN_BUDGET_OUTPUT:
+        return False, detail + "; budget exceeded"
+    # modelUsage covers the entire call, subagents included. It is an upper
+    # bound on main output, never a main-only measurement. A small total can
+    # prove the ceiling; a larger/missing total leaves it unverified.
+    if host_output is None or host_output > MAIN_BUDGET_OUTPUT:
+        return False, detail + "; output budget unverified: no host upper bound within the ceiling"
+    if host_output < usage["output"]:
+        return False, detail + "; inconsistent host output total"
+    return True, detail + f"; host total output upper bound {host_output:,} proves the output ceiling"
 
 
 def audit_spawns(records):
@@ -767,7 +780,7 @@ def judge_case(check, fixture, case):
         product = product_source([os.path.relpath(p, folder) for p in tracked])
         ok_reads, reads = stage0_judgment(events, SEED_WORKTREE, product)
         ok_pointer, pointers = pointer_judgment(events)
-        ok_budget, budget = budget_judgment(case.get("ledger") or [], case.get("session"))
+        ok_budget, budget = budget_judgment(case.get("ledger") or [], case.get("session"), case.get("host_output"))
         return ok_reads and ok_pointer and ok_budget, f"{reads}; {pointers}; {budget}"
     if check == "s9":
         start = len(seed_text(fixture).rstrip("\n").splitlines()) + 2
@@ -1099,6 +1112,23 @@ def named_sources(ctx, entry):
     return sorted(p for p in files if p in text or os.path.basename(p) in text)
 
 
+def remap_reads(records, repo, product):
+    """S3a's changed store must be inspected; the unrelated IP limiter must
+    not be re-read. Caller searches remain allowed. This checks the known
+    fixture boundary, not arbitrary source dependency semantics."""
+    read = set()
+    for record in records:
+        if str(record.get("agent_type", "")).removeprefix(PLUGIN_PREFIX) != "squad-recon":
+            continue
+        given, cwd = record.get("tool_input") or {}, record.get("cwd") or repo
+        if record.get("tool_name") == "Read" and given.get("file_path"):
+            read.add(repo_path(given["file_path"], cwd, repo))
+        elif record.get("tool_name") == "Bash":
+            read.update(bash_reads(given.get("command") or "", cwd, repo, product, include_searches=False))
+    changed, unrelated = "src/server/db/store.js", "src/server/middleware/rateLimit.js"
+    return changed in read and unrelated not in read, f"Recon fresh reads: {sorted(read)}"
+
+
 def check_s3a(ctx, report, protocol):
     """S3a: commit B edits src/server/db/store.js, which the plan names."""
     expect_no_executor(ctx, report)
@@ -1111,10 +1141,14 @@ def check_s3a(ctx, report, protocol):
               "the new ## Recon entry re-maps src/server/db/store.js, the path commit B changed")
     seed = [e for e in entries_of(ctx.before_lines) if e["heading"] == "## Recon"]
     if recon and seed:
-        mapped, scoped = named_sources(ctx, seed[0]), named_sources(ctx, recon[-1])
-        report.ok(len(scoped) < len(mapped),
-                  f"the new ## Recon entry names fewer src/ files than the seed's full map ({len(mapped)}), so it "
-                  f"re-maps only what commit B moved", f"it names {scoped}")
+        mapped, updated = named_sources(ctx, seed[0]), named_sources(ctx, recon[-1])
+        report.ok(set(mapped) <= set(updated),
+                  "the new ## Recon entry retains the complete map, including unchanged paths",
+                  f"missing {sorted(set(mapped) - set(updated))}")
+    if expect_tool_log(ctx, report):
+        product = git(ctx.repo, "ls-files", "src").splitlines()
+        scoped, found = remap_reads(ctx.events, ctx.repo, product)
+        report.ok(scoped, "Recon inspects the changed store without re-reading the unrelated IP limiter", found)
     report.ok(new_plan_attempts(ctx) == ["2"], "the new plan is attempt 2, revision r2", f"got {new_plan_attempts(ctx)}")
     report.ok(not changed_during_call(ctx), "no product file changed during this call", ", ".join(changed_during_call(ctx)))
     expect_log_kept(ctx, report)
@@ -1358,11 +1392,14 @@ def check_s8(ctx, report, protocol):
                       "prompts and routing)", found)
         if ok:
             report.note(found)
-    ok, found = budget_judgment(ledger(ctx.repo), ctx.result.get("session_id"))
+    host_usage = list((ctx.result.get("modelUsage") or {}).values())
+    host_output = sum(int(m["outputTokens"]) for m in host_usage) if host_usage and all(
+        "outputTokens" in m for m in host_usage) else None
+    ok, found = budget_judgment(ledger(ctx.repo), ctx.result.get("session_id"), host_output)
     report.ok(ok, f"the main session stays within {MAIN_BUDGET_INPUT:,} billed input and {MAIN_BUDGET_OUTPUT:,} output "
-                  f"tokens (the ledger's main-session line)", found)
+                  f"tokens (input from ledger; output requires a host upper bound)", found)
     if ok:
-        report.note(found + "; the ledger's output can read low (the ledger check below notes any shortfall)")
+        report.note(found)
 
 
 def check_s9(ctx, report, protocol):

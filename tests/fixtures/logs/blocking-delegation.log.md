@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T09:00:12Z
+Audit: no
 Run: 2026-09-01-rename-source-id
 
 Goal: Rename the legacyId field to sourceId across the importer and its fixtures.

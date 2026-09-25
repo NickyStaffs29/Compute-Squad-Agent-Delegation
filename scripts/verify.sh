@@ -2644,7 +2644,7 @@ if sorted(live_rule_files) != sorted(LIVE_RULES + c + ".json" for c in live_rule
         or live_rule_checks != sorted(check_live.LOG_RULE_CHECKS):
     fail(f"{LIVE_RULES} holds exactly one <check>.json for each check whose rule reads the hook log or the ledger "
          f"({', '.join(check_live.LOG_RULE_CHECKS)}); found {live_rule_files!r}")
-LIVE_CASE_KEYS = {"note", "live", "events", "session", "ledger", "append"}
+LIVE_CASE_KEYS = {"note", "live", "events", "session", "ledger", "append", "host_output"}
 live_cases = 0
 with tempfile.TemporaryDirectory() as tmp:
     for check in live_rule_checks:
@@ -3234,8 +3234,8 @@ print(
 # 26). The command in SKILL.md's Hard rules, and the PM's form of it, run in
 # temp dirs under sh (and dash and bash where installed). On a plain log the
 # copy equals the log, the PM's form ends it with the Archive target: line it
-# printed, and the log is left empty. When a cmp shim that exits 1 stands in
-# for cmp, the command exits nonzero, the copy is written, and the log keeps
+# printed, and the log is left empty. When a shim corrupts the destination
+# then runs real cmp, the command exits nonzero, the copy is written, and the log keeps
 # its sha256, apart from the PM form's intent line: it clears only after cmp.
 # When a date shim makes the name collide
 # with an existing archive, or the archive directory cannot be written, the
@@ -3326,7 +3326,8 @@ with tempfile.TemporaryDirectory() as tmp:
     cmp_shim = os.path.join(tmp, "cmp-shim")
     os.makedirs(cmp_shim)
     with open(os.path.join(cmp_shim, "cmp"), "w", encoding="utf-8") as handle:
-        handle.write("#!/bin/sh\necho 'cmp shim: the copy differs' >&2\nexit 1\n")
+        handle.write("#!/bin/sh\nfor copy in compute-squad-archive/*.md; do printf '\\ncorrupted copy\\n' >> \"$copy\"; done\n"
+                     + "exec " + shlex.quote(shutil.which("cmp")) + ' "$@"\n')
     os.chmod(os.path.join(cmp_shim, "cmp"), 0o755)
     cmp_kept = 0
     collided = f"compute-squad-archive/COMPUTE_SQUAD_LOG_{FIXED_STAMP}_{sample_run}.md"
@@ -3347,7 +3348,7 @@ with tempfile.TemporaryDirectory() as tmp:
                 fail(f"{label}: the archive copy is not the log" + (" ending with its Archive target: line" if form == "PM" else ""))
             if os.path.getsize(os.path.join(root, "COMPUTE_SQUAD_LOG.md")) != 0:
                 fail(f"{label}: the active log is not empty after 'archived and cleared:'")
-            # A copy cmp does not verify, forced by a cmp shim that exits 1:
+            # A corrupted destination checked by real cmp: wrong operands must not pass.
             # the command exits nonzero and clears nothing. The log keeps its
             # sha256 (the PM form's Archive target: line apart), and the only
             # new file is the copy.
@@ -3374,7 +3375,7 @@ with tempfile.TemporaryDirectory() as tmp:
             before = tree_hashes(root)
             run = run_shell(shell, command, root, path_prefix=shim)
             archive_runs += 1
-            if run.returncode == 0 or "archived and cleared" in run.stdout or tree_hashes(root) != before:
+            if run.returncode == 0 or "archived and cleared" in run.stdout or not run.stderr.strip() or tree_hashes(root) != before:
                 fail(f"{label}: over an existing {collided} it must exit nonzero and change no file; it exited "
                      f"{run.returncode} and printed {run.stdout.strip()!r}")
             # An archive directory that cannot be written: a file stands in
@@ -4132,4 +4133,5 @@ else:
     print(f"PASS: check 9: {len(dated)} dated claims ({', '.join(w for w, _d in dated)}) are at most {LIMIT_DAYS} days old")
 PYEOF
 
+python3 tests/test_review_regressions.py
 echo "verify.sh: all checks passed"

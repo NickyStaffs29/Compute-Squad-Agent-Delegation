@@ -2,6 +2,7 @@
 Timestamp: 2026-09-12T14:02:10Z
 Run: 2026-09-12-billing-note
 Attended: yes
+Audit: no
 Goal: Add an annual-billing note under the plans table on the pricing page.
 Acceptance criteria:
 - AC1: public/index.html shows "Prices are per month, billed annually. Cancel any time." directly under the plans table.
