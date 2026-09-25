@@ -14,13 +14,25 @@ Claude agent markdown in agents/, this script writes:
 exits 1 on any difference. --parse-manifest PATH parses a manifest, prints it
 as JSON, and exits 1 on the first line the grammar does not allow.
 
---validate-catalog PATH [--strict] reads a Codex model catalog (the JSON that
-`codex debug models` prints) and checks every model and reasoning effort that
-codex/agents/*.toml and codex/profiles.toml pin against it. It exits 1 when a
-model is missing or retired or lacks the pinned effort, and warns when a model
-is superseded or retires within 30 days (a failure with --strict). A catalog
-it cannot read as that format is reported as not validated, never as a pass,
-and exits 0 (1 with --strict). codex/update.sh runs it before installing.
+--validate-catalog PATH [--strict] [--choices CHOICES] reads a Codex model
+catalog (the JSON that `codex debug models` prints) and checks every model and
+reasoning effort that codex/agents/*.toml and codex/profiles.toml pin against
+it; with --choices it checks the pins the effective build would carry instead.
+It exits 1 when a model is missing or retired or lacks the pinned effort, and
+warns when a model is superseded or retires within 30 days (a failure with
+--strict). A catalog it cannot read as that format is reported as not
+validated, never as a pass, and exits 0 (1 with --strict).
+
+The account's Codex model choices live outside the repository, in
+$CODEX_HOME/compute-squad/choices.conf, which codex/update.sh passes as
+CHOICES. models.conf stays the release default; a choice replaces each Codex
+rung's model and effort, never which rung a role sits on.
+--choose CATALOG CHOICES asks, on a terminal, which listed model and effort
+fills each tier, shows the result, and saves it only on a literal `yes`.
+--catalog-status CATALOG CHOICES prints current, changed, or unsaved.
+--render-codex OUTDIR CHOICES writes the effective Codex build into a new
+directory: a local marketplace holding the plugin payload, the agents, and the
+profile files. None of the three writes the repository.
 """
 
 from __future__ import annotations
@@ -28,10 +40,15 @@ from __future__ import annotations
 import collections
 import datetime
 import difflib
+import hashlib
 import json
+import os
 import pathlib
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "agents"
@@ -39,15 +56,31 @@ OUTPUT = ROOT / "codex" / "agents"
 MANIFEST = ROOT / "models.conf"
 VERSION = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
 
-# models.conf grammar: blank lines, '#' comment lines, one 'reviewed
-# YYYY-MM-DD' line before the first section, and the two sections below. A
-# '[name]' line opens a section and names its columns; every row in it is a
-# key plus exactly one field per column. Rungs are listed lowest first.
+# The grammar models.conf and choices.conf share: blank lines, '#' comment
+# lines, then each header line once, before the first section. A '[name]' line
+# opens a section and names its columns; every row in it is a key plus exactly
+# one field per column. Each grammar names its header lines (with the form of
+# their value), its sections, and which sections have the rungs as their keys.
+# Rungs are listed lowest first.
 RUNGS = ("bottom", "mid", "top")
-SECTION_COLUMNS = {
-    "rung": ("claude", "codex"),
-    "role": ("claude_rung", "codex_rung", "codex_effort"),
+HEADER_FORMS = {
+    "date": ("YYYY-MM-DD", r"[0-9]{4}-[0-9]{2}-[0-9]{2}"),
+    "sha256": ("<64 lowercase hex digits>", r"[0-9a-f]{64}"),
+    "effort": ("<effort>", r"[a-z][a-z0-9_-]*"),
 }
+MANIFEST_GRAMMAR = {
+    "headers": {"reviewed": "date"},
+    "sections": {"rung": ("claude", "codex"), "role": ("claude_rung", "codex_rung", "codex_effort")},
+    "rung_keyed": ("rung",),
+}
+CHOICES_GRAMMAR = {
+    "headers": {"chosen": "date", "catalog": "sha256", "main_effort": "effort"},
+    "sections": {"tier": ("codex", "codex_effort")},
+    "rung_keyed": ("tier",),
+}
+SECTION_COLUMNS = MANIFEST_GRAMMAR["sections"]
+# Columns whose value must be a rung.
+RUNG_COLUMNS = ("claude_rung", "codex_rung")
 # Roles with no agent file: the main session and the audit fan-out.
 EXTRA_ROLES = ("strategy", "finder", "skeptic")
 # Agent text names rungs; a model name there would go stale on a re-point.
@@ -80,7 +113,8 @@ LABELS = tuple(
 )
 
 # codex/profiles.toml: a fixed header, then one table per profile, each taking
-# its model and effort from one models.conf role. codex/update.sh reads it.
+# its model and effort from one models.conf role. It records the release
+# defaults; codex/update.sh writes each Codex home's profiles from its choices.
 PROFILE_HEADER = (
     "# Codex profile reference for Compute Squad.\n"
     "#\n"
@@ -134,14 +168,19 @@ MANUAL_STAGES = {
 ROUTING_BEGIN = "<!-- routing:begin -->"
 ROUTING_END = "<!-- routing:end -->"
 
-# --validate-catalog: the pinned (model, effort) pairs come from the files
-# codex/update.sh installs. A key = "value" line before an agent TOML's
+# --validate-catalog: the pinned (model, effort) pairs come from the release's
+# codex/agents/*.toml and codex/profiles.toml, or with --choices from the
+# effective build. A key = "value" line before an agent TOML's
 # developer_instructions, or inside a [profiles.<name>] table.
 PINNED_KEY = re.compile(r'^(model|model_reasoning_effort)\s*=\s*"([^"\\]*)"\s*$')
 RETIREMENT_WARNING_DAYS = 30
 SUPERSEDED = (
     "{model} is superseded by {target}; see Changing models in CONTRIBUTING.md. "
     "Do not apply the upgrade target as is: it can put two rungs on one model."
+)
+SUPERSEDED_CHOICE = (
+    "{model} is superseded by {target}; to choose again, run codex/update.sh --review-models. "
+    "Do not apply the upgrade target as is: it can put two tiers on one model."
 )
 
 
@@ -157,11 +196,12 @@ class ManifestError(BuildError):
     pass
 
 
-def parse_manifest(text: str, source: str = "models.conf") -> dict:
-    """Parse a manifest. Any line the grammar does not allow is an error,
-    never a default."""
-    reviewed = None
+def parse_grammar(text: str, source: str, grammar: dict) -> tuple[dict, dict]:
+    """Parse text in one grammar and return (headers, sections). Any line the
+    grammar does not allow is an error, never a default."""
+    headers: dict = {}
     sections: dict = {}
+    columns_of = grammar["sections"]
     current = None
     for number, raw in enumerate(text.splitlines(), 1):
         where = f"{source}:{number}"
@@ -171,33 +211,36 @@ def parse_manifest(text: str, source: str = "models.conf") -> dict:
         fields = line.split()
         if fields[0].startswith("["):
             name = fields[0][1:-1] if fields[0].endswith("]") else ""
-            if name not in SECTION_COLUMNS:
-                known = ", ".join(f"[{section}]" for section in SECTION_COLUMNS)
+            if name not in columns_of:
+                known = ", ".join(f"[{section}]" for section in columns_of)
                 raise ManifestError(f"{where}: unknown section {fields[0]!r}; the sections are {known}")
             if name in sections:
                 raise ManifestError(f"{where}: section [{name}] appears twice")
-            if tuple(fields[1:]) != SECTION_COLUMNS[name]:
+            if tuple(fields[1:]) != columns_of[name]:
                 raise ManifestError(
-                    f"{where}: [{name}] must name the columns {' '.join(SECTION_COLUMNS[name])}; "
+                    f"{where}: [{name}] must name the columns {' '.join(columns_of[name])}; "
                     f"found {' '.join(fields[1:]) or 'none'}"
                 )
             current = name
             sections[name] = {}
             continue
         if current is None:
-            if fields[0] != "reviewed":
+            key = fields[0]
+            if key not in grammar["headers"]:
                 raise ManifestError(f"{where}: {line!r} is outside a section")
-            if reviewed is not None:
-                raise ManifestError(f"{where}: a second 'reviewed' line")
-            if len(fields) != 2 or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", fields[1]):
-                raise ManifestError(f"{where}: expected 'reviewed YYYY-MM-DD'; found {line!r}")
-            try:
-                datetime.date.fromisoformat(fields[1])
-            except ValueError:
-                raise ManifestError(f"{where}: {fields[1]!r} is not a calendar date") from None
-            reviewed = fields[1]
+            if key in headers:
+                raise ManifestError(f"{where}: a second '{key}' line")
+            shown, pattern = HEADER_FORMS[grammar["headers"][key]]
+            if len(fields) != 2 or not re.fullmatch(pattern, fields[1]):
+                raise ManifestError(f"{where}: expected '{key} {shown}'; found {line!r}")
+            if grammar["headers"][key] == "date":
+                try:
+                    datetime.date.fromisoformat(fields[1])
+                except ValueError:
+                    raise ManifestError(f"{where}: {fields[1]!r} is not a calendar date") from None
+            headers[key] = fields[1]
             continue
-        columns = SECTION_COLUMNS[current]
+        columns = columns_of[current]
         if len(fields) != len(columns) + 1:
             raise ManifestError(
                 f"{where}: a [{current}] row has {len(columns) + 1} fields ({current} {' '.join(columns)}); "
@@ -207,30 +250,74 @@ def parse_manifest(text: str, source: str = "models.conf") -> dict:
         if key in sections[current]:
             raise ManifestError(f"{where}: [{current}] row {key!r} appears twice")
         row = dict(zip(columns, fields[1:]))
-        if current == "rung" and key not in RUNGS:
+        if current in grammar["rung_keyed"] and key not in RUNGS:
             raise ManifestError(f"{where}: unknown rung {key!r}; the rungs are {', '.join(RUNGS)}")
-        if current == "role":
-            for column in ("claude_rung", "codex_rung"):
-                if row[column] not in RUNGS:
-                    raise ManifestError(
-                        f"{where}: {key} has unknown {column} {row[column]!r}; the rungs are {', '.join(RUNGS)}"
-                    )
+        for column in RUNG_COLUMNS:
+            if column in row and row[column] not in RUNGS:
+                raise ManifestError(
+                    f"{where}: {key} has unknown {column} {row[column]!r}; the rungs are {', '.join(RUNGS)}"
+                )
         sections[current][key] = row
-    if reviewed is None:
-        raise ManifestError(f"{source}: no 'reviewed YYYY-MM-DD' line")
-    for name in SECTION_COLUMNS:
+    for key, form in grammar["headers"].items():
+        if key not in headers:
+            raise ManifestError(f"{source}: no '{key} {HEADER_FORMS[form][0]}' line")
+    for name in columns_of:
         if name not in sections:
             raise ManifestError(f"{source}: no [{name}] section")
         if not sections[name]:
             raise ManifestError(f"{source}: the [{name}] section has no rows")
-    for rung in RUNGS:
-        if rung not in sections["rung"]:
-            raise ManifestError(f"{source}: [rung] has no {rung!r} row")
+    for name in grammar["rung_keyed"]:
+        for rung in RUNGS:
+            if rung not in sections[name]:
+                raise ManifestError(f"{source}: [{name}] has no {rung!r} row")
+    return headers, sections
+
+
+def parse_manifest(text: str, source: str = "models.conf") -> dict:
+    """Parse models.conf, the release routing."""
+    headers, sections = parse_grammar(text, source, MANIFEST_GRAMMAR)
     return {
-        "reviewed": reviewed,
+        "reviewed": headers["reviewed"],
         "rungs": {rung: sections["rung"][rung] for rung in RUNGS},
         "roles": sections["role"],
     }
+
+
+def parse_choices(text: str, source: str) -> dict:
+    """Parse choices.conf, one Codex home's model and effort per tier. Each
+    tier needs its own model, so no two rungs collapse onto one."""
+    headers, sections = parse_grammar(text, source, CHOICES_GRAMMAR)
+    tiers = {rung: sections["tier"][rung] for rung in RUNGS}
+    models = [tiers[rung]["codex"] for rung in RUNGS]
+    if len(set(models)) != len(models):
+        raise ManifestError(
+            f"{source}: each tier needs its own model; bottom, mid, top are {', '.join(models)}"
+        )
+    return {**headers, "tiers": tiers}
+
+
+def load_choices(path: str) -> dict:
+    try:
+        text = pathlib.Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise ManifestError(f"cannot read the model choices {path}: {error}") from None
+    return parse_choices(text, path)
+
+
+def effective_manifest(release: dict, choices: dict) -> dict:
+    """The release manifest with each Codex rung's model, and each role's Codex
+    effort, taken from the choices: a role gets its Codex rung's tier effort,
+    and the main session (strategy) gets main_effort. Rungs, roles, and every
+    Claude column stay the release's."""
+    rungs = {rung: dict(row) for rung, row in release["rungs"].items()}
+    roles = {role: dict(row) for role, row in release["roles"].items()}
+    for rung in RUNGS:
+        rungs[rung]["codex"] = choices["tiers"][rung]["codex"]
+    for role, row in roles.items():
+        row["codex_effort"] = (
+            choices["main_effort"] if role == "strategy" else choices["tiers"][row["codex_rung"]]["codex_effort"]
+        )
+    return {**release, "rungs": rungs, "roles": roles, "chosen": choices["chosen"]}
 
 
 def load_manifest() -> dict:
@@ -334,8 +421,15 @@ def render_skill_block(manifest: dict) -> str:
     """The shared skill's routing block, which both hosts load at run time."""
     roles, rungs = manifest["roles"], manifest["rungs"]
     top_down = RUNGS[::-1]
+    if "chosen" in manifest:
+        source = (
+            f"Generated from `models.conf` (reviewed {manifest['reviewed']}), with the Codex IDs and efforts this "
+            f"Codex home chose on {manifest['chosen']}; change them with `codex/update.sh --review-models`, never here."
+        )
+    else:
+        source = f"Generated from `models.conf` (reviewed {manifest['reviewed']}); edit that file, never this block."
     lines = [
-        f"Generated from `models.conf` (reviewed {manifest['reviewed']}); edit that file, never this block.",
+        source,
         "Rungs (Claude alias, Codex ID): "
         + "; ".join(f"{rung} `{rungs[rung]['claude']}`, `{rungs[rung]['codex']}`" for rung in top_down)
         + ".",
@@ -464,9 +558,11 @@ def with_routing_block(relpath: str, text: str, block: str) -> str:
     return "\n".join(lines[:begins[0] + 1] + block.split("\n") + lines[ends[0]:])
 
 
-def build() -> dict[str, tuple[str, str]]:
-    """Return {path relative to the repo root: (content, label)} for every generated file."""
-    manifest = load_manifest()
+def build(manifest: dict | None = None) -> dict[str, tuple[str, str]]:
+    """Return {path relative to the repo root: (content, label)} for every
+    generated file, from models.conf or from the manifest given."""
+    if manifest is None:
+        manifest = load_manifest()
     generated: dict[str, tuple[str, str]] = {}
     bodies: dict[str, tuple[str, str]] = {}
     for source in sorted(SOURCE.glob("*.md")):
@@ -563,19 +659,21 @@ class CatalogFormatError(ValueError):
     """The catalog is not the JSON --validate-catalog knows how to read."""
 
 
-def pinned_pairs() -> dict:
+def pinned_pairs(texts: dict | None = None) -> dict:
     """Return {(model, effort): [where]} for every model and reasoning effort
-    pinned by codex/agents/*.toml and the tables of codex/profiles.toml."""
-    sources = sorted(OUTPUT.glob("*.toml"))
-    if not sources:
-        raise BuildError("codex/agents/ holds no *.toml; run python3 codex/build-agents.py")
-    sources.append(ROOT / "codex" / "profiles.toml")
+    pinned by codex/agents/*.toml and the tables of codex/profiles.toml: the
+    committed files, or texts ({relpath: content}) when given."""
+    if texts is None:
+        sources = sorted(OUTPUT.glob("*.toml"))
+        if not sources:
+            raise BuildError("codex/agents/ holds no *.toml; run python3 codex/build-agents.py")
+        sources.append(ROOT / "codex" / "profiles.toml")
+        texts = {path.relative_to(ROOT).as_posix(): path.read_text(encoding="utf-8") for path in sources}
     pairs: dict = {}
-    for path in sources:
-        relpath = path.relative_to(ROOT).as_posix()
+    for relpath, text in texts.items():
         tables: dict = {}
         table = ""
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in text.splitlines():
             line = line.strip()
             if line.startswith("developer_instructions"):
                 break
@@ -654,10 +752,26 @@ def load_catalog(text: str, pinned: list) -> dict:
     return catalog
 
 
-def validate_catalog(path: str, strict: bool) -> int:
-    """Check every pinned model and effort against a Codex model catalog."""
+def effective_pin_texts(manifest: dict) -> dict:
+    """The agent TOMLs and profiles the effective build would carry, keyed by
+    what a message should name: the agent, or the profiles."""
+    texts = {}
+    for relpath, (content, _label) in build(manifest).items():
+        if relpath.startswith("codex/agents/"):
+            texts[f"your choices for {pathlib.PurePosixPath(relpath).stem}"] = content
+        elif relpath == "codex/profiles.toml":
+            texts["your choices for the profiles"] = content
+    return texts
+
+
+def validate_catalog(path: str, strict: bool, choices: str | None = None) -> int:
+    """Check every pinned model and effort against a Codex model catalog: the
+    committed pins, or with choices the pins the effective build would carry."""
     prefix = "--validate-catalog:"
-    pairs = pinned_pairs()
+    if choices:
+        pairs = pinned_pairs(effective_pin_texts(effective_manifest(load_manifest(), load_choices(choices))))
+    else:
+        pairs = pinned_pairs()
     pinned = sorted({model for model, _effort in pairs})
     try:
         text = pathlib.Path(path).read_text(encoding="utf-8")
@@ -671,6 +785,27 @@ def validate_catalog(path: str, strict: bool) -> int:
         print(f"{prefix} {level}: catalog format not recognized; models were not validated ({error})", file=sys.stderr)
         return 1 if strict else 0
 
+    failures, warnings = check_pins(catalog, pairs, strict, SUPERSEDED_CHOICE if choices else SUPERSEDED)
+    for message in warnings:
+        print(f"{prefix} WARN: {message}", file=sys.stderr)
+    for message in failures:
+        print(f"{prefix} FAIL: {message}", file=sys.stderr)
+    if failures:
+        listed = sorted(slug for slug, entry in catalog.items() if entry["visibility"] == "list")
+        print(f"{prefix} the catalog lists: {', '.join(listed) or 'no models'}", file=sys.stderr)
+        return 1
+    pins = sum(len(ws) for ws in pairs.values())
+    print(
+        f"{prefix} {pins} pins name {len(pinned)} models; each is in the catalog, is not retired, and supports "
+        f"its pinned reasoning effort ({len(warnings)} warnings)"
+    )
+    return 0
+
+
+def check_pins(catalog: dict, pairs: dict, strict: bool, superseded: str = SUPERSEDED) -> tuple[list, list]:
+    """Return (failures, warnings) for pinned (model, effort) pairs against a
+    catalog load_catalog has checked for those models."""
+    pinned = sorted({model for model, _effort in pairs})
     now = datetime.datetime.now(datetime.timezone.utc)
     failures, warnings = [], []
     for model in pinned:
@@ -698,37 +833,375 @@ def validate_catalog(path: str, strict: bool) -> int:
                 soon = f"{model} retires at {upgrade['retirement_at']}, within {RETIREMENT_WARNING_DAYS} days; {pinned_in}"
                 (failures if strict else warnings).append(soon)
         if upgrade["model"]:
-            warnings.append(SUPERSEDED.format(model=model, target=upgrade["model"]))
+            warnings.append(superseded.format(model=model, target=upgrade["model"]))
+    return failures, warnings
 
+
+def read_catalog(path: str) -> tuple[str, dict]:
+    """Return (text, {slug: entry}) from a catalog file. Only each entry's
+    slug and visibility are required here; the chooser and the fingerprint
+    read the rest through efforts_of and upgrade_of, so one odd entry never
+    blocks a choice between the others."""
+    try:
+        text = pathlib.Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise CatalogFormatError(f"cannot read the catalog {path}: {error}") from None
+    return text, load_catalog(text, [])
+
+
+def efforts_of(entry: dict) -> list:
+    """The efforts a catalog entry supports; none when it lists none."""
+    levels = entry.get("supported_reasoning_levels")
+    if not isinstance(levels, list):
+        return []
+    return [level["effort"] for level in levels if isinstance(level, dict) and isinstance(level.get("effort"), str)]
+
+
+def upgrade_of(entry: dict) -> dict:
+    """A catalog entry's upgrade object; empty when it has none."""
+    upgrade = entry.get("upgrade")
+    return upgrade if isinstance(upgrade, dict) else {}
+
+
+def catalog_fingerprint(catalog: dict) -> str:
+    """SHA-256 over what a choice depends on: each listed model's slug, its
+    efforts, its upgrade target, and its retirement, sorted by slug. Catalog
+    order and other metadata do not change it; a newly listed model does."""
+    reduced = []
+    for slug in sorted(s for s, entry in catalog.items() if entry["visibility"] == "list"):
+        upgrade = upgrade_of(catalog[slug])
+        reduced.append({
+            "slug": slug,
+            "efforts": sorted(efforts_of(catalog[slug])),
+            "upgrade": upgrade.get("model"),
+            "retirement": upgrade.get("retirement_at"),
+        })
+    return hashlib.sha256(json.dumps(reduced, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def release_choices(release: dict) -> dict:
+    """The release pins in choices form, shown as the defaults on first setup:
+    each tier's Codex model and the effort of the first role on that Codex
+    rung, and the main session's effort."""
+    tiers = {}
+    for rung in RUNGS:
+        efforts = [
+            row["codex_effort"] for role, row in release["roles"].items()
+            if role != "strategy" and row["codex_rung"] == rung
+        ]
+        if not efforts:
+            raise ManifestError(f"models.conf: no role besides strategy is on the Codex {rung} rung")
+        tiers[rung] = {"codex": release["rungs"][rung]["codex"], "codex_effort": efforts[0]}
+    return {"main_effort": release["roles"]["strategy"]["codex_effort"], "tiers": tiers}
+
+
+def render_choices(choices: dict) -> str:
+    width = max(len("codex"), *(len(choices["tiers"][rung]["codex"]) for rung in RUNGS)) + 2
+    rows = [f"{'[tier]':<9}{'codex':<{width}}codex_effort"]
+    rows += [
+        f"{rung:<9}{choices['tiers'][rung]['codex']:<{width}}{choices['tiers'][rung]['codex_effort']}"
+        for rung in RUNGS[::-1]
+    ]
+    return (
+        "# Compute Squad: Codex model choices for this Codex home.\n"
+        "# Written by `bash codex/update.sh --review-models`; rerun it to change them.\n"
+        f"chosen {choices['chosen']}\n"
+        f"catalog {choices['catalog']}\n"
+        f"main_effort {choices['main_effort']}\n"
+        "\n" + "\n".join(rows) + "\n"
+    )
+
+
+def write_choices(path: str, choices: dict) -> None:
+    """Write the choices through a temp file in the same directory, so a
+    reader never sees a partial file."""
+    text = render_choices(choices)
+    parse_choices(text, path)
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    fd, temp = tempfile.mkstemp(prefix=".choices.", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp, path)
+    except BaseException:
+        if os.path.exists(temp):
+            os.unlink(temp)
+        raise
+
+
+class Cancelled(Exception):
+    pass
+
+
+def ask(prompt: str) -> str:
+    print(prompt, end="", flush=True)
+    line = sys.stdin.readline()
+    if not line:
+        raise Cancelled
+    return line.strip()
+
+
+def choose(catalog_path: str, choices_path: str) -> int:
+    """Ask which listed model and effort fills each Codex tier, then the main
+    session's effort; save only on a literal `yes`. It never picks, ranks, or
+    substitutes a model."""
+    prefix = "--choose:"
+    if not os.isatty(0):
+        print(f"{prefix} needs a terminal; run `bash codex/update.sh --review-models` in one", file=sys.stderr)
+        return 2
+    try:
+        text, catalog = read_catalog(catalog_path)
+        release = load_manifest()
+        defaults = release_choices(release)
+    except (CatalogFormatError, BuildError) as error:
+        print(f"{prefix} FAIL: {error}; nothing changed", file=sys.stderr)
+        return 1
+    saved = None
+    if os.path.exists(choices_path):
+        try:
+            saved = load_choices(choices_path)
+        except ManifestError as error:
+            print(f"Your saved choices cannot be read ({error}); showing the release defaults. "
+                  f"Saving replaces {choices_path}.")
+    current = saved or defaults
+    source = "saved" if saved else "release default"
+    now = datetime.datetime.now(datetime.timezone.utc)
+    main_rung = release["roles"]["strategy"]["codex_rung"]
+
+    def retired_at(entry: dict):
+        at = upgrade_of(entry).get("retirement_at")
+        try:
+            return at if at is not None and parse_catalog_time(at) <= now else None
+        except CatalogFormatError:
+            return None
+
+    print("Codex models your account's catalog lists (listing is availability, not a recommendation):")
+    for slug in sorted(s for s, entry in catalog.items() if entry["visibility"] == "list"):
+        entry = catalog[slug]
+        upgrade = upgrade_of(entry)
+        facts = [f"efforts {', '.join(efforts_of(entry)) or 'none'}"]
+        if upgrade.get("model"):
+            facts.append(f"superseded by {upgrade['model']}")
+        if upgrade.get("retirement_at"):
+            facts.append(f"{'retired' if retired_at(entry) else 'retires'} at {upgrade['retirement_at']}")
+        print(f"  {slug}: {'; '.join(facts)}")
+    print("Press Enter to keep the value in brackets.")
+
+    def reject(reason: str) -> None:
+        print(f"  rejected: {reason}; choose again")
+
+    try:
+        tiers: dict = {}
+        for rung in RUNGS[::-1]:
+            shown = current["tiers"][rung]
+            while True:
+                model = ask(f"{rung} tier model [{shown['codex']}, {source}]: ") or shown["codex"]
+                entry = catalog.get(model)
+                taken = [other for other, row in tiers.items() if row["codex"] == model]
+                if entry is None:
+                    reject(f"{model} is not in this account's model catalog")
+                elif entry["visibility"] != "list":
+                    reject(f"{model} is hidden in the catalog (visibility {entry['visibility']})")
+                elif retired_at(entry):
+                    reject(f"{model} was retired at {retired_at(entry)}")
+                elif not efforts_of(entry):
+                    reject(f"the catalog lists no reasoning efforts for {model}")
+                elif taken:
+                    reject(f"{model} is already the {taken[0]} tier's model; each tier needs its own model")
+                else:
+                    break
+            supported = efforts_of(entry)
+            while True:
+                effort = ask(
+                    f"{rung} tier reasoning effort for {model} (it supports {', '.join(supported)}) "
+                    f"[{shown['codex_effort']}, {source}]: "
+                ) or shown["codex_effort"]
+                if effort in supported:
+                    break
+                reject(f"{model} does not support reasoning effort {effort!r}")
+            tiers[rung] = {"codex": model, "codex_effort": effort}
+        main_model = tiers[main_rung]["codex"]
+        supported = efforts_of(catalog[main_model])
+        while True:
+            main_effort = ask(
+                f"main session reasoning effort on {main_model} (it supports {', '.join(supported)}) "
+                f"[{current['main_effort']}, {source}]: "
+            ) or current["main_effort"]
+            if main_effort in supported:
+                break
+            reject(f"{main_model} does not support reasoning effort {main_effort!r}")
+
+        chosen = {
+            "chosen": now.date().isoformat(),
+            "catalog": catalog_fingerprint(catalog),
+            "main_effort": main_effort,
+            "tiers": tiers,
+        }
+        manifest = effective_manifest(release, chosen)
+        print("\nResulting Codex routing (the release's rungs, your models and efforts):")
+        for label in LABELS:
+            rung = manifest["roles"][label.role]["codex_rung"]
+            print(
+                f"  {label.role:<27}{rung:<8}{manifest['rungs'][rung]['codex']:<24}"
+                f"{manifest['roles'][label.role]['codex_effort']}"
+            )
+        print("Profiles:")
+        for profile, role in PROFILES:
+            print(
+                f"  {profile:<27}{model_of(manifest, role, 'codex'):<24}{manifest['roles'][role]['codex_effort']}"
+            )
+        print(f"Changes against the {'saved choices' if saved else 'release defaults'}:")
+        for rung in RUNGS[::-1]:
+            before = f"{current['tiers'][rung]['codex']} {current['tiers'][rung]['codex_effort']}"
+            after = f"{tiers[rung]['codex']} {tiers[rung]['codex_effort']}"
+            print(f"  {rung}: {'unchanged (' + after + ')' if before == after else before + ' -> ' + after}")
+        if current["main_effort"] == main_effort:
+            print(f"  main session effort: unchanged ({main_effort})")
+        else:
+            print(f"  main session effort: {current['main_effort']} -> {main_effort}")
+        if ask("Type yes to save these choices: ") != "yes":
+            raise Cancelled
+    except (Cancelled, KeyboardInterrupt):
+        print("\ncancelled; nothing changed")
+        return 1
+
+    pairs = pinned_pairs(effective_pin_texts(manifest))
+    try:
+        load_catalog(text, sorted({model for model, _effort in pairs}))
+    except CatalogFormatError as error:
+        print(f"{prefix} FAIL: the catalog entry for a chosen model is not in a form this script reads ({error}); "
+              "not saved; nothing changed", file=sys.stderr)
+        return 1
+    failures, warnings = check_pins(catalog, pairs, strict=False, superseded=SUPERSEDED_CHOICE)
     for message in warnings:
         print(f"{prefix} WARN: {message}", file=sys.stderr)
-    for message in failures:
-        print(f"{prefix} FAIL: {message}", file=sys.stderr)
     if failures:
-        listed = sorted(slug for slug, entry in catalog.items() if entry["visibility"] == "list")
-        print(f"{prefix} the catalog lists: {', '.join(listed) or 'no models'}", file=sys.stderr)
+        for message in failures:
+            print(f"{prefix} FAIL: {message}", file=sys.stderr)
+        print(f"{prefix} not saved; nothing changed", file=sys.stderr)
         return 1
-    pins = sum(len(ws) for ws in pairs.values())
-    print(
-        f"{prefix} {pins} pins name {len(pinned)} models; each is in the catalog, is not retired, and supports "
-        f"its pinned reasoning effort ({len(warnings)} warnings)"
-    )
+    write_choices(choices_path, chosen)
+    print(f"saved {choices_path}")
     return 0
 
 
-USAGE = "usage: build-agents.py [--check | --parse-manifest PATH | --validate-catalog PATH [--strict]]"
+def catalog_status(catalog_path: str, choices_path: str) -> int:
+    """Print unsaved, current, changed, or unknown (a catalog this script
+    cannot read). Writes nothing."""
+    if not os.path.exists(choices_path):
+        print("unsaved")
+        return 0
+    choices = load_choices(choices_path)
+    try:
+        fingerprint = catalog_fingerprint(read_catalog(catalog_path)[1])
+    except CatalogFormatError:
+        print("unknown")
+        return 0
+    print("current" if fingerprint == choices["catalog"] else "changed")
+    return 0
+
+
+def render_codex(outdir: str, choices_path: str) -> int:
+    """Write the effective Codex build into a new directory: a local
+    marketplace (compute-squad-local) whose plugin is this checkout's tracked
+    .codex-plugin/ and skills/ files, with the skill's routing block rendered
+    from the effective models; the seven agent TOMLs; and the four profile
+    files. Every file comes from one render of one manifest."""
+    out = pathlib.Path(outdir)
+    if out.exists():
+        raise BuildError(f"{outdir} already exists; --render-codex writes a new directory")
+    choices = load_choices(choices_path)
+    manifest = effective_manifest(load_manifest(), choices)
+    generated = build(manifest)
+    git = os.environ.get("GIT_BIN") or "git"
+    try:
+        listing = subprocess.run(
+            [git, "-C", str(ROOT), "ls-files", "-z", "--", ".codex-plugin", "skills"],
+            capture_output=True, check=True,
+        ).stdout.decode("utf-8")
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise BuildError(f"cannot list the plugin's tracked files with {git}: {error}") from None
+    payload = sorted(path for path in listing.split("\0") if path)
+    if ".codex-plugin/plugin.json" not in payload or "skills/compute-squad/SKILL.md" not in payload:
+        raise BuildError(f"{git} ls-files did not list .codex-plugin/plugin.json and skills/compute-squad/SKILL.md")
+
+    plugin = out / "plugins" / "compute-squad"
+    for relpath in payload:
+        dest = plugin / relpath
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if relpath in generated:
+            dest.write_text(generated[relpath][0], encoding="utf-8")
+        else:
+            shutil.copyfile(ROOT / relpath, dest)
+        shutil.copymode(ROOT / relpath, dest)
+    release_market = json.loads((ROOT / ".agents" / "plugins" / "marketplace.json").read_text(encoding="utf-8"))
+    entry = release_market["plugins"][0]
+    marketplace = {
+        "name": "compute-squad-local",
+        "interface": {"displayName": "Compute Squad (local build)"},
+        "plugins": [{
+            "name": entry["name"],
+            "source": {"source": "local", "path": "./plugins/compute-squad"},
+            "policy": entry["policy"],
+            "category": entry["category"],
+        }],
+    }
+    (out / ".agents" / "plugins").mkdir(parents=True)
+    (out / ".agents" / "plugins" / "marketplace.json").write_text(json.dumps(marketplace, indent=2) + "\n", encoding="utf-8")
+    (out / "agents").mkdir()
+    for relpath, (content, _label) in generated.items():
+        if relpath.startswith("codex/agents/"):
+            (out / "agents" / pathlib.PurePosixPath(relpath).name).write_text(content, encoding="utf-8")
+    (out / "profiles").mkdir()
+    for profile, role in PROFILES:
+        (out / "profiles" / f"{profile}.config.toml").write_text(
+            f"model = {toml_string(model_of(manifest, role, 'codex'))}\n"
+            f"model_reasoning_effort = {toml_string(manifest['roles'][role]['codex_effort'])}\n",
+            encoding="utf-8",
+        )
+    tiers = "; ".join(
+        f"{rung} {choices['tiers'][rung]['codex']} {choices['tiers'][rung]['codex_effort']}" for rung in RUNGS[::-1]
+    )
+    print(f"{tiers}; main session effort {choices['main_effort']}")
+    return 0
+
+
+USAGE = (
+    "usage: build-agents.py [--check | --parse-manifest PATH | --validate-catalog PATH [--strict] [--choices CHOICES]"
+    " | --choose CATALOG CHOICES | --catalog-status CATALOG CHOICES | --render-codex OUTDIR CHOICES]"
+)
 
 
 def main(args: list) -> int:
     if args[:1] == ["--validate-catalog"]:
-        if len(args) not in (2, 3) or args[2:] not in ([], ["--strict"]):
+        options = args[2:]
+        strict = options[:1] == ["--strict"]
+        if strict:
+            options = options[1:]
+        choices = None
+        if len(options) == 2 and options[0] == "--choices":
+            choices, options = options[1], []
+        if len(args) < 2 or options:
             print(USAGE, file=sys.stderr)
             return 2
         try:
-            return validate_catalog(args[1], strict=args[2:] == ["--strict"])
+            return validate_catalog(args[1], strict=strict, choices=choices)
         except BuildError as error:
             print(f"FAIL: {error}", file=sys.stderr)
             return 1
+    for flag, run in (("--choose", choose), ("--catalog-status", catalog_status), ("--render-codex", render_codex)):
+        if args[:1] == [flag]:
+            if len(args) != 3:
+                print(USAGE, file=sys.stderr)
+                return 2
+            try:
+                return run(args[1], args[2])
+            except (BuildError, CatalogFormatError, OSError) as error:
+                print(f"{flag}: FAIL: {error}", file=sys.stderr)
+                return 1
     if args[:1] == ["--parse-manifest"]:
         if len(args) != 2:
             print(USAGE, file=sys.stderr)

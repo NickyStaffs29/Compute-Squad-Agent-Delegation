@@ -54,11 +54,18 @@ scenarios themselves spend model tokens, so run them by hand before a release.
 
 Routing names models in one file, `models.conf`. Protocol text names rungs (top, mid, bottom) and never a model; `scripts/verify.sh` check 7l enforces that.
 
+Codex models change in two places, and only one is in this repository:
+
+- **Release defaults.** The Codex column of `models.conf` is what a release ships and what the chooser shows on a Codex home's first setup. Change it with the steps below.
+- **Account choices.** Each Codex home picks its own model and reasoning effort per tier with `bash codex/update.sh --review-models`, saved in `$CODEX_HOME/compute-squad/choices.conf`. A choice never touches the repository, and a release that changes `models.conf` changes no one's saved choices. It replaces each rung's Codex model and effort, never which rung a role sits on, so check 6's rung policy still holds, and the chooser keeps the three tiers on three different models.
+
+To change the release defaults:
+
 1. On an account that will run the squad, list what resolves. Codex: `codex debug models`, reading each model's slug, visibility, upgrade and retirement fields. Claude Code: `claude -p --model <alias> --output-format json "Reply ok"`, reading the model ID under `modelUsage`.
 2. Assign rungs by capability, not by name. A family name can change rungs between generations: Sol was the top Codex rung in generation 5.6 and is the mid rung in generation 6. Never apply a catalog upgrade target as is; it can put two rungs on one model.
 3. Edit the `[rung]` lines in `models.conf`, confirm each Codex effort is in the model's supported levels, and set `reviewed` to today.
 4. If a Codex model is new, raise the CLI floor in `README.md` and `codex/README.md` to the first release whose `codex debug models --bundled` lists it.
 5. Run `python3 codex/build-agents.py`, `bash scripts/build-plugin.sh`, then `bash scripts/verify.sh`.
-6. Run `codex/update.sh` on a logged-in machine, then one `codex exec -m <id> -c model_reasoning_effort=<effort> "Reply ok"` per distinct model and effort pair.
+6. Commit, because the updater installs only from a clean checkout. Then, on a logged-in machine, run `codex/update.sh --review-models` and type the new defaults for each tier (once choices are saved, Enter keeps those, not the release defaults), then run one `codex exec -m <id> -c model_reasoning_effort=<effort> "Reply ok"` per distinct model and effort pair.
 7. Run one live squad run per host and compare the model ID on each stage entry's `Agent:` line with `models.conf`.
 8. Bump the version and name the old and new models in `CHANGELOG.md`.
