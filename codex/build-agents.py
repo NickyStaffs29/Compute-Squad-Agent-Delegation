@@ -118,7 +118,7 @@ ACCEPT_HEADING = "## ACCEPT mode"
 # roles whose models the operator picks from, each with a label prefix.
 MANUAL_STAGES = {
     "01-archive.md": ("Archive the prior log", (("", "squad-mech"),)),
-    "02-recon.md": ("Read-only codebase mapping", (("", "squad-recon"),)),
+    "02-recon.md": ("Codebase mapping and baseline check", (("", "squad-recon"),)),
     "03-pm-plan.md": ("Spec + task breakdown, no code", (("", "squad-pm"),)),
     "04-execute.md": (
         "Implementation, exactly per plan",

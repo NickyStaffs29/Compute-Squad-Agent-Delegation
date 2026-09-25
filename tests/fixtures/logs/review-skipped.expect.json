@@ -1,0 +1,26 @@
+{
+  "note": "Finding 3's 8a rule: after a high-stakes PASS the next entry other than a Status or Decision is a ## High-stakes review. Here WO-1's high-stakes PASS goes straight on to WO-2 with no review.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Run this in the main session on every high-stakes PASS; never delegate it."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "In a high-stakes run that Status follows an upheld review of this PASS"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "review-after-pass"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    }
+  ]
+}

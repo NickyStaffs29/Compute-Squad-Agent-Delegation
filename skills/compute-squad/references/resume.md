@@ -19,11 +19,14 @@ Read this before any spawn when `COMPUTE_SQUAD_LOG.md` is non-empty at invocatio
 | `## Executor` | In an audit-grade run, run the audit first. Then spawn `squad-pm` in ACCEPT mode. |
 | `## PM — Accept (pending)` | Resolve its `DELEGATE:` block or `needs-human:` question, then spawn `squad-pm` in ACCEPT mode for the verdict. |
 | `## PM — FAIL` | Re-run the stage on its `Rerun:` line at the rung the escalation rules give, then every later stage. |
-| `## PM — PASS` in a high-stakes run | Run the main-session high-stakes review (Stage 5). Never spawn ACCEPT again for this verdict. Then, if the governing plan has work orders after this one, append a `## Status` naming the next one and apply the grant rule; otherwise close the run with the archive command. |
+| `## PM — PASS` in a high-stakes run | Run the high-stakes review procedure (Stage 5) before anything else. Never spawn ACCEPT again for this verdict. |
 | `## PM — PASS` in any other run | If the governing plan has work orders after this one, append a `## Status` naming the next one and apply the grant rule. Otherwise the PM's archive or clear did not finish: hand back to the user. |
+| `## High-stakes review` reading `Result: upheld` | If the governing plan has work orders after the one its PASS accepted, append a `## Status` naming the next one and apply the grant rule. Otherwise spawn `squad-mech` to close the run. |
+| `## High-stakes review` reading `Result: held` | Put its open items to the user, record each answer as a `## Decision`, then run a new review. An unattended run stops. |
+| `## High-stakes review` reading `Result: overturned` | It counts as a FAIL: re-run the stage on its `Rerun:` line at the rung the escalation rules give, then every later stage. |
 
 A run is high-stakes once any line in the log reads `High-stakes: yes` (Hard rules).
 
-Tree check: run `git status --porcelain`. A listed path other than `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` that no `## Executor` entry of this run names means a stage edited files without logging. Show those paths to the user and stop. Never spawn an executor on edits no entry explains.
+Tree check: run `git status --porcelain`. A listed path other than `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` that no `Files changed:` line of this run names, and that no `## Recon` baseline line of this run names after `tree changed:`, means a stage edited files without logging. Show those paths to the user and stop. Never spawn an executor on edits no entry explains.
 
 Base check, when `Base:` names a commit that differs from `git rev-parse HEAD`: run `git diff --name-only <Base> HEAD`. If no listed path is in the governing plan's must-NOT-change list or among the files and tests of the work order about to run, append a `## Status` with the new `Base:` and continue. If any is, spawn `squad-recon` to re-map those paths only, in a new attempt that names the earlier Recon attempt as the map for every other path, then `squad-pm` in PLAN mode for a complete new plan attempt, which needs its own grant unless the mode is `full`.

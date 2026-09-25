@@ -1,0 +1,22 @@
+{
+  "note": "Finding 3's 8a rule: only a ## Status follows an upheld review of the last work order, then squad-mech's closing archive. Here a Decision follows it instead.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "On `upheld`, spawn `squad-mech` to close the run: its archive command copies the log, now ending with your review and that Status, verifies the copy with `cmp`, and clears the active log."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "review-close"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "closed: a new goal starts at Stage 1",
+      "via": "step 3"
+    }
+  ]
+}

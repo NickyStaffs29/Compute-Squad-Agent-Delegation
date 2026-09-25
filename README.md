@@ -158,7 +158,7 @@ entries can be short, but the discipline can't.
   gaps with you, locks the goal and acceptance criteria into the log's `## Goal — Locked` entry.
 - **Stage 1 — Archive**, `squad-mech`: starts every run from a clean log. Failed runs are never
   discarded. They are evidence.
-- **Stage 2 — Recon**, `squad-recon`: maps the codebase read-only.
+- **Stage 2 — Recon**, `squad-recon`: maps the codebase and checks the evidence prerequisites.
 - **Stage 3 — Plan**, `squad-pm` (PLAN mode): turns the map into a spec and classifies the work.
 - **Stage 4 — Execute**, the executor the classification routes to: implements exactly what the plan
   says.
@@ -176,7 +176,7 @@ A complete worked run with every log entry format is in [`docs/example-log.md`](
 A run creates two things in your project root:
 
 - `COMPUTE_SQUAD_LOG.md`, the active log every stage appends to.
-- `compute-squad-archive/`, copies of past runs named by UTC time and run ID. The log is archived before a new run starts and again on PASS, and an existing archive is never overwritten, so a failed run is never lost.
+- `compute-squad-archive/`, copies of past runs named by UTC time and run ID. The log is archived before a new run starts and again on PASS, or, on a high-stakes change, after an upheld high-stakes review, and an existing archive is never overwritten, so a failed run is never lost.
   - `compute-squad-archive/usage.jsonl` (Claude Code only): one line per stage with its model, elapsed time and tokens, written by a plugin hook and never cleared.
 
 Both are run state, not source. Add them to your `.gitignore` unless you specifically want run history in version control:
@@ -192,7 +192,7 @@ A first run in a project with no log file is normal. Stage 1 creates it empty an
 
 ### squad-recon (mid rung, read-only)
 
-The mapper. Given a locked goal, it sweeps the codebase and pins down exactly what the change touches: files, functions, line ranges, call sites, tests, migrations, config, and the invariants that must survive (auth boundaries, privacy rules, logging hygiene). It reads whole subsystems rather than fragments. It writes nothing except its log entry.
+The mapper. Given a locked goal, it sweeps the codebase and pins down exactly what the change touches: files, functions, line ranges, call sites, tests, migrations, config, and the invariants that must survive (auth boundaries, privacy rules, logging hygiene). It reads whole subsystems rather than fragments. It changes nothing except its log entry. Its one command beyond inspection is a single baseline run of the test or verify command, whose result opens its entry.
 
 Its standard: the PM should never have to guess. Ambiguity Recon cannot resolve gets named explicitly in its entry, so the plan resolves it on purpose instead of by accident. A goal that cannot be met as written stops as a `needs-human:` blocker.
 
@@ -200,9 +200,9 @@ Its standard: the PM should never have to guess. Ambiguity Recon cannot resolve 
 
 The project manager. Plans work, accepts deliverables, never writes product code. One agent, two invocations per run.
 
-**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-mechanical`, COMPLEX routes it to `squad-executor-complex`, and STANDARD stays on `squad-executor`.
+**PLAN mode** produces the spec: exact files and functions to change, the change to each, tests to add and what each asserts, what must NOT change, and the verification plan. It starts from Recon's baseline result, reconciles every count the plan states, marks decisions that rest on unverified facts as assumed, and escalates before dropping existing behavior. The bar is an ordered task list a junior engineer could follow without a single judgment call. That bar is the whole system. Cheap execution is only safe because the plan carries the intelligence. PLAN also classifies the work: MECHANICAL, STANDARD, or COMPLEX. MECHANICAL routes execution to `squad-executor-mechanical`, COMPLEX routes it to `squad-executor-complex`, and STANDARD stays on `squad-executor`.
 
-**ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, and reads the Executor's account only after its own checks and refutations. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. FAIL comes with evidence and exactly one named stage to re-run. PASS on the plan's last work order archives the log first, then clears it, and hands high-stakes changes back to your session to review and clear. Nothing clears the log before a PASS.
+**ACCEPT mode** is adversarial by instruction. It re-derives expectations from the locked criteria before reading the Executor's account, and reads the Executor's account only after its own checks and refutations. It re-runs the full test suite itself. It never trusts logged claims. It attempts refutations: concurrency, empty and duplicate data, permission boundaries. It records a result for every numbered criterion against the exact tree it tested; a criterion that already failed before the change stops for your decision, and only you can waive one. FAIL comes with evidence and exactly one named stage to re-run. On an ordinary change, PASS on the plan's last work order archives the log first, then clears it. On a high-stakes change, PASS archives nothing: your session reviews the tested tree, writes a `## High-stakes review` entry, and only an upheld review sends the log to squad-mech for the verified archive and clear. Nothing clears the log before a PASS. A PASS means the tested tree passed locally, not that it is ready to merge or deploy.
 
 Decisions the PM is not allowed to make: anything product-level, irreversible, or cost-bearing, and anything that would change the locked goal. Those get logged as named blockers and go back to the human. Guessing past a blocker is a protocol violation, not initiative.
 
@@ -210,7 +210,7 @@ Decisions the PM is not allowed to make: anything product-level, irreversible, o
 
 The builder. Reads the full log, then works the task list of the plan revision and work order the latest Status names, in order. Exactly what the plan says. No more, no less.
 
-If the plan is wrong or impossible, it stops and logs a blocker naming Plan as the stage to re-run. It does not improvise a better design, because an executor that improvises invalidates the acceptance review downstream. A judgment call the plan left open is a plan defect and gets reported as one.
+If the plan is wrong or impossible, it stops and logs a blocker naming Plan as the stage to re-run. It does not improvise a better design, because an executor that improvises invalidates the acceptance review downstream. A judgment call the plan left open is a plan defect and gets reported as one. A check that already fails on the unchanged tree, or fails for a cause outside the plan, stops with a `needs-human:` blocker instead.
 
 It runs the project's own test and verify commands as it goes and will not log completion with failing tests.
 
@@ -222,7 +222,7 @@ The execution-tier half of the DELEGATE protocol. When a stage delegates a subta
 
 ### squad-mech (bottom rung, the intern)
 
-Zero-judgment busywork, executed exactly. Log archival before every run (verified copy first, truncate second, never the reverse). File rotation. Formatting normalization. Inventories. Fixture generation from an exact template.
+Zero-judgment busywork, executed exactly. Log archival before every run, and the closing archive after an upheld high-stakes review (verified copy first, truncate second, never the reverse). File rotation. Formatting normalization. Inventories. Fixture generation from an exact template.
 
 Its one skill beyond following procedure is knowing what it is not: handed anything that requires a judgment call, it refuses with `REFUSED:` and the step, which goes back to whoever requested it. An intern that knows its lane is worth more than a mid-level that does not.
 
@@ -310,7 +310,7 @@ Only MECHANICAL, transcription-grade work runs there, and the plan carries the i
 Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. The append-only file protocol is portable across the Claude and Codex plugin implementations.
 
 **Six stages for a one-line change?**
-The stages are mandatory. Their length is not. A one-line change gets a three-sentence Recon entry and a four-line plan. The discipline is the constant; the overhead scales with the work.
+The stages are mandatory. Their length is not. A one-line change gets a Recon map of a few lines and a four-line plan. The discipline is the constant; the overhead scales with the work.
 
 **What does a run cost?**
 A full run spawns at least five agents: the intern, Recon, the PM twice, and the Executor; a plan run spawns three. DELEGATE helpers, FAIL re-runs, and an audit fan-out add more. Snapshot 2026-09-24: one measured run of 3.9.2 on an eight-file fixture repo with a top-rung main session billed about 1.6M input and 47k output tokens and cost $3.00 at list prices, two thirds of it in the main session. List prices that day per million input and output tokens: Fable 5.1 $10/$50, Opus 5.5 $4/$20, Sonnet 5 $2/$10, Haiku 4.5 $1/$5. Treat it as one data point, not a quote; the real number tracks the main session's turns, how much each stage reads (re-sent on every later call), and how many stages re-run. On Claude Code, each run's measured usage per stage is in `compute-squad-archive/usage.jsonl`.

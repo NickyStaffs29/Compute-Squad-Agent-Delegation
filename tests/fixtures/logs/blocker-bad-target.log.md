@@ -4,8 +4,8 @@ Run: 2026-09-01-export-dry-run
 
 Goal: Add a --dry-run flag to the export command that prints the files it would write and writes nothing.
 Acceptance criteria:
-- export --dry-run writes no file and exits 0.
-- export --dry-run prints one line per file a real run would write.
+- AC1: export --dry-run writes no file and exits 0.
+- AC2: export --dry-run prints one line per file a real run would write.
 Out of scope: the import command.
 Assumptions: none.
 
@@ -25,9 +25,20 @@ Timestamp: 2026-09-01T10:03:40Z
 Agent: squad-recon (claude-sonnet-5)
 Attempt: 1
 
-The command is defined in src/cli/export.js (lines 12-58). It writes through
-writeOutputs() in src/cli/write.js (lines 5-31), its only caller. Tests:
-test/export.test.js (6 cases).
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 0; 6 passed; tree changed: no
+Map:
+- src/cli/export.js:12-58 the export command: parses its flags and calls writeOutputs()
+- src/cli/write.js:5-31 writeOutputs: "function writeOutputs(files, options) {"; writes every output file
+Callers:
+- writeOutputs <- src/cli/export.js:40
+Tests:
+- test/export.test.js: 6 cases on the export command
+Invariants:
+none found
+Open for the PM:
+none found
 
 ## PM — Plan
 Timestamp: 2026-09-01T10:08:02Z
@@ -49,11 +60,13 @@ Agent: squad-executor (claude-sonnet-5)
 Attempt: 1
 Plan: r1, work order all
 
-Completed task 1 in src/cli/export.js. Task 2 is blocked: writeOutputs() also
-writes a lock file before its loop (src/cli/write.js:8), which the plan does
-not mention.
-
-Deviations: none. Tasks 2 and 3 are not done.
+Tasks: 1 of 3; task 2 is blocked
+Files changed: src/cli/export.js
+Checks:
+none found
+Deviations: none
+For acceptance: none
+Commit: 1a2b3c4d5e6f, working tree 1 changed file
 
 BLOCKER:
 - rerun: PM

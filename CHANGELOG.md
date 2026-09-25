@@ -1,5 +1,167 @@
 # Changelog
 
+## 4.3.0 — 2026-09-25
+
+Lands work order WO-3e of the 3.9.2 analysis: acceptance grammar, the high-stakes review, and
+evidence checks (findings 2, 3, 14, and 16, plus finding 13's executor stop targets and re-spawn
+objective), with the live scenarios finding 26 names for them. Criteria are numbered and every
+verdict records a result for each one against the tree it tested. A high-stakes PASS now archives
+nothing: the main session appends a `## High-stakes review` entry, and only an upheld review sends
+the log to squad-mech's closing archive. This replaces WO-2's interim close. The archive command's
+body from WO-2 is unchanged; only who runs it and when changes. ACCEPT's independent re-run, the
+three-FAIL cap, and the skeptic brief's concurrency and accessibility carve-out are unchanged.
+
+- **Numbered criteria and the criteria block (finding 2).** Stage 0 step 4 numbers criteria AC1,
+  AC2, and so on, and the Goal template's criterion line reads `- AC1: <concrete, verifiable
+  item>` in `skills/compute-squad/SKILL.md`, `codex/SKILL.md`, and `codex/README.md`. PLAN's
+  verification plan maps each criterion ID. Every PASS and FAIL, and every pending entry that asks
+  about a criterion, carries a block: a `Tested: <commit SHA>, working tree <clean | N changed
+  files>` line, a table with one row per ID (Result `met`, `not met`, `not met: pre-existing`,
+  `waived`, or `not checked`, and How `reproduced` or `inspected`), then `Regressions:`, `Outside
+  scope:`, and `Executor points:`. A pre-existing failure stops the run with `needs-human: waive
+  or re-scope <ID>`, and only a `## Decision` of Type waiver waives a row. In `agents/squad-pm.md`
+  the block sits inside the ACCEPT template's heredoc rather than in a separate fence. One
+  reconciliation with WO-3d's per-work-order verdicts: a verdict on a work order that is not the
+  plan's last may mark a later work order's criterion `not checked` and name that work order; the
+  last work order's verdict checks every criterion. When the Executor entry judged is
+  `squad-executor-complex`'s, every `met` row is `reproduced`, which makes WO-3b's top-rung control
+  concrete (Stage 5 now points to the How column). Before reporting a PASS the main session reads
+  the block and reports the run as not accepted if any row fails that rule. `README.md` gains
+  finding 2's two sentences, including "PASS means local acceptance of the tested tree".
+- **The ACCEPT template and fixed fields (findings 2, 9, 13, and 16).** The template gains
+  `Answers:`, `High-stakes:`, and the criteria block. `Answers:` appears from attempt 2 and names
+  the latest `## PM — FAIL` or overturned review since the latest PASS, or reads `Answers: none`
+  (as on the first verdict of a later work order, which WO-3d's whole-log count makes attempt 2).
+  Its placeholder says so (`<from attempt 2: the latest FAIL or overturned review since the latest
+  PASS, or none>`) in place of finding 28's "the FAIL or BLOCKER this attempt addresses", which
+  the linter would reject for a BLOCKER.
+  ACCEPT gains a step recording the tree tested and a step answering each Executor point ("Never
+  PASS with an unanswered point."). SKILL.md's fixed-field Hard rule, and its reading copy, now name
+  `Answers:` from attempt 2, `High-stakes:` on PASS and FAIL followed on a FAIL by `Rerun:`, and
+  `Result:`, plus `Rerun:` when overturned, on high-stakes reviews.
+- **The high-stakes review (finding 3).** SKILL.md Stage 5 splits PASS into three bullets:
+  ordinary (the PM archives and clears), high-stakes (the PM archives and clears nothing, and the
+  main session runs the review before anything else), and earlier work order (WO-3d's rule, now
+  noting that in a high-stakes run the next work order follows an upheld review of this PASS). A
+  new "High-stakes review procedure" gives six steps and the `## High-stakes review` template with
+  `Result: <upheld | overturned | held>`; `upheld` spawns squad-mech to close the run, `overturned`
+  counts as a FAIL and re-runs the stage on its `Rerun:` line, and `held` hands the open items to
+  the user. Deviations the tree forced: the template uses the tree's `Timestamp:` form, puts
+  `Result:` and `Rerun:` directly under `Agent:` as the fixed-field rule requires, and fills
+  `Tested:` as ACCEPT does (`git rev-parse --short=12 HEAD`); step 6 spawns nothing while a later
+  work order remains. The interim close is gone everywhere: the PM's "archived, log kept" form,
+  the main session running the archive command, "This closing archive is the main session's own
+  step", and the three legitimate clears. The Hard rules now name two clearers (finding 9's
+  clearing clause and finding 11's two-clears and archive-rule text), add `## High-stakes review`
+  to the closed heading list, and restore "or an overturned high-stakes review" in the attempt
+  rule. The Status rule's exception now reads "once an archive has cleared the log", so no Status
+  is demanded in an emptied log. `agents/squad-pm.md` PASS step 2 merges the high-stakes stop with
+  WO-3d's work-order stop ("archive nothing and clear nothing"), step 3 is finding 3's, and the
+  re-run sentences in the PM, Recon, and three executor bodies regain "or an overturned high-stakes
+  review". `codex/README.md`'s On PASS paragraph carries the template byte for byte,
+  `codex/SKILL.md` mirrors the bullets and rules, and `README.md`'s PASS sentence is finding 3's;
+  its archive-directory line and its squad-mech section now name the archive after an upheld
+  review.
+- **squad-mech's closing archive (finding 3).** `agents/squad-mech.md` runs its archive procedure
+  when told to close a run after an upheld review, guarded by `grep '^Result:' COMPUTE_SQUAD_LOG.md
+  | tail -n 1`, which must print exactly `Result: upheld`; otherwise it changes nothing. One
+  addition: step 2's open-run check is for a new run only, since the Status after a review always
+  has an open `Next:`. Step 2 now calls its truncate one of two legitimate clears. The guard reads
+  only the latest `Result:` line, so it would also allow a close after an upheld review of an
+  earlier work order; review step 6 keeps the main session from asking for one.
+- **Resume (findings 3, 10, and 16).** `skills/compute-squad/references/resume.md`'s high-stakes
+  PASS row now runs the review procedure, and three new rows route a review reading `upheld` (next
+  work order, or squad-mech's close), `held` (put the open items to the user; an unattended run
+  stops), and `overturned` (a FAIL). The tree check reads `Files changed:` lines again, finding
+  10's wording that WO-3d deferred, and also the paths a `## Recon` baseline line names after
+  `tree changed:`: finding 14's baseline run never cleans up after itself, so without this a
+  baseline that leaves `coverage/` behind would stop the first executor spawn of a resumed run.
+  `tests/resume_next.py` models the new rows and the Recon clause.
+- **Labeled Recon and Executor entries (finding 16).** `agents/squad-recon.md` and the three
+  executor bodies use labeled sections in place of two prose paragraphs; the Executor's include
+  `Files changed:`, `Checks:`, `Commit:`, and numbered `F<n>` points that ACCEPT answers under
+  `Executor points:`. The entry-shape sentences keep the tree's `DELEGATE:` and final `BLOCKER:`
+  wording and WO-1's "Length follows the change". `README.md` now says "a Recon map of a few lines".
+- **Evidence prerequisites (finding 14).** Recon gains a step checking the goal's stated facts,
+  one baseline run of the test or verify command on the untouched tree in finding 14's form (git
+  status before and after, `set -o pipefail`, the tail of the output, the exit code), and the
+  tools the criteria need, and raises a `needs-human:` blocker when the criteria cannot be met as
+  locked. It is step 5, not 6, because WO-1 removed a step. Its `Checks:` block opens with a
+  goal-facts line and a baseline line. PLAN gains four bullets: start from Recon's Checks block,
+  reconcile every count, mark unverified decisions `Assumed:`, and escalate before removing
+  existing behavior. SKILL.md Stage 2 and Stage 3 and `codex/SKILL.md` gain a sentence each,
+  `README.md` three, and `codex/build-agents.py` renames the Recon row of `codex/README.md`'s
+  generated table to "Codebase mapping and baseline check". `codex/SKILL.md`'s Stage 2 now says
+  Recon changes nothing except its log entry and runs one baseline command, as `README.md` does,
+  in place of "read-only except for its one append to the log".
+- **Re-spawn objective and stop targets (finding 13).** One sentence, byte-identical in the five
+  stage bodies, tells a re-spawned stage to write `Answers:` naming the entry that sent it back.
+  Additions: leave the line out on attempt 1 (a live probe wrote `Answers: none, first attempt`
+  without it); a stage re-run only because an earlier stage re-ran names what sent that stage
+  back, and one re-run for a moved base names the latest `## Status`. "(`Revision:` in a plan)" is
+  dropped, since WO-3d defined no such field. The Recon, Plan, and Executor templates gain
+  `Answers:` under `Attempt:`. The executors' test bullet now stops with `needs-human:` when a
+  check already fails on the unchanged tree or fails for a cause outside the plan, and a judgment
+  call handed back names the open decision and the options; `README.md` mirrors the stop.
+- **Example log (findings 2, 3, 14, and 16).** `docs/example-log.md` no longer relabels the broken
+  criterion as pre-existing: the plan handles concurrency with a row lock and a test (d), and
+  `Totals:` reads 4 tests. Criteria are AC1 to AC3; Recon is labeled, with a goal-facts line and a
+  baseline of 2,751 passed / 12 skipped (4 below the PASS's count); the plan ends with an
+  `Assumed:` line; the Executor has labeled sections and points F1 and F2. The PASS has
+  `High-stakes: yes`, `Tested: 4f2c9a1d07e3` (HEAD is the base, since the change is uncommitted),
+  the criteria table, and answers to F1 and F2. After its Status comes an upheld `## High-stakes
+  review` (18 auth tests passed, not the report's 17) and a Status naming squad-mech's closing
+  archive. The closing paragraph is finding 3's.
+- **Check 7 (findings 2, 3, 13, 14, and 16).** In `scripts/verify.sh`, new 7g holds the criteria
+  block byte-identical in both SKILL.md files, the PM body, and `codex/05-pm-accept.md`, with the
+  Result values the linter uses. New 7h holds the review template alike in SKILL.md and
+  `codex/README.md`, the PM's archive-nothing step, squad-mech's close guard, and the example's
+  review, and bans the interim close's phrases. 7i holds the review template and the new
+  `Answers:` lines to the linter's field table and knows a pending entry has no `High-stakes:`
+  line; 7j drops the PM's interim form. 7p gains an `answers` row (28 rows), its work-order-stop
+  row pins the merged PM step 2, and its "7n check line" row anchors on step 2's sentence. New 7w
+  (the report's 7x for finding 16) holds the Recon and Executor templates to the linter's labels
+  and the PLAN template to a `Totals:` line. New 7x covers finding 14's Recon step, Checks block,
+  baseline form, PM phrases, and executor stop target, and bans the old one-carve-out Bash rule.
+- **Check 8 (findings 2, 3, 13, 14, 16, and 26).** `tests/check_logs.py` gains eleven rules:
+  `criteria`, `waiver`, `parity`, `labels`, `executor-points`, `totals`, `review-after-pass`,
+  `review-rerun`, `review-close`, `answers`, and `recon-checks`, and reads the ID prefix, block
+  shape, and top-rung executor from SKILL.md. The static twins: `pass-not-met` fails `criteria` and
+  `waived-no-decision` fails `waiver`. Every existing fixture was rewritten to the new grammar. New
+  fixtures include `waived-decision`, `pending-pre-existing`, `inspected-top-rung`,
+  `recon-unlabeled`, `points-unanswered`, `plan-no-totals`, eight `review-*` logs,
+  `answers-missing`, `answers-next-wo`, `recon-no-baseline`, `recon-side-effect`, and the seeds
+  `s5`, `s5b`, and `s6a`. A fixture's `.expect.json` may now list live outcomes; 8a lints each
+  appended to its seed, and 8b runs the live S5 rule over the same seven. 8a reports 38 passing and
+  39 failing fixture logs; 8b checks 14 resume rows over 95 cases and 77 logs; 8c makes 1571
+  grant-hook decisions. New 8d runs the archive command and the PM's form under sh, dash, and bash
+  in temp dirs (an exact copy, a clear only after `cmp`, which a `cmp` shim that exits 1 tests by
+  leaving the log in place, nothing changed on a name collision or an unwritable archive directory),
+  and squad-mech's close guard over every fixture log and the example: it allows the closing archive
+  only after an upheld review, that archive holds the review, and the example's upheld review must
+  be among those closed. `CONTRIBUTING.md`'s check 8 sentence names both.
+- **The live tier (findings 2, 3, 14, 16, and 26).** New `tests/fixtures/repo-ui/` has one page, a
+  stylesheet with a 624px `.plans` table, passing unit tests, and `npm run check:overflow`, which
+  measures horizontal overflow at 390px in Playwright's Chromium (exit 1 here, 0 once fixed, 2
+  with no browser). `tests/live/run.sh` gains S5 (execute mode, stopping after the verdict, so a
+  FAIL cannot lead to a legitimate re-run PASS), S5b (the browser hidden; Recon must block), S6a (a
+  new one-work-order high-stakes seed ending at the PASS), and S6b (an archive collision under a
+  date shim, which asserts `ARCHIVE FAILED` with nothing changed, following finding 11's design
+  rather than section 6's "second archive under a distinct name"), with a per-scenario preflight
+  that stops before any spend. S5b and S6b go beyond the scenarios section 4 names for WO-3e.
+  `tests/live/check_live.py` gains their checks, S4's deferred `Tested:` assertion, S2's
+  `Files changed:` and Executor-points assertions, and S1's Recon baseline assertion.
+- **Not landed, or not run.** No live scenario ran, so these acceptance items are unverified: S5
+  and S6a passing live, and a reference run's Recon entry naming its baseline result (S1 now
+  asserts it). Cheap probes, about $0.75 in total: a Haiku session spawning squad-mech closed a log
+  after an upheld review with the archive equal to the log, and refused on a held one; two Sonnet
+  Recon probes on repo-reset recorded a false goal fact and the baseline, and wrote no `Answers:`
+  on attempt 1, though the logged baseline command lacked `set -o pipefail`; a Haiku probe
+  confirmed a `date` shim on PATH reaches a headless session's Bash tool. Not built: S5c (a
+  pre-existing failure moved onto the gate), finding 14's false-premise variant, S6a with an
+  overturned or held review, S6b with a read-only archive directory, the large-output S5 variant,
+  and the per-archive count of needs-human blockers by origin.
+
 ## 4.2.0 — 2026-09-24
 
 Lands work order WO-3d of the 3.9.2 analysis: wire format, resume, handoff, and one active run

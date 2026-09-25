@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "agents/squad-pm.md",
-      "text": "If a FAIL or a `rerun: Plan` blocker names Plan, append a new, complete `## PM — Plan` entry with the next `Attempt:` and classify it again from scratch."
+      "text": "If a FAIL, a `rerun: Plan` blocker, or an overturned high-stakes review names Plan, append a new, complete `## PM — Plan` entry with the next `Attempt:` and classify it again from scratch."
     },
     {
       "file": "agents/squad-pm.md",
@@ -11,7 +11,7 @@
     },
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "A re-run after a FAIL or a `rerun:` blocker is a new attempt under the plain heading, never `(cont.)`, and complete on its own."
+      "text": "A re-run after a FAIL, a `rerun:` blocker, or an overturned high-stakes review is a new attempt under the plain heading, never `(cont.)`, and complete on its own."
     }
   ],
   "lint": {

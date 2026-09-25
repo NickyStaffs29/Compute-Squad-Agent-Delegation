@@ -4,8 +4,8 @@ Run: 2026-09-02-export-dry-run
 
 Goal: Add a --dry-run flag to the export command that prints the files it would write and writes nothing.
 Acceptance criteria:
-- export --dry-run writes no file and exits 0.
-- export --dry-run prints one line per file a real run would write.
+- AC1: export --dry-run writes no file and exits 0.
+- AC2: export --dry-run prints one line per file a real run would write.
 Out of scope: the import command.
 Assumptions: none.
 
@@ -25,9 +25,20 @@ Timestamp: 2026-09-02T09:03:40Z
 Agent: squad-recon (claude-opus-5-5)
 Attempt: 1
 
-The command is defined in src/cli/export.js (lines 12-58). It writes through
-writeOutputs() in src/cli/write.js (lines 5-31), its only caller. Tests:
-test/export.test.js (6 cases).
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 0; 6 passed; tree changed: no
+Map:
+- src/cli/export.js:12-58 the export command: parses its flags and calls writeOutputs()
+- src/cli/write.js:5-31 writeOutputs: "function writeOutputs(files, options) {"; writes every output file
+Callers:
+- writeOutputs <- src/cli/export.js:40
+Tests:
+- test/export.test.js: 6 cases on the export command
+Invariants:
+none found
+Open for the PM:
+none found
 
 ## Status
 Timestamp: 2026-09-02T09:03:51Z
@@ -88,8 +99,10 @@ Agent: squad-executor (claude-opus-5-5)
 Attempt: 1
 Plan: r1, work order all
 
-Completed WO-1: src/cli/export.js parses --dry-run and passes dryRun to
-writeOutputs(), and src/cli/write.js prints each path and skips the write when
-dryRun is set. `npm test` -> exit 0; 6 passed.
-
-Deviations: none. WO-2 is outside this grant and was not started.
+Tasks: 1-2 (WO-1)
+Files changed: src/cli/export.js, src/cli/write.js
+Checks:
+- `npm test` -> exit 0; 6 passed
+Deviations: none
+For acceptance: none
+Commit: 1a2b3c4d5e6f, working tree 2 changed files

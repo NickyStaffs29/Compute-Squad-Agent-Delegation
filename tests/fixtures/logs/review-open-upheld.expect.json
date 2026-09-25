@@ -1,0 +1,22 @@
+{
+  "note": "Finding 3's 8a rule: an upheld review has no open row. This one upholds with a risk it could not rule out.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`upheld` needs every risk ruled out and every decision approved."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "review-close"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-mech to close the run",
+      "via": "row: `## High-stakes review` reading `Result: upheld`"
+    }
+  ]
+}

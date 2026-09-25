@@ -1,6 +1,6 @@
 # Compute Squad: Codex reading copy
 
-Version: 4.2.0
+Version: 4.3.0
 No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
@@ -47,8 +47,8 @@ Do this directly in the main session; never delegate it:
    assumptions; once the Goal entry is written, only the user changes them. A
    false goal fact that changes what a criterion checks is a `needs-human:`
    blocker.
-4. Lock one goal sentence and concrete, verifiable acceptance criteria. No
-   later stage may redefine them; changes return here. Changing a command,
+4. Lock one goal sentence and concrete, verifiable acceptance criteria,
+   numbered AC1, AC2, and so on. No later stage may redefine them; changes return here. Changing a command,
    test, or check that a criterion names redefines that criterion. A re-lock
    needs the user: a `## Decision` entry of Type re-lock quoting their words,
    then a new full `## Goal — Locked` entry with a `Supersedes:` line naming
@@ -62,7 +62,7 @@ Run: <UTC date and a slug: lowercase letters, digits, hyphens>
 Attended: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
-- <concrete, verifiable item>
+- AC1: <concrete, verifiable item>
 Out of scope: <items>
 Assumptions: <only for unattended runs; otherwise "none">
 ```
@@ -149,10 +149,14 @@ verified archive procedure here.
 
 ## Stage 2 — Recon (`squad-recon`, mid rung)
 
-Spawn `squad-recon` with the locked goal and criteria. It is read-only except
-for its one append to the log. It maps exact files, functions, line ranges,
-call sites, tests, migrations, config, invariants, risks, and unresolved
-ambiguities for the PM.
+Spawn `squad-recon` with the locked goal and criteria. It changes nothing
+except its log entry, and its one command beyond inspection is a single
+baseline run. It maps exact files, functions, line ranges, call sites, tests,
+migrations, config, invariants, risks, and unresolved ambiguities for the PM.
+It also checks the evidence prerequisites (the goal's stated facts, one
+baseline run of the test or verify command, and the tools the criteria's
+evidence needs) and raises a `needs-human:` blocker when the criteria cannot be
+met as locked.
 
 ## Stage 3 — Plan (`squad-pm`, top rung, PLAN mode)
 
@@ -160,7 +164,10 @@ Spawn `squad-pm` in PLAN mode after Recon logs. It reads the locked goal and
 Recon entry, produces the exact implementation spec and ordered task list, and
 classifies execution as MECHANICAL, STANDARD, or COMPLEX. It never writes
 product code. Product-level, irreversible, or cost-bearing decisions become a
-`BLOCKER:` with `needs-human:` for the main session.
+`BLOCKER:` with `needs-human:` for the main session. It starts from Recon's
+Checks block, reconciles the plan's counts, marks unverified decisions
+`Assumed:`, and raises a `needs-human:` blocker before removing existing
+behavior that no Out of scope line or Decision covers.
 
 ## Stage 4 — Execute
 
@@ -187,25 +194,70 @@ after escalation), acceptance shares that rung, and four controls stand in for
 the missing one: ACCEPT is a fresh spawn that never saw the Executor's working
 context, it derives its expectations from the locked criteria before it reads
 the Executor's entry, every criterion it marks met is reproduced rather than
-inspected, and a high-stakes change still gets the main-session review before
+inspected (its criteria block's How column), and a high-stakes change still gets the main-session review before
 archive.
 
-- **PASS:** append the PASS entry, archive the full log with the archive
-  command, which verifies the copy with `cmp`, then clear the active log only
-  for a non-high-stakes change. Leave high-stakes logs intact for final
-  main-session review, which closes the run with the same archive command.
-  That closing archive is the main session's own step, not a stage's work, so
-  the hard rule against doing a stage's work does not cover it. A PASS on a
-  work order that is not the plan revision's last archives and clears nothing,
-  whatever its stakes: append a `## Status` naming the next work order, which
-  outside `full` mode needs its own grant. After a high-stakes review of such a
-  PASS, the closing archive waits for the PASS on the last work order.
+- **PASS, ordinary:** when no line in the log reads `High-stakes: yes` and no
+  work orders remain, the PM appends its PASS entry and runs the archive
+  command, which clears the active log only after `cmp` verifies the copy.
+  Report outcome and evidence to the user.
+- **PASS, high-stakes:** when any line in the log reads `High-stakes: yes`, the
+  PM appends its PASS entry and archives and clears nothing. Run the
+  high-stakes review below before anything else. The log is archived only
+  after an upheld review is in it.
+- **PASS, earlier work order:** a PASS on a work order that is not the plan
+  revision's last archives and clears nothing, whatever its stakes: append a
+  `## Status` naming the next work order, which outside `full` mode needs its
+  own grant. In a high-stakes run that Status follows an upheld review of this
+  PASS, and the closing archive waits for an upheld review of the last work
+  order's PASS.
 - **FAIL:** append a `## PM — FAIL` entry whose `Rerun:` line names exactly one
   stage (Recon, Plan, or Executor), with evidence. Leave the log intact and
   rerun that stage plus every later stage; each re-run is a new attempt.
-- **Accept pending:** append a pending entry and `DELEGATE:` block when
-  zero-judgment work is needed before the verdict; run the helper, append its
-  result, and respawn the PM.
+- **Accept pending:** the PM needed delegated work or a user decision before
+  it could decide. Run its `DELEGATE:` block and append the results, or put its
+  `needs-human:` question to the user and record the answer as a `## Decision`
+  followed by a `## Status`; then respawn the PM for the verdict.
+
+Every PASS and FAIL entry, and every pending entry that asks the user about a
+criterion, carries the PM's criteria block, one row per criterion ID in the
+latest `## Goal — Locked` entry:
+
+```
+Tested: <commit SHA>, working tree <clean | N changed files>
+| Criterion | Result | How | Evidence |
+|---|---|---|---|
+| AC1 | met | reproduced | <the check run and the refutation attempted, and what each showed> |
+Regressions: <none | defects this change introduced>
+Outside scope: <none | defects no criterion covers that also exist on the base commit>
+Executor points:
+- F1: <the check you ran> -> <what it showed>
+```
+
+Before reporting a PASS, read that block (in the archive if the PM cleared the
+log). If an ID has no row, a row reads anything but `met` or `waived` (or `not
+checked` for a criterion only a later work order covers), a `waived` row has no
+matching `## Decision` of Type waiver, or `Regressions:` is not `none`, report
+the run as not accepted and name the rows. PASS means local acceptance of the
+tested tree, not PR readiness, merge, deploy, or live verification.
+
+**High-stakes review.** On every high-stakes PASS the main session reviews the
+change itself, never through a stage: it lists from the latest Goal entry what
+could go wrong in each class the change touches (auth, payments, migrations,
+privacy, production config) before reading the PASS, reads the full diff
+against the base commit, re-runs the plan's verification commands, records
+what rules out each risk or writes `open`, and lists every decision after the
+first Goal entry that changed a criterion, a verification command, or the
+scope, which only a `## Decision` quoting the user approves. It appends a
+`## High-stakes review` entry (template in the shared skill's Stage 5) whose
+`Result:` line reads `upheld` (every risk ruled out, every decision approved),
+`overturned` (a defect, with a `Rerun:` line naming the earliest stage that
+must fix it), or `held` (an open risk or unapproved decision, no defect), then
+a `## Status`. On `upheld` it spawns `squad-mech` to close the run: the
+archive copies the log with the review in it, verifies it with `cmp`, and
+clears the log. `overturned` counts as a FAIL and re-runs the named stage and
+every later stage; `held` leaves the log intact for the user. Nothing is ever
+appended to an archive after it is written.
 
 ## Intra-stage delegation
 
@@ -232,7 +284,9 @@ only and is capped at 5 helpers per stage per run.
   it.
 - Every fresh run starts with `## Goal — Locked` and `## Status` after Stage 1
   archives prior state. The log clears only after a PASS on the last work
-  order of the governing plan revision and a verified archive.
+  order of the governing plan revision and a verified archive: the PM's on an
+  ordinary change, or `squad-mech`'s closing archive after an upheld
+  `## High-stakes review`.
 - A blocker is always:
 
 ```
@@ -243,13 +297,15 @@ BLOCKER:
 
 - Only `## Recon`, `## PM — Plan`, and `## Executor` may add ` (cont.)`, and
   only for a stage continuing after its own `BLOCKING` `DELEGATE:` block. A
-  re-run after a FAIL or a `rerun:` blocker is a new, complete attempt under
-  the plain heading. The latest attempt of each stage governs; the next
+  re-run after a FAIL, a `rerun:` blocker, or an overturned high-stakes review
+  is a new, complete attempt under the plain heading. The latest attempt of each stage governs; the next
   `## Status` names the governing plan revision on its `Plan:` line.
 - Routing values sit on fixed lines under the `Agent:` line, one value each:
-  `Attempt:` on every stage entry (a plan's attempt is its revision); `Plan:`
-  on Executor entries; `Classification:` and `High-stakes:` on PM Plan
-  entries; `Rerun:` on PM FAIL entries. Route and count from these lines and
+  `Attempt:` on every stage entry (a plan's attempt is its revision), then
+  `Answers:` from attempt 2; `Plan:` on Executor entries; `Classification:`
+  and `High-stakes:` on PM Plan entries; `High-stakes:` on PM PASS and FAIL
+  entries, followed on a FAIL by `Rerun:`; `Result:`, plus `Rerun:` when
+  overturned, on high-stakes reviews. Route and count from these lines and
   from `- rerun:` blocker lines, never from prose. A run is high-stakes once
   any line reads `High-stakes: yes`; no later entry lowers it.
 - Count FAILs from the log: the FAIL total is the number of lines matching

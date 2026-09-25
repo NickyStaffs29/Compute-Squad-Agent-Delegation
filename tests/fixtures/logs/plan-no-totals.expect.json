@@ -1,0 +1,22 @@
+{
+  "note": "A plan entry with no Totals: line.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "State every quantity the work produces (files changed, tests added, rows, records, endpoints) once, on a `Totals:` line at the top of the entry"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "totals"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: spawn squad-executor (STANDARD)",
+      "via": "step 4: perform Next"
+    }
+  ]
+}

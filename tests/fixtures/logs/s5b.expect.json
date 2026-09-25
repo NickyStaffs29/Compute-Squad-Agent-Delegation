@@ -1,0 +1,28 @@
+{
+  "note": "Live seed for section 6, S5's no-browser variant (S5b), in tests/live/run.sh, on tests/fixtures/repo-ui/ with PLAYWRIGHT_BROWSERS_PATH set to an empty directory, so the browser check AC2 names cannot run. Resuming spawns squad-recon, whose Checks: block names the missing browser and whose entry ends with a needs-human: blocker; the run stops there, before any plan or execution.",
+  "cites": [
+    {
+      "file": "agents/squad-recon.md",
+      "text": "For each acceptance criterion, name the command or tool that will produce its evidence (test runner, browser, database, renderer) and confirm it is present."
+    },
+    {
+      "file": "agents/squad-recon.md",
+      "text": "End your entry with a `needs-human:` blocker when the baseline fails and the goal does not set out to fix that failure, when a tool a criterion needs is missing, or when a false fact changes what a criterion checks."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A `needs-human:` blocker stops the pipeline: spawn no stage until it is resolved."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: spawn squad-recon",
+      "via": "step 4: perform Next"
+    }
+  ]
+}

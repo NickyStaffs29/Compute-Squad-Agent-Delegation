@@ -33,7 +33,12 @@
 #      files; 7c the helper cap; 7d each of the four files with a generated
 #      routing block has one begin and one end marker; 7e the product
 #      description; 7f the ## Status and ## Decision templates in SKILL.md
-#      and codex/README.md; 7i log headings stay on SKILL.md's closed list,
+#      and codex/README.md; 7g the PM's criteria block in both SKILL.md
+#      files, the PM body, and its Codex prompt, with the Result values the
+#      log linter checks; 7h the high-stakes review: its template in SKILL.md
+#      and codex/README.md, the PM's archive-nothing step, squad-mech's close
+#      guard, the example's review, and no trace of the main session
+#      clearing the log itself; 7i log headings stay on SKILL.md's closed list,
 #      whose bullet carries the (cont.) rule, and every log template carries
 #      the routing fields the log linter checks; 7j the archive command; 7l
 #      protocol text names rungs, not models, outside the routing block; 7m the three executor bodies are one
@@ -43,8 +48,8 @@
 #      grammar span (7k), the command output forms (7n), the latest-Goal
 #      read, the rule that changing a criterion's command redefines the
 #      criterion, and finding 9's (cont.), plan-read, verdict-scope,
-#      attempt, routing, and FAIL-count text, and squad-mech's open-run
-#      guard; 7q the agent
+#      attempt, routing, and FAIL-count text, squad-mech's open-run guard,
+#      and finding 13's Answers: sentence in every stage body; 7q the agent
 #      description budget; 7r no agent has a tool to spawn agents; 7s
 #      codex/SKILL.md stays a reading copy and both SKILL.md files carry the
 #      no-absorption rule; 7t no file names a renamed executor or the old
@@ -53,20 +58,39 @@
 #      reads the goal from the entry at the top of the log; 7v the resume
 #      table in references/resume.md routes from every stage heading, both
 #      SKILL.md files point a resume at it and carry the one-active-run rule,
-#      and squad-mech's open-run guard is in its body, prompt, and TOML.
+#      and squad-mech's open-run guard is in its body, prompt, and TOML; 7w
+#      the Recon and Executor templates carry the labels the log linter
+#      checks, and the PLAN template a Totals: line; 7x Recon checks the
+#      evidence prerequisites, its template's Checks: block matches the
+#      linter's forms, PLAN starts from it and reconciles its counts, and no
+#      stage keeps the old one-carve-out Bash rule.
 #   8. Behavior without a model, on fixtures under tests/: log grammar,
 #      including the grant hook's verdict on every Executor entry, the
 #      re-lock record, the stop at a needs-human blocker, and the routing
 #      fields, attempt numbers, governing plan revision, high-stakes line,
-#      and (cont.) rule (8a), the next action references/resume.md gives
+#      and (cont.) rule, the numbered criteria and every verdict's criteria
+#      block, waivers, top-rung parity, entry labels, Executor points, plan
+#      totals, the high-stakes review's place, Rerun: line, and close, the
+#      Answers: line of every re-run, and the Recon entry's goal-facts and
+#      baseline lines, over every fixture log and over the verdicts a live
+#      seed lists as outcomes, S5's among them (8a), the next action
+#      references/resume.md gives
 #      for every fixture log under the states its .expect.json names, with
 #      every row, step, and check exercised, each live scenario's repo as
 #      tests/live/run.sh --setup-only builds it giving its static twin's
-#      state and action, and squad-mech's open-run guard agreeing with the
+#      state and action, the live S5 check's verdict rule agreeing with
+#      those outcomes, and squad-mech's open-run guard agreeing with the
 #      one-active-run rule (8b), the
 #      grant hook's decisions on synthetic PreToolUse JSON and over the live
 #      seed logs, including its hold on every stage agent except squad-mech
-#      while a needs-human blocker is open (8c),
+#      while a needs-human blocker is open (8c), the archive command in temp
+#      dirs, which must copy exactly, clear only after cmp (keeping the log
+#      when a cmp shim fails), and change nothing on a name collision or an
+#      unwritable archive directory, and squad-mech's
+#      close guard, which must allow the closing archive only after an upheld
+#      high-stakes review, whose entry the archive then holds, with the S6a
+#      seed closing only once its review is appended and the S6b seed's
+#      colliding archive changing nothing (8d),
 #      codex/update.sh with stubs (8e), which must refuse a model the
 #      stub catalog lacks and leave CODEX_HOME unchanged, and whose catalog
 #      validator must apply its effort, retirement, upgrade, and format rules,
@@ -826,6 +850,111 @@ for heading in ("## Status", "## Decision"):
 
 print(f"PASS: check 7: the ## Status and ## Decision templates are byte-identical across {', '.join(main_entry_paths)}")
 
+# ---- 7g: the criteria block (finding 2). Every PASS and FAIL entry carries
+# one block: a Tested: line naming the tree, a table with one row per
+# criterion ID, then Regressions:, Outside scope:, and Executor points:
+# (finding 16). SKILL.md and its reading copy carry it as a bare-fenced block
+# that opens with the Tested: line; the PM body and its generated Codex prompt
+# carry the same lines inside the ACCEPT template's heredoc. All four match
+# byte for byte. The PM files state the Result values and the question a
+# pre-existing failure puts to the user, all four say what a PASS means, the
+# log linter's Result values are the PM's, and both SKILL.md files number the
+# Goal template's criteria (7a holds the template's three copies alike).
+CRITERIA_OPEN = "Tested: <commit SHA>, working tree <clean | N changed files>"
+CRITERIA_SKILLS = ["skills/compute-squad/SKILL.md", "codex/SKILL.md"]
+CRITERIA_PM = ["agents/squad-pm.md", "codex/05-pm-accept.md"]
+LOG_HEREDOC = "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'"
+criteria_blocks = {path: extract_fenced_block(read(path), path, "```", CRITERIA_OPEN) for path in CRITERIA_SKILLS}
+for path in CRITERIA_PM:
+    lines = read(path).splitlines()
+    starts = [i for i, line in enumerate(lines) if line == CRITERIA_OPEN]
+    if len(starts) != 1:
+        fail(f"{path}: needs the line {CRITERIA_OPEN!r} exactly once, in the ACCEPT template; found {len(starts)}")
+    opened = max((i for i in range(starts[0]) if lines[i] == LOG_HEREDOC), default=None)
+    if opened is None or "EOF" in lines[opened:starts[0]]:
+        fail(f"{path}: the criteria block must sit inside the ACCEPT template's {LOG_HEREDOC!r} heredoc")
+    end = starts[0]
+    while end < len(lines) and lines[end].strip():
+        end += 1
+    criteria_blocks[path] = lines[starts[0]:end]
+ref_path = CRITERIA_SKILLS[0]
+for path, block in criteria_blocks.items():
+    if block != criteria_blocks[ref_path]:
+        fail(f"{path}: the criteria block differs from {ref_path}'s: {block!r}")
+if not any(line.startswith("Executor points:") for line in criteria_blocks[ref_path]):
+    fail(f"{ref_path}: the criteria block has no Executor points: line (finding 16)")
+CRITERIA_TEXT = {
+    "Result is exactly one of": CRITERIA_PM,
+    "needs-human: waive or re-scope <ID>": CRITERIA_PM,
+    "PASS means local acceptance of the tested tree": CRITERIA_PM + CRITERIA_SKILLS,
+    "numbered AC1, AC2, and so on": CRITERIA_SKILLS,
+    "- AC1: <concrete, verifiable item>": CRITERIA_SKILLS,
+}
+for needed, paths in CRITERIA_TEXT.items():
+    for path in paths:
+        if needed not in " ".join(read(path).split()):
+            fail(f"{path}: missing {needed!r}")
+sys.dont_write_bytecode = True
+sys.path.insert(0, "tests")
+import check_logs  # noqa: E402
+result_sentence = re.search(r"Result is exactly one of (.+?)\. ", " ".join(read(CRITERIA_PM[0]).split()))
+pm_results = re.findall(r"`([^`]+)`", result_sentence.group(1)) if result_sentence else []
+if sorted(pm_results) != sorted(check_logs.RESULTS):
+    fail(f"{CRITERIA_PM[0]} gives the Result values {pm_results!r}, but tests/check_logs.py lints {list(check_logs.RESULTS)!r}")
+
+print(
+    f"PASS: check 7: the criteria block is byte-identical across {', '.join(criteria_blocks)} (in the PM files, inside "
+    f"the ACCEPT template), the PM files state its Result values ({', '.join(pm_results)}) as the log linter does, and "
+    f"both SKILL.md files number the Goal template's criteria"
+)
+
+
+# ---- 7h: the high-stakes review (finding 3). On a high-stakes PASS the PM
+# archives nothing; the main session reviews the change, appends a
+# ## High-stakes review entry, and only an upheld review sends the log to
+# squad-mech's closing archive. The review template is byte-identical in
+# SKILL.md and codex/README.md (on the manual Codex path the operator writes
+# it by hand), the PM body and its Codex prompt stop a high-stakes PASS with
+# nothing archived, squad-mech's body and its Codex prompt carry the close
+# guard (check 8d runs it), the example log's review has one Tested: line and
+# one Result: line, and no file keeps the old flow, in which the main session
+# cleared or archived the log itself.
+REVIEW_HEADING = "## High-stakes review"
+REVIEW_PATHS = ["skills/compute-squad/SKILL.md", "codex/README.md"]
+review_blocks = {path: extract_fenced_block(read(path), path, "```markdown", REVIEW_HEADING) for path in REVIEW_PATHS}
+for path, block in review_blocks.items():
+    if block != review_blocks[REVIEW_PATHS[0]]:
+        fail(f"{path}: the {REVIEW_HEADING} template differs from {REVIEW_PATHS[0]}'s: {block!r}")
+for path in CRITERIA_PM:
+    if "archive nothing and clear nothing" not in " ".join(read(path).split()):
+        fail(f"{path}: a high-stakes PASS must 'archive nothing and clear nothing' (finding 3)")
+CLOSE_GUARD = "grep '^Result:' COMPUTE_SQUAD_LOG.md | tail -n 1"
+for path in ("agents/squad-mech.md", "codex/01-archive.md"):
+    if CLOSE_GUARD not in read(path):
+        fail(f"{path}: squad-mech's closing archive must first run `{CLOSE_GUARD}`")
+example_review = extract_fenced_block(read("docs/example-log.md"), "docs/example-log.md", "```markdown", REVIEW_HEADING)
+tested_lines = [line for line in example_review if line.startswith("Tested: ")]
+result_lines = [line for line in example_review if re.fullmatch(r"Result: (upheld|overturned|held)", line)]
+if len(tested_lines) != 1 or len(result_lines) != 1:
+    fail(f"docs/example-log.md: the {REVIEW_HEADING} entry needs one 'Tested: ' line and one 'Result: <upheld|overturned|"
+         f"held>' line; found {len(tested_lines)} and {len(result_lines)}")
+# The last two are WO-2's interim close, which this flow replaced.
+RETIRED_CLOSE = (
+    "clear the log yourself", "clears it themselves", "you clear it once", "clears the log afterwards",
+    "archived, log kept", "main session's own step",
+)
+for path in tracked_files("skills", "agents", "codex", "docs", "README.md"):
+    flat = " ".join(read(path).split()).lower()
+    for phrase in RETIRED_CLOSE:
+        if phrase in flat:
+            fail(f"{path}: contains {phrase!r}, the old high-stakes close; the log is archived only by squad-mech "
+                 f"after an upheld {REVIEW_HEADING}")
+
+print(
+    f"PASS: check 7: the {REVIEW_HEADING} template is byte-identical across {', '.join(REVIEW_PATHS)}, the PM files "
+    f"archive nothing on a high-stakes PASS, squad-mech carries its close guard, the example's review has one Tested: "
+    f"and one Result: line, and no file keeps the old high-stakes close"
+)
 
 # ---- 7i: the closed heading list. SKILL.md's Hard rules carry the one list
 # of log headings and name the headings that may add " (cont.)". Every
@@ -941,15 +1070,21 @@ for heading in listed_headings + [h + CONT for h in cont_headings]:
 # prints it with --fields. Every log template in agents/*.md and codex/0*.md
 # (a cat >> COMPUTE_SQUAD_LOG.md <<'EOF' block) must carry exactly those
 # lines, in order, right under its Agent: line, and no other template line
-# may start with a routing field. Every stage heading in the table needs a
-# template, except the PASS and pending entries, which the PM body derives
-# from the FAIL template by the two sentences named below, so their fields
-# must be the FAIL fields without Rerun. Both SKILL.md files route from the
-# Classification: line and count FAILs from the Rerun: lines.
+# may start with a routing field. The main session's ## High-stakes review
+# template, fenced in SKILL.md and codex/README.md (7h), is held to the same
+# table. Every heading in the table needs a template, except the PASS and
+# pending entries, which the PM body derives from the FAIL template by the
+# two sentences named below, so their fields must be the FAIL fields without
+# the ones each sentence drops (Rerun, and for a pending entry High-stakes
+# too). Both SKILL.md files route from the Classification: line and count
+# FAILs from the Rerun: lines.
 HEREDOC_OPEN = "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'"
 DERIVED_FROM_FAIL = {
-    "## PM — PASS": "A PASS uses `## PM — PASS` and has no `Rerun:` line.",
-    "## PM — Accept (pending)": "A pending entry uses `## PM — Accept (pending)`, has no `Rerun:` line,",
+    "## PM — PASS": ("A PASS uses `## PM — PASS` and has no `Rerun:` line.", ("Rerun",)),
+    "## PM — Accept (pending)": (
+        "A pending entry uses `## PM — Accept (pending)`, has no `High-stakes:` or `Rerun:` line,",
+        ("High-stakes", "Rerun"),
+    ),
 }
 FIELD_ROUTE_RULES = (
     "`Classification:` line of the governing plan revision",
@@ -967,6 +1102,7 @@ for heading in field_table:
     if not heading_on_list(heading):
         fail(f"tests/check_logs.py gives routing fields to {heading!r}, which is not on {skill_path}'s heading list")
 templated = {}
+log_templates = []
 for path in tracked_files("agents/*.md", "codex/0*.md"):
     lines = read(path).splitlines()
     for start in (i for i, line in enumerate(lines) if line == HEREDOC_OPEN):
@@ -975,28 +1111,34 @@ for path in tracked_files("agents/*.md", "codex/0*.md"):
             if line == "EOF":
                 break
             block.append(line)
-        heading = block[0] if block else ""
-        agent_at = next((i for i, line in enumerate(block) if line.startswith("Agent: ")), None)
-        if not heading.startswith("## ") or agent_at is None:
-            fail(f"{path}:{start + 1}: a log template opens with its heading and carries an Agent: line")
-        expected = [f"{name}: {placeholder}" for name, placeholder in field_table.get(heading, [])]
-        got = block[agent_at + 1:agent_at + 1 + len(expected)]
-        if got != expected:
-            fail(f"{path}:{start + 1}: the {heading} template's lines under Agent: must be {expected!r}, the FIELDS "
-                 f"table in tests/check_logs.py; found {got!r}. Change the template and the table together")
-        stray = [line for index, line in enumerate(block)
-                 if not agent_at < index <= agent_at + len(expected)
-                 and any(line.startswith(name + ": ") for name in field_names)]
-        if stray:
-            fail(f"{path}:{start + 1}: the {heading} template has routing field lines outside its fixed lines: {stray!r}")
-        templated.setdefault(heading, []).append(path)
-fail_fields = [f for f in field_table["## PM — FAIL"] if f[0] != "Rerun"]
+        log_templates.append((path, start, block))
+for path in REVIEW_PATHS:
+    lines = read(path).splitlines()
+    start = next(i for i in range(len(lines) - 1) if lines[i] == "```markdown" and lines[i + 1] == REVIEW_HEADING)
+    log_templates.append((path, start, review_blocks[path]))
+for path, start, block in log_templates:
+    heading = block[0] if block else ""
+    agent_at = next((i for i, line in enumerate(block) if line.startswith("Agent: ")), None)
+    if not heading.startswith("## ") or agent_at is None:
+        fail(f"{path}:{start + 1}: a log template opens with its heading and carries an Agent: line")
+    expected = [f"{name}: {placeholder}" for name, placeholder in field_table.get(heading, [])]
+    got = block[agent_at + 1:agent_at + 1 + len(expected)]
+    if got != expected:
+        fail(f"{path}:{start + 1}: the {heading} template's lines under Agent: must be {expected!r}, the FIELDS "
+             f"table in tests/check_logs.py; found {got!r}. Change the template and the table together")
+    stray = [line for index, line in enumerate(block)
+             if not agent_at < index <= agent_at + len(expected)
+             and any(line.startswith(name + ": ") for name in field_names)]
+    if stray:
+        fail(f"{path}:{start + 1}: the {heading} template has routing field lines outside its fixed lines: {stray!r}")
+    templated.setdefault(heading, []).append(path)
 for heading, fields in field_table.items():
     if heading in templated:
         continue
-    sentence = DERIVED_FROM_FAIL.get(heading)
-    if sentence is None or fields != fail_fields:
-        fail(f"no log template in agents/*.md carries the routing fields tests/check_logs.py gives {heading!r}")
+    sentence, dropped = DERIVED_FROM_FAIL.get(heading, (None, ()))
+    if sentence is None or fields != [f for f in field_table["## PM — FAIL"] if f[0] not in dropped]:
+        fail(f"no log template in agents/*.md or {', '.join(REVIEW_PATHS)} carries the routing fields "
+             f"tests/check_logs.py gives {heading!r}")
     for path in ("agents/squad-pm.md", "codex/05-pm-accept.md"):
         if sentence not in read(path):
             fail(f"{path}: must say {sentence!r}, which defines the {heading} entry from the FAIL template")
@@ -1019,9 +1161,9 @@ print(
 # right after that rule is the canonical copy. In every file that runs it,
 # the ```bash blocks that name compute-squad-archive must be exactly the
 # expected forms: the plain command, or the PM's form (the prefix the rule
-# names, then the second line), preceded on a high-stakes PASS by the PM's
-# form that ends with the echo the rule names in place of the clear. The
-# read-back and whole-file Write wording it replaced must not come back.
+# names, then the second line). A high-stakes PASS archives nothing (7h), so
+# there is no third form. The read-back and whole-file Write wording it
+# replaced must not come back.
 skill_path = "skills/compute-squad/SKILL.md"
 skill_text = read(skill_path)
 skill_lines = skill_text.splitlines()
@@ -1041,15 +1183,7 @@ prefix_match = re.search(r"The PM's form inserts `([^`]+)` at the start of the s
 if not prefix_match:
     fail(f"{skill_path}: the archive rule no longer names the PM's prefix")
 plain_form = [archive_first, archive_second]
-pm_form = [archive_first, prefix_match.group(1) + archive_second]
-pm_forms = [pm_form]
-kept_match = re.search(r"on a high-stakes PASS it also ends with `([^`]+)` in place of the clear", skill_lines[idx])
-if kept_match:
-    clear_at = archive_second.find(" && : > COMPUTE_SQUAD_LOG.md")
-    if clear_at < 0:
-        fail(f"{skill_path}: the archive command no longer clears the log with ': > COMPUTE_SQUAD_LOG.md'")
-    kept_second = prefix_match.group(1) + archive_second[:clear_at] + " && " + kept_match.group(1)
-    pm_forms = [[archive_first, kept_second], pm_form]
+pm_forms = [[archive_first, prefix_match.group(1) + archive_second]]
 
 
 def archive_blocks(text):
@@ -1270,7 +1404,8 @@ CRITERION_COMMAND = (
 # work the revision and work order the latest Status names; ACCEPT judges
 # only that work order and leaves the log open while another one remains;
 # the main session routes on the Classification: line and counts FAILs from
-# the Rerun: lines.
+# the Rerun: lines. The work-order stop also holds a high-stakes PASS for the
+# main session's review (finding 3).
 EXECUTOR_PLAN_READ = (
     "Work through the tasks of the plan revision and work order that the latest `## Status` entry names, in order, "
     "and stop at the end of that work order; with no `## Status`, use the latest `## PM — Plan` entry and all its "
@@ -1281,8 +1416,9 @@ VERDICT_SCOPE = (
     "history, and other work orders are outside this verdict."
 )
 WORK_ORDER_STOP = (
-    "If the governing plan revision has a work order after the one you accepted, stop here: archive nothing, clear "
-    "nothing, and say in your final summary that the run stays open for the next work order."
+    "If any line in the log reads `High-stakes: yes`, or the governing plan revision has a work order after the one "
+    "you accepted, stop here: archive nothing and clear nothing. Your final summary says which: the log awaits the "
+    "main session's high-stakes review, the run stays open for the next work order, or both."
 )
 PLAN_ATTEMPT = (
     "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n "
@@ -1299,6 +1435,18 @@ CLASSIFICATION_ROUTE = (
 FAIL_COUNT = (
     "Count FAILs from the log, never from memory: the FAIL total is the number of lines matching "
     "`^(Rerun: |- rerun: )`, and each such line charges one FAIL to the stage it names."
+)
+# Finding 13: every stage body tells a re-spawned stage what sent it back,
+# on its Answers: line, in one sentence (the log linter's answers rule checks
+# the line; the PM's ACCEPT section states the verdict form).
+ANSWERS_SENTENCE = (
+    "On attempt 1, leave the template's `Answers:` line out. From attempt 2 on, write `Answers:` directly under your "
+    "`Attempt:` line, naming by heading and timestamp what sent "
+    "this stage back: the latest `## PM — FAIL` or overturned `## High-stakes review` whose `Rerun:` line names this "
+    "stage, the latest `BLOCKER:` whose `rerun:` line names it, or the `## Decision` that resolved your own "
+    "`needs-human:` blocker. If this stage re-runs only because an earlier stage did, name what sent that stage back; "
+    "if it re-runs for a moved base commit, name the latest `## Status`. Closing what it names is your first objective; "
+    "then complete the rest of the work in full."
 )
 # Finding 11: squad-mech refuses to archive a log whose latest Next: line is
 # open, so a second run cannot truncate a live one (check 8b runs the guard).
@@ -1339,7 +1487,8 @@ SHARED_SPANS = [
              contains=(BLOCKER_FENCE, "is a protocol violation.")),
     span_row("7n output form", EXECUTOR_BODIES + ["codex/04-execute.md"], text="`" + OUTPUT_FORM + "`"),
     span_row("7n ACCEPT output form", PM_FILES, text="`" + ACCEPT_FORM + "`"),
-    span_row("7n check line", PM_FILES, text=CHECK_LINE_FORM),
+    # The PASS step repeats the form, so the row anchors on step 2's sentence.
+    span_row("7n check line", PM_FILES, text="Record each command in your entry as " + CHECK_LINE_FORM + "."),
 ] + [
     span_row(f"ACCEPT read: {part}", PM_FILES, text=command) for part, command in ACCEPT_READS
 ] + [
@@ -1357,6 +1506,7 @@ SHARED_SPANS = [
     span_row("classification route", [SKILL], text=CLASSIFICATION_ROUTE),
     span_row("FAIL count", [SKILL], text=FAIL_COUNT),
     span_row("open-run guard", ["agents/squad-mech.md", "codex/01-archive.md"], text=OPEN_RUN_GUARD_SPAN),
+    span_row("answers", BODIES + ["codex/02-recon.md", "codex/03-pm-plan.md", "codex/04-execute.md"], text=ANSWERS_SENTENCE),
 ]
 
 
@@ -1668,6 +1818,142 @@ print(
     f"PASS: check 7: {RESUME}'s next-action table routes from {', '.join(routed)}; both SKILL.md files send a resume "
     f"to it and carry the one-active-run rule, and squad-mech's open-run guard is in its body, prompt, and TOML"
 )
+
+# ---- 7w: entry labels (finding 16). Recon and Executor entries are labeled
+# sections, one line per item, not prose paragraphs. The Recon template in
+# agents/squad-recon.md and codex/02-recon.md, and the Executor template in
+# agents/squad-executor.md and codex/04-execute.md (7m holds the other two
+# executors to it), carry exactly the labels tests/check_logs.py --labels
+# lints, in its order, after their fixed lines. The PLAN template states the
+# plan's totals on a Totals: line, and ACCEPT answers every Executor point.
+labels_run = subprocess.run([sys.executable, "tests/check_logs.py", "--labels"], capture_output=True, text=True)
+try:
+    label_table = json.loads(labels_run.stdout) if labels_run.returncode == 0 else None
+except ValueError:
+    label_table = None
+if not isinstance(label_table, dict) or set(label_table) != {"## Recon", "## Executor"}:
+    fail(f"tests/check_logs.py --labels exited {labels_run.returncode} without its label table: {labels_run.stderr.strip()}")
+LABEL_TEMPLATES = {
+    "## Recon": ["agents/squad-recon.md", "codex/02-recon.md"],
+    "## Executor": ["agents/squad-executor.md", "codex/04-execute.md"],
+}
+FIXED_PREFIXES = ("Timestamp:", "Agent:", "Attempt:", "Answers:", "Plan:")
+for heading, paths in LABEL_TEMPLATES.items():
+    for path in paths:
+        lines = read(path).splitlines()
+        opens = [i for i, line in enumerate(lines) if line == LOG_HEREDOC and lines[i + 1:i + 2] == [heading]]
+        if len(opens) != 1:
+            fail(f"{path}: needs one {LOG_HEREDOC!r} template for {heading!r}; found {len(opens)}")
+        block = []
+        for line in lines[opens[0] + 2:]:
+            if line == "EOF":
+                break
+            block.append(line)
+        found = [line.split(":", 1)[0] for line in block
+                 if line.strip() and not line.startswith("- ") and ":" in line and not line.startswith(FIXED_PREFIXES)]
+        if found != label_table[heading]:
+            fail(f"{path}: the {heading} template's labels are {found!r}; tests/check_logs.py lints "
+                 f"{label_table[heading]!r}. Change the template and LABELS together")
+for path in ("agents/squad-pm.md", "codex/03-pm-plan.md"):
+    if "\nTotals: <every quantity the work produces>\n" not in read(path) or "on a `Totals:` line" not in read(path):
+        fail(f"{path}: the PLAN template needs its 'Totals: <every quantity the work produces>' line and the Totals: rule")
+for path in CRITERIA_PM:
+    if "Never PASS with an unanswered point." not in read(path):
+        fail(f"{path}: ACCEPT must answer every Executor point ('Never PASS with an unanswered point.')")
+
+print(
+    "PASS: check 7: the Recon and Executor templates carry the labels the log linter checks ("
+    + "; ".join(f"{h}: {', '.join(l)}" for h, l in label_table.items())
+    + "), the PLAN template a Totals: line, and ACCEPT answers every Executor point"
+)
+
+# ---- 7x: evidence prerequisites (finding 14). Recon checks the goal's stated
+# facts, runs the project's test or verify command once on the untouched
+# tree, and confirms the tools the criteria's evidence needs; its Checks:
+# block opens with those results. PLAN starts from that block, reconciles its
+# counts, marks its own assumptions, and escalates before dropping existing
+# behavior. The Recon template in agents/squad-recon.md and codex/02-recon.md
+# carries the Checks: lines, and an instance of each must match the forms the
+# log linter's recon-checks rule reads (tests/check_logs.py GOAL_FACTS_LINE,
+# BASELINE_LINE, BASELINE_SKIPPED). The Recon body and prompt carry
+# the one baseline command form and the skip line; no agent body or Codex
+# prompt keeps the old "exactly one carve-out" Bash rule. The executors stop
+# with needs-human: on a failure Recon's Checks block already records
+# (finding 13), so that clause names the block this check pins.
+EVIDENCE = "evidence prerequisites"
+EVIDENCE_PATHS = ["agents/squad-recon.md", "codex/02-recon.md", "skills/compute-squad/SKILL.md", "codex/SKILL.md"]
+RECON_TEMPLATES = ["agents/squad-recon.md", "codex/02-recon.md"]
+RECON_CHECKS = [
+    "Checks:",
+    "- goal facts: <all confirmed | each false one, with the file:line that contradicts it>",
+    "- `<baseline command>` -> exit <code>; <last summary line>; tree changed: <no | the paths>",
+    "- `<presence check for a tool a criterion needs>` -> exit <code>; <version or path>",
+]
+BASELINE_FORM = (
+    '`git status --porcelain; set -o pipefail; <command> 2>&1 | tail -n 20; echo "exit $?"; git status --porcelain`'
+)
+BASELINE_SKIP = "- baseline: not run, <why>"
+PLAN_PREREQS = (
+    "Start from Recon's Checks block and do not re-run a baseline it logged.",
+    "Reconcile before you append:",
+    "with `Assumed:` and name the check that would confirm it.",
+    "Never describe a compatibility loss as accepted.",
+)
+PLAN_PATHS = ["agents/squad-pm.md", "codex/03-pm-plan.md"]
+STOP_TARGET = "`needs-human:` when Recon's Checks block or the plan records the same failure on the unchanged tree"
+OLD_CARVE_OUT = "exactly one carve-out"
+
+
+def instance(line):
+    line = line.replace("<baseline command>", "npm test").replace(
+        "<presence check for a tool a criterion needs>", "node --version").replace("<code>", "0")
+    return re.sub(r"<[^<>]+>", "x", line)
+
+
+for path in EVIDENCE_PATHS:
+    if EVIDENCE not in " ".join(read(path).split()):
+        fail(f"{path}: must name the {EVIDENCE!r} Recon checks")
+for path in RECON_TEMPLATES:
+    lines = read(path).splitlines()
+    opens = [i for i, line in enumerate(lines) if line == LOG_HEREDOC and lines[i + 1:i + 2] == ["## Recon"]]
+    block = []
+    for line in lines[opens[0] + 2:] if len(opens) == 1 else []:
+        if line == "EOF":
+            break
+        block.append(line)
+    at = [i for i, line in enumerate(block) if line == RECON_CHECKS[0]]
+    if len(at) != 1 or block[at[0]:at[0] + len(RECON_CHECKS)] != RECON_CHECKS:
+        fail(f"{path}: the ## Recon template's Checks: block must read {RECON_CHECKS!r}")
+    text = read(path)
+    for needed in (BASELINE_FORM, "`" + BASELINE_SKIP + "`"):
+        if needed not in text:
+            fail(f"{path}: Recon's baseline step must give {needed!r}")
+forms = [
+    (instance(RECON_CHECKS[1]), check_logs.GOAL_FACTS_LINE, "GOAL_FACTS_LINE"),
+    (instance(RECON_CHECKS[2]), check_logs.BASELINE_LINE, "BASELINE_LINE"),
+    (instance(BASELINE_SKIP), check_logs.BASELINE_SKIPPED, "BASELINE_SKIPPED"),
+]
+for sample, pattern, name in forms:
+    if not re.fullmatch(pattern, sample):
+        fail(f"tests/check_logs.py {name} rejects {sample!r}, an instance of the Recon template's line; change the "
+             f"template and the linter together")
+for path in PLAN_PATHS:
+    missing = [phrase for phrase in PLAN_PREREQS if phrase not in read(path)]
+    if missing:
+        fail(f"{path}: PLAN must start from Recon's Checks block, reconcile, mark assumptions, and keep behavior; "
+             f"missing {missing!r}")
+for path in EXECUTOR_BODIES + ["codex/04-execute.md"]:
+    if STOP_TARGET not in read(path):
+        fail(f"{path}: the stop target must name Recon's Checks block: {STOP_TARGET!r}")
+stale = [path for path in tracked_files("agents/", "codex/") if OLD_CARVE_OUT in read(path)]
+if stale:
+    fail(f"{', '.join(stale)}: still say {OLD_CARVE_OUT!r}; Recon's Bash has two carve-outs, the baseline run and the log append")
+
+print(
+    f"PASS: check 7: Recon checks the {EVIDENCE} ({', '.join(EVIDENCE_PATHS)}), its template's Checks: block matches "
+    f"the log linter's recon-checks forms, PLAN starts from it and reconciles its counts ({', '.join(PLAN_PATHS)}), the "
+    f"executors' stop target names it, and no agent body or Codex prompt keeps {OLD_CARVE_OUT!r}"
+)
 PYEOF
 
 # ---------------------------------------------------------------------------
@@ -1715,12 +2001,25 @@ def read(path):
 # above it, and its needs-human rule lets no stage entry follow a needs-human
 # blocker until a Decision. Its fields, attempt, governing-plan, high-stakes,
 # and cont rules hold the routing lines finding 9 fixes under each stage
-# entry's Agent: line (check 7i holds the templates to the same table). The example
+# entry's Agent: line (check 7i holds the templates to the same table). Its
+# criteria, waiver, and parity rules hold every PASS and FAIL to finding 2's
+# criteria block, whose shape it reads from SKILL.md (check 7g holds the
+# copies alike), and its labels, executor-points, and totals rules hold the
+# Recon and Executor entries, the verdict's answers, and the plan to finding
+# 16's labels (check 7w holds the templates to them). Its review rules hold
+# the main session's ## High-stakes review to finding 3: one follows every
+# high-stakes PASS, its Rerun: line appears only when it is overturned, and an
+# upheld review has no open item and closes the run. Its answers rule holds
+# every re-run to finding 13's Answers: line, and its recon-checks rule holds
+# the Recon entry's Checks: block to finding 14's goal-facts and baseline
+# lines (check 7x holds the template to the same forms). The example
 # log must lint clean. Each fixture tests/fixtures/logs/<name>.log.md has a
 # <name>.expect.json that cites the protocol text it tests (each cited text
 # must still be in the cited file) and says whether the linter passes it or
 # which rules it fails. Every negative fixture must fail with exactly its
-# rules, and every linter rule needs at least one negative fixture.
+# rules, and every linter rule needs at least one negative fixture. A live
+# seed's .expect.json may also list outcomes, entries a live call could
+# append, each with the lint result the seed plus that entry must give.
 LINTER = "tests/check_logs.py"
 FIXTURES = "tests/fixtures/logs/"
 INVENTED = FIXTURES + "invented-heading.log.md"
@@ -1801,9 +2100,45 @@ uncovered = [r for r in linter_rules if r not in covered]
 if uncovered:
     fail(f"linter rules with no negative fixture in {FIXTURES}: {uncovered!r}")
 
+# A live seed's .expect.json may list outcomes: entries a live call could
+# append ("append", one string per line), each with the lint result the seed
+# plus that entry must give. S5's are the verdicts section 6 names as its
+# 8a twin: over the S5 seed, a PASS with a not met row and a PASS with a
+# waived row and no Decision fail; the FAIL and the pending entry S5 accepts
+# lint clean. Check 8b holds the live check's judgment to each "live" value.
+OUTCOME_KEYS = {"note", "append", "lint", "live"}
+outcomes_linted = 0
+with tempfile.TemporaryDirectory() as tmp:
+    for log in logs:
+        expect_path = log[:-len(".log.md")] + ".expect.json"
+        for number, outcome in enumerate(json.loads(read(expect_path)).get("outcomes") or [], 1):
+            if (not isinstance(outcome, dict) or set(outcome) != OUTCOME_KEYS or not outcome["append"]
+                    or not all(isinstance(line, str) for line in outcome["append"])
+                    or outcome["live"] not in ("pass", "fail")):
+                fail(f"{expect_path}: outcome {number} needs exactly {sorted(OUTCOME_KEYS)!r}, with 'append' a list "
+                     f"of lines and 'live' pass or fail")
+            outcome_lint = outcome["lint"] if isinstance(outcome["lint"], dict) else {}
+            wanted, wanted_rules = outcome_lint.get("result"), outcome_lint.get("rules")
+            if wanted not in ("pass", "fail") or not isinstance(wanted_rules, list) \
+                    or (wanted == "fail") != bool(wanted_rules) or any(r not in linter_rules for r in wanted_rules):
+                fail(f"{expect_path}: outcome {number}'s lint.result must be pass with no rules, or fail with rules "
+                     f"from {linter_rules!r}")
+            appended = os.path.join(tmp, f"{os.path.basename(log)[:-len('.log.md')]}-{number}.log.md")
+            with open(appended, "w", encoding="utf-8") as handle:
+                handle.write(read(log).rstrip("\n") + "\n\n" + "\n".join(outcome["append"]) + "\n")
+            run = run_linter(appended)
+            found = fired_rules(run.stdout)
+            if (wanted == "pass" and run.returncode != 0) \
+                    or (wanted == "fail" and (run.returncode != 1 or found != set(wanted_rules))):
+                fail(f"{log} with {expect_path}'s outcome {number} appended should "
+                     + ("lint clean" if wanted == "pass" else f"fail exactly {sorted(wanted_rules)!r}")
+                     + f"; exit {run.returncode}, fired {sorted(found)!r}:\n{run.stdout}{run.stderr}")
+            outcomes_linted += 1
+
 print(
     f"PASS: check 8: docs/example-log.md lints clean, {len(passing)} fixture logs pass, and {len(failing)} fail "
-    f"with exactly their expected rules; every linter rule has a failing fixture ({', '.join(linter_rules)})"
+    f"with exactly their expected rules; every linter rule has a failing fixture ({', '.join(linter_rules)}); "
+    f"{outcomes_linted} live-seed outcomes, each appended to its seed, lint as their fixtures state"
 )
 
 # ---- 8b: the resume table. tests/resume_next.py models
@@ -1818,13 +2153,19 @@ print(
 # be exercised by a fixture that lints clean. The section 6 scenarios whose
 # static twin is 8b must map to the case named below, with the action the
 # scenario asserts. Every live scenario in tests/live/run.sh is the live half
-# of one of those twins, seeded with the twin's fixture: run.sh's --list,
+# of one of those twins, seeded with the twin's fixture (S5 and S5b on
+# tests/fixtures/repo-ui/, the rest on tests/fixtures/repo-reset/; S5's
+# verdicts are also 8a's outcomes, and S6a and S6b also have 8d twins),
+# and the live S5 check's rule gives each of its seed's outcomes the value
+# the fixture states: run.sh's --list,
 # --dry-run, and --setup-only run for every scenario with CI set and a claude
 # stub that must never be called, and in each repo --setup-only builds, HEAD
 # and git status against the seeded Base: must give the twin's state, and the
 # model over the seeded log must give the twin's action with the repo's own
 # commits in it. Where node is installed, each repo's npm test script passes,
-# so no live scenario starts on a broken tree. squad-mech's open-run guard,
+# so no live scenario starts on a broken tree, and a scenario that prints a
+# preflight passes it as printed (S5's and S5b's only where Playwright's
+# Chromium starts). squad-mech's open-run guard,
 # the command its archive procedure runs before the archive command, runs
 # with sh (and dash and bash where installed) over every fixture log, and
 # must refuse the archive for exactly the logs the one-active-run rule
@@ -1859,7 +2200,7 @@ RESUME_TWINS = [
     ("S2", "s2", {}, "step 4: perform Next", EXECUTOR_SPAWN, None),
     ("S2b", "s2b", {}, "row: `## PM — Plan`", "awaits a grant for r2", EXECUTOR_SPAWN),
     ("S2c", "s2c", {"dirty": ["src/server/auth/reset.service.js", "src/server/auth/__tests__/reset.routes.test.js"]},
-     "row: `## PM — PASS` in a high-stakes run", "await a grant", EXECUTOR_SPAWN),
+     "row: `## PM — PASS` in a high-stakes run", "high-stakes review procedure", EXECUTOR_SPAWN),
     ("S3a", "s3", {"head": "b7e41d2", "moved": ["src/server/db/store.js"]}, "base check: re-map",
      "spawn squad-recon to re-map src/server/db/store.js", EXECUTOR_SPAWN),
     ("S3b", "s3", {"head": "b7e41d2", "moved": ["docs/notes.md"]}, "base check: continue", EXECUTOR_SPAWN,
@@ -1871,6 +2212,12 @@ RESUME_TWINS = [
                                                "src/server/auth/__tests__/reset.routes.test.js",
                                                "src/server/log.js"]},
      "step 5: accept", "review git diff 4f2c9a1 against c3a9f05", EXECUTOR_SPAWN),
+    ("S5", "s5", {"dirty": ["public/index.html", "public/styles.css", "test/page.test.js"]}, "step 4: perform Next",
+     "spawn squad-pm (ACCEPT)", EXECUTOR_SPAWN),
+    ("S5b", "s5b", {}, "step 4: perform Next", "spawn squad-recon", "squad-pm"),
+    ("S6a", "s6a", {"dirty": ["src/server/auth/reset.service.js", "src/server/auth/__tests__/reset.routes.test.js"]},
+     "row: `## PM — PASS` in a high-stakes run", "high-stakes review procedure", "squad-mech"),
+    ("S6b", "run-parked", {"request": "new-goal"}, "new run: archive", "archive the log", "refuse"),
     ("S7b", "s7b", {}, "step 2", "three FAILs", "append"),
     ("second run", "s2", {"request": "new-goal"}, "new run: refuse", "park, or abandon", "Stage 1"),
 ]
@@ -1923,7 +2270,8 @@ LIVE_RUN = "tests/live/run.sh"
 LIVE_CHECK = "tests/live/check_live.py"
 LIVE_TWINS = {
     "s1": "S1 turn 1", "s1n": "S1 turn 1", "s2": "S2", "s2b": "S2b", "s2c": "S2c", "s2o": "second run",
-    "s3a": "S3a", "s3b": "S3b", "s4": "S4", "s4b": "S4b", "s7b": "S7b",
+    "s3a": "S3a", "s3b": "S3b", "s4": "S4", "s4b": "S4b", "s5": "S5", "s5b": "S5b", "s6a": "S6a", "s6b": "S6b",
+    "s7b": "S7b",
 }
 GIT_STATE = ("head", "moved", "dirty")
 for path in (LIVE_RUN, LIVE_CHECK):
@@ -1936,6 +2284,25 @@ twin_rows = {row[0]: row for row in RESUME_TWINS}
 unknown_twins = sorted(set(LIVE_TWINS.values()) - set(twin_rows))
 if unknown_twins:
     fail(f"LIVE_TWINS names rows RESUME_TWINS lacks: {unknown_twins!r}")
+
+# The live check's rule for a scenario whose seed lists outcomes (8a lints
+# them): over each outcome's entries it gives the outcome's "live" value, so
+# the rule a live S5 call is judged by is the one these fixtures pin, and the
+# outcomes hold at least one verdict it accepts and one it rejects.
+LIVE_JUDGES = {"s5": check_live.s5_judgment}
+judged_outcomes = 0
+for seed, judge in LIVE_JUDGES.items():
+    seed_log = FIXTURES + seed + ".log.md"
+    outcomes = json.loads(read(seed_log[:-len(".log.md")] + ".expect.json")).get("outcomes") or []
+    if {o["live"] for o in outcomes} != {"pass", "fail"}:
+        fail(f"{FIXTURES}{seed}.expect.json needs outcomes the live {seed} check accepts and outcomes it rejects")
+    start = len(read(seed_log).rstrip("\n").splitlines()) + 2
+    for number, outcome in enumerate(outcomes, 1):
+        accepted, found = judge(check_live.entries_of(outcome["append"], start), check_live.SEED_BASE)
+        if accepted != (outcome["live"] == "pass"):
+            fail(f"{LIVE_CHECK}'s {seed} rule " + ("accepts" if accepted else "rejects") + f" outcome {number} of "
+                 f"{FIXTURES}{seed}.expect.json ({found}); the fixture says live: {outcome['live']}")
+        judged_outcomes += 1
 
 
 def porcelain_paths(text):
@@ -1953,6 +2320,7 @@ def porcelain_paths(text):
 
 
 live_repos = live_tests = 0
+browser, preflights_run, preflights_skipped = None, [], []
 with tempfile.TemporaryDirectory() as tmp:
     claude_stub = os.path.join(tmp, "claude")
     with open(claude_stub, "w", encoding="utf-8") as handle:
@@ -2047,6 +2415,27 @@ with tempfile.TemporaryDirectory() as tmp:
                 fail(f"{LIVE_RUN} {name}: npm test's script ({script}) fails on the tree --setup-only builds, so the "
                      f"live scenario would start broken:\n{(test.stdout + test.stderr)[-1500:]}")
             live_tests += 1
+        # A scenario whose premise needs its own environment (S5's browser,
+        # S5b's missing one, S6b's clock) prints the preflight a live run
+        # executes before it spends: run it here as printed. S6b's needs only
+        # sh and date; S5's and S5b's need Playwright's Chromium, so they run
+        # where it starts.
+        preflight = re.search(r"^  preflight:\n    \(cd (.+) &&\n     (.+) \)$", setup.stdout, re.MULTILINE)
+        if preflight:
+            if os.path.exists(os.path.join(repo, *check_live.BROWSER_CHECK[1].split("/"))):
+                if browser is None:
+                    probe = subprocess.run(list(check_live.BROWSER_CHECK) + ["--probe"], cwd=repo,
+                                           capture_output=True, text=True, timeout=120) if node else None
+                    browser = bool(probe) and probe.returncode == 0
+                if not browser:
+                    preflights_skipped.append(name)
+                    continue
+            run = subprocess.run(["bash", "-c", f"cd {preflight.group(1)} && {preflight.group(2)}"],
+                                 capture_output=True, text=True, timeout=300)
+            if run.returncode != 0:
+                fail(f"{LIVE_RUN} {name}: the preflight --setup-only prints fails, so the live scenario's premise does "
+                     f"not hold:\n{(run.stdout + run.stderr)[-1500:]}")
+            preflights_run.append(name)
 
 guard = re.search(r"first run `([^`]+)`\. If it prints a line other than `Next: none`, change nothing and report "
                   r"`ARCHIVE REFUSED: open run` followed by that line\.", read(MECH))
@@ -2078,6 +2467,10 @@ print(
     f"next action"
     + (f", with npm test's script passing in all {live_tests}" if live_tests else " (node is not installed, so their "
        "npm test did not run)")
+    + (f"; the preflights of {', '.join(preflights_run)} hold as --setup-only prints them" if preflights_run else "")
+    + (f" ({', '.join(preflights_skipped)} not run: Playwright's Chromium does not start here)"
+       if preflights_skipped else "")
+    + f"; the live S5 rule accepts and rejects the {judged_outcomes} outcomes its seed lists as they state"
     + f"; squad-mech's open-run guard agrees with the one-active-run rule "
     f"over every fixture log ({guard_checked} runs under {', '.join(guard_shells)})"
 )
@@ -2103,8 +2496,8 @@ print(
 # Every other agent, and input the script cannot read, is allowed silently.
 # Over the live seeds in tests/fixtures/logs/ that tests/live/run.sh uses
 # (8b reads them from run.sh --list, and each needs a verdict here), every
-# executor is denied for s1, s2b, and s4 and allowed for s2, s2c, s3, and
-# s7b. The hook and the plan's Attempt: line name the same revision
+# executor is denied for s1, s2b, s4, and run-parked (S6b) and allowed for
+# s2, s2c, s3, s5, s5b, s6a, and s7b. The hook and the plan's Attempt: line name the same revision
 # (finding 9): a plan whose Attempt: line is wrong does not move the hook's
 # count, and over the fixtures with a (cont.) plan or two revisions, a grant
 # for the latest plan's Attempt: number allows and a grant for any other
@@ -2189,7 +2582,8 @@ GATE_CASES = [
     ("a later Status that grants", GOAL + status("none") + PLAN + status(ALL), "allow"),
 ]
 SEED_VERDICTS = [("s1", "deny"), ("s2", "allow"), ("s2b", "deny"), ("s2c", "allow"), ("s3", "allow"),
-                 ("s4", "deny"), ("s7b", "allow")]
+                 ("s4", "deny"), ("s5", "allow"), ("s5b", "allow"), ("s6a", "allow"), ("run-parked", "deny"),
+                 ("s7b", "allow")]
 unjudged = sorted(set(seed for _, seed, _ in scenarios) - set(seed for seed, _ in SEED_VERDICTS))
 if unjudged:
     fail(f"check 8c needs the grant hook's verdict over every live seed {LIVE_RUN} uses; none for {unjudged!r}")
@@ -2313,7 +2707,11 @@ with tempfile.TemporaryDirectory() as tmp:
     # work-order scope of a grant, which this hook does not check, so 8b
     # covers S2c. S3's r1 WO-1 grant allows before the base check, which is
     # 8b's, and S7b's allows too: the three-FAIL stop is the main session's,
-    # so 8b covers it.
+    # so 8b covers it. S5's r1 grant, and S5b's and S6a's full-mode grants,
+    # allow: S5 and S6a spawn no executor because their next action is ACCEPT
+    # and the high-stakes review (8b), and S5b's stop is Recon's needs-human:
+    # blocker, which this hook then holds (check_live.py asserts it). S6b's
+    # parked plan-mode log denies.
     for seed, expected in SEED_VERDICTS:
         with open(log, "w", encoding="utf-8") as handle:
             handle.write(read(FIXTURES + seed + ".log.md"))
@@ -2388,6 +2786,334 @@ print(
     f"{', '.join(f'{seed} {verdict}' for seed, verdict in SEED_VERDICTS)}; allowed only for the latest plan's "
     f"Attempt: number over {', '.join(ATTEMPT_SEEDS)}; {', '.join(executors + held)} held while a "
     f"needs-human: blocker has no ## Decision after it; and {HOLD_EXEMPT} always allowed"
+)
+
+# ---- 8d: the archive command and the closing archive (findings 3, 11, and
+# 26). The command in SKILL.md's Hard rules, and the PM's form of it, run in
+# temp dirs under sh (and dash and bash where installed). On a plain log the
+# copy equals the log, the PM's form ends it with the Archive target: line it
+# printed, and the log is left empty. When a cmp shim that exits 1 stands in
+# for cmp, the command exits nonzero, the copy is written, and the log keeps
+# its sha256, apart from the PM form's intent line: it clears only after cmp.
+# When a date shim makes the name collide
+# with an existing archive, or the archive directory cannot be written, the
+# command exits nonzero and truncates nothing: every file keeps its sha256,
+# apart from the PM form's intent line when only the copy fails. Then
+# squad-mech's close guard, taken from its body, runs over every fixture log
+# and the example log's entries: it allows the closing archive exactly where
+# the latest ## High-stakes review reads Result: upheld, and there the
+# command's copy holds the whole log, review entry included, and the log is
+# left empty; the example log, whose review is upheld, must be among those
+# closed. Last, the live seeds' twins: S6a's seed, which ends in a
+# high-stakes PASS, is refused, and closed with the review in the copy once a
+# Status, the review from SKILL.md's template filled in as upheld, and a
+# Status are appended (a log that must lint clean); over S6b's seed the
+# open-run guard allows Stage 1, and under the date shim, with an archive
+# already at the name, the command exits nonzero and changes no file.
+import hashlib  # noqa: E402
+import check_logs  # noqa: E402  (tests/ is on sys.path since 8b)
+
+ARCHIVE_RULE = "- Every archive copy is written by this command and nothing else"
+skill_lines = read("skills/compute-squad/SKILL.md").splitlines()
+rule_at = next((i for i, line in enumerate(skill_lines) if line.startswith(ARCHIVE_RULE)), None)
+if rule_at is None:
+    fail(f"skills/compute-squad/SKILL.md: no Hard-rules bullet starting {ARCHIVE_RULE!r}")
+fence_at = next(i for i in range(rule_at + 1, len(skill_lines)) if skill_lines[i].strip())
+if skill_lines[fence_at:fence_at + 1] != ["```bash"] or skill_lines[fence_at + 3:fence_at + 4] != ["```"]:
+    fail("skills/compute-squad/SKILL.md: the archive command must be a two-line ```bash block right after its rule")
+archive_first, archive_second = skill_lines[fence_at + 1:fence_at + 3]
+pm_prefix = re.search(r"The PM's form inserts `([^`]+)` at the start of the second line", skill_lines[rule_at])
+if not pm_prefix:
+    fail("skills/compute-squad/SKILL.md: the archive rule no longer names the PM's prefix")
+ARCHIVE_FORMS = {
+    "squad-mech": archive_first + "\n" + archive_second + "\n",
+    "PM": archive_first + "\n" + pm_prefix.group(1) + archive_second + "\n",
+}
+close = re.search(r"When told to close a run, first run `([^`]+)`\. If it does not print exactly `([^`]+)`, change "
+                  r"nothing", read(MECH))
+if not close:
+    fail(f"{MECH}: no close guard reading \"When told to close a run, first run `<command>`. If it does not print "
+         f"exactly `<line>`, change nothing\"")
+close_guard, close_line = close.group(1), close.group(2)
+if close_line != "Result: upheld":
+    fail(f"{MECH}: the close guard must wait for 'Result: upheld', not {close_line!r}")
+ARCHIVED = re.compile(r"archived and cleared: (compute-squad-archive/COMPUTE_SQUAD_LOG_\d{4}-\d{2}-\d{2}_\d{6}_(\S+)\.md)")
+FIXED_STAMP = "2026-01-02_030405"
+archive_shells = [sh for sh in ("sh", "dash", "bash") if shutil.which(sh)]
+if "sh" not in archive_shells:
+    fail("check 8d needs sh, which runs the archive command on every host")
+
+
+def tree_hashes(root):
+    """{relative path: sha256, or 'dir'} for everything under root."""
+    found = {}
+    for top, dirs, files in os.walk(root):
+        for name in dirs:
+            found[os.path.relpath(os.path.join(top, name), root)] = "dir"
+        for name in files:
+            path = os.path.join(top, name)
+            with open(path, "rb") as handle:
+                found[os.path.relpath(path, root)] = hashlib.sha256(handle.read()).hexdigest()
+    return found
+
+
+def run_shell(shell, script, cwd, path_prefix=None):
+    env = dict(os.environ)
+    if path_prefix:
+        env["PATH"] = path_prefix + os.pathsep + env.get("PATH", "")
+    return subprocess.run([shell, "-c", script], cwd=cwd, capture_output=True, text=True, env=env, timeout=60)
+
+
+def fresh_dir(parent, name, log_text):
+    root = os.path.join(parent, name)
+    os.makedirs(root)
+    with open(os.path.join(root, "COMPUTE_SQUAD_LOG.md"), "w", encoding="utf-8") as handle:
+        handle.write(log_text)
+    return root
+
+
+SAMPLE = read(FIXTURES + "review-upheld.log.md")
+sample_run = re.search(r"^Run: (\S+)$", SAMPLE, re.MULTILINE).group(1)
+archive_runs = 0
+with tempfile.TemporaryDirectory() as tmp:
+    shim = os.path.join(tmp, "shim")
+    os.makedirs(shim)
+    with open(os.path.join(shim, "date"), "w", encoding="utf-8") as handle:
+        handle.write(f"#!/bin/sh\necho {FIXED_STAMP}\n")
+    os.chmod(os.path.join(shim, "date"), 0o755)
+    cmp_shim = os.path.join(tmp, "cmp-shim")
+    os.makedirs(cmp_shim)
+    with open(os.path.join(cmp_shim, "cmp"), "w", encoding="utf-8") as handle:
+        handle.write("#!/bin/sh\necho 'cmp shim: the copy differs' >&2\nexit 1\n")
+    os.chmod(os.path.join(cmp_shim, "cmp"), 0o755)
+    cmp_kept = 0
+    collided = f"compute-squad-archive/COMPUTE_SQUAD_LOG_{FIXED_STAMP}_{sample_run}.md"
+    for shell in archive_shells:
+        for form, command in ARCHIVE_FORMS.items():
+            label = f"the {form} archive command under {shell}"
+            # A plain log: an exact copy, then an empty log.
+            root = fresh_dir(tmp, f"{shell}-{form}-plain", SAMPLE)
+            run = run_shell(shell, command, root)
+            archive_runs += 1
+            printed = ARCHIVED.fullmatch(run.stdout.strip())
+            if run.returncode != 0 or not printed or printed.group(2) != sample_run:
+                fail(f"{label} on a plain log exited {run.returncode} and printed {run.stdout.strip()!r} "
+                     f"{run.stderr.strip()!r}; expected 'archived and cleared: <archive named for {sample_run}>'")
+            copy = read(os.path.join(root, printed.group(1)))
+            wanted = SAMPLE + (f"Archive target: {printed.group(1)}\n" if form == "PM" else "")
+            if copy != wanted:
+                fail(f"{label}: the archive copy is not the log" + (" ending with its Archive target: line" if form == "PM" else ""))
+            if os.path.getsize(os.path.join(root, "COMPUTE_SQUAD_LOG.md")) != 0:
+                fail(f"{label}: the active log is not empty after 'archived and cleared:'")
+            # A copy cmp does not verify, forced by a cmp shim that exits 1:
+            # the command exits nonzero and clears nothing. The log keeps its
+            # sha256 (the PM form's Archive target: line apart), and the only
+            # new file is the copy.
+            root = fresh_dir(tmp, f"{shell}-{form}-cmp", SAMPLE)
+            run = run_shell(shell, command, root, path_prefix=cmp_shim)
+            archive_runs += 1
+            log_now = read(os.path.join(root, "COMPUTE_SQUAD_LOG.md"))
+            kept = log_now == SAMPLE or (
+                form == "PM" and re.fullmatch(re.escape(SAMPLE) + r"Archive target: \S+\n", log_now) is not None)
+            left = sorted(tree_hashes(root))
+            copies = [p for p in left if p.startswith("compute-squad-archive" + os.sep)]
+            if run.returncode == 0 or "archived and cleared" in run.stdout or not kept or len(copies) != 1 \
+                    or set(left) != {"COMPUTE_SQUAD_LOG.md", "compute-squad-archive"} | set(copies):
+                fail(f"{label}: when cmp fails it must exit nonzero, print no 'archived and cleared', and leave the log "
+                     f"as it was" + (" apart from its Archive target: line" if form == "PM" else "") + f"; it exited "
+                     f"{run.returncode}, printed {run.stdout.strip()!r}, and left {left!r} with the log "
+                     + ("kept" if kept else "changed"))
+            cmp_kept += 1
+            # A name collision, forced by the date shim: nothing changes.
+            root = fresh_dir(tmp, f"{shell}-{form}-collision", SAMPLE)
+            os.makedirs(os.path.join(root, "compute-squad-archive"))
+            with open(os.path.join(root, collided), "w", encoding="utf-8") as handle:
+                handle.write("an earlier run's archive\n")
+            before = tree_hashes(root)
+            run = run_shell(shell, command, root, path_prefix=shim)
+            archive_runs += 1
+            if run.returncode == 0 or "archived and cleared" in run.stdout or tree_hashes(root) != before:
+                fail(f"{label}: over an existing {collided} it must exit nonzero and change no file; it exited "
+                     f"{run.returncode} and printed {run.stdout.strip()!r}")
+            # An archive directory that cannot be written: a file stands in
+            # its place, and, when not running as root, a read-only directory.
+            blockers = ["file"] + (["read-only"] if os.geteuid() != 0 else [])
+            for blocker in blockers:
+                root = fresh_dir(tmp, f"{shell}-{form}-{blocker}", SAMPLE)
+                archive_dir = os.path.join(root, "compute-squad-archive")
+                if blocker == "file":
+                    with open(archive_dir, "w", encoding="utf-8") as handle:
+                        handle.write("not a directory\n")
+                else:
+                    os.makedirs(archive_dir)
+                    os.chmod(archive_dir, 0o555)
+                before = tree_hashes(root)
+                run = run_shell(shell, command, root)
+                archive_runs += 1
+                if blocker != "file":
+                    os.chmod(archive_dir, 0o755)
+                after = tree_hashes(root)
+                log_now = read(os.path.join(root, "COMPUTE_SQUAD_LOG.md"))
+                intent = re.fullmatch(re.escape(SAMPLE) + r"Archive target: \S+\n", log_now)
+                if form == "PM" and intent:
+                    after["COMPUTE_SQUAD_LOG.md"] = before["COMPUTE_SQUAD_LOG.md"]
+                if run.returncode == 0 or "archived and cleared" in run.stdout or after != before:
+                    fail(f"{label}: with an unwritable archive directory ({blocker}) it must exit nonzero and truncate "
+                         f"nothing; it exited {run.returncode} and printed {run.stdout.strip()!r}")
+
+    # The closing archive: squad-mech's close guard, then its command.
+    close_logs = [(log, read(log)) for log in logs]
+    example_entries = "".join(text + "\n" for _, text in check_logs.read_log("docs/example-log.md", True))
+    close_logs.append(("docs/example-log.md (its entries)", example_entries))
+    closed = refused = example_closes = 0
+    for name, text in close_logs:
+        _, entries = check_logs.split_entries(list(enumerate(text.splitlines(), 1)))
+        reviews = [e for e in entries if e["heading"] == check_logs.REVIEW_HEADING]
+        latest = next((x[len("Result: "):] for _, x in reviews[-1]["body"] if x.startswith("Result: ")), None) \
+            if reviews else None
+        for shell in archive_shells:
+            root = fresh_dir(tmp, f"close-{closed + refused}-{shell}", text)
+            before = tree_hashes(root)
+            guard = run_shell(shell, close_guard, root)
+            allows = guard.stdout.rstrip("\n") == close_line
+            if guard.stderr or tree_hashes(root) != before or allows != (latest == "upheld"):
+                fail(f"{MECH}'s close guard under {shell} over {name} printed {guard.stdout.strip()!r} "
+                     f"{guard.stderr.strip()!r}; the latest {check_logs.REVIEW_HEADING} reads {latest!r}, and only "
+                     f"'upheld' allows the closing archive")
+            if not allows:
+                refused += 1
+                continue
+            run = run_shell(shell, ARCHIVE_FORMS["squad-mech"], root)
+            printed = ARCHIVED.fullmatch(run.stdout.strip())
+            copy = read(os.path.join(root, printed.group(1))) if printed else ""
+            if run.returncode != 0 or copy != text or check_logs.REVIEW_HEADING not in copy.splitlines():
+                fail(f"the closing archive under {shell} over {name} exited {run.returncode}; its copy must be the "
+                     f"whole log, {check_logs.REVIEW_HEADING} entry included")
+            if os.path.getsize(os.path.join(root, "COMPUTE_SQUAD_LOG.md")) != 0:
+                fail(f"the closing archive under {shell} over {name} left the active log non-empty")
+            closed += 1
+            example_closes += name == close_logs[-1][0]
+
+    # S6a's static twin (section 6): its live seed ends in a high-stakes
+    # PASS, so the close guard refuses it. Appended to it, what S6a's main
+    # session appends: a ## Status, the review from SKILL.md's template filled
+    # in as upheld, and the ## Status after it. That log lints clean, the
+    # guard allows it, and the closing archive's copy is the whole log,
+    # review included, with the active log left empty.
+    s6a_seed = read(FIXTURES + "s6a.log.md")
+    s6a_entries = check_logs.split_entries(list(enumerate(s6a_seed.splitlines(), 1)))[1]
+    seed_status = [text for _, text in [e for e in s6a_entries if e["heading"] == "## Status"][-1]["body"]]
+    seed_tested = next(text for e in s6a_entries if e["heading"] == "## PM — PASS"
+                       for _, text in e["body"] if text.startswith("Tested: "))
+
+    def s6a_status(stamp, following):
+        lines = ["## Status"]
+        for text in seed_status:
+            if text.startswith("Timestamp: "):
+                text = "Timestamp: " + stamp
+            elif text.startswith("Next: "):
+                text = "Next: " + following
+            lines.append(text)
+        return "\n".join(lines).rstrip("\n") + "\n"
+
+    review_at = next((i for i in range(len(skill_lines) - 1)
+                      if skill_lines[i] == "```markdown" and skill_lines[i + 1] == check_logs.REVIEW_HEADING), None)
+    if review_at is None:
+        fail(f"skills/compute-squad/SKILL.md: no ```markdown block opening with {check_logs.REVIEW_HEADING}")
+    review_values = {"Timestamp": "2026-09-15T10:36:40Z", "Agent": "main session (claude-fable-5-1)",
+                     "Result": "upheld", "Tested": seed_tested[len("Tested: "):]}
+    review_items = {
+        "Checked": ["- `npm test` -> exit 0; tests 8, pass 8, fail 0"],
+        "Risks": ["- auth: a refused request tells another account or an anonymous caller that the account exists | "
+                  "test (a): the refused response deep-equals the first, and the diff adds no log call"],
+        "Decisions after lock": ["- none"],
+    }
+    review = [check_logs.REVIEW_HEADING]
+    for text in skill_lines[review_at + 2:]:
+        if text == "```":
+            break
+        key, _, value = text.partition(": ")
+        if text.startswith("- "):
+            continue
+        if text.endswith(":") and text[:-1] in review_items:
+            review += [text] + review_items[text[:-1]]
+        elif key == "Rerun":
+            continue   # an upheld review has no Rerun: line
+        elif key in review_values:
+            review.append(f"{key}: {review_values[key]}")
+        else:
+            fail(f"skills/compute-squad/SKILL.md: the {check_logs.REVIEW_HEADING} template line {text!r} is new to "
+                 f"check 8d's S6a twin; teach it a value")
+    reviewed = "\n".join([
+        s6a_seed.rstrip("\n"), "", s6a_status("2026-09-15T10:31:12Z", "main-session high-stakes review").rstrip("\n"),
+        "", "\n".join(review), "", s6a_status("2026-09-15T10:36:48Z", "spawn squad-mech for the closing archive"),
+    ])
+    count, problems = check_logs.lint(list(enumerate(reviewed.splitlines(), 1)), check_logs.load_protocol(SKILL))
+    if problems:
+        fail("check 8d's S6a twin: the s6a seed with a Status, an upheld review, and a Status appended does not lint "
+             "clean: " + "; ".join(f"line {line} [{rule}] {message}" for line, rule, message in problems[:5]))
+    s6a_closed = 0
+    for shell in archive_shells:
+        for text, allowed in ((s6a_seed, False), (reviewed, True)):
+            root = fresh_dir(tmp, f"s6a-{shell}-{allowed}", text)
+            guard_run = run_shell(shell, close_guard, root)
+            if (guard_run.stdout.rstrip("\n") == close_line) != allowed:
+                fail(f"{MECH}'s close guard under {shell} " + ("refused" if allowed else "allowed")
+                     + " the S6a log " + ("after" if allowed else "before") + f" its upheld review; it printed "
+                     f"{guard_run.stdout.strip()!r}")
+            if not allowed:
+                continue
+            run = run_shell(shell, ARCHIVE_FORMS["squad-mech"], root)
+            printed = ARCHIVED.fullmatch(run.stdout.strip())
+            copy = read(os.path.join(root, printed.group(1))) if printed else ""
+            if run.returncode != 0 or copy != text or os.path.getsize(os.path.join(root, "COMPUTE_SQUAD_LOG.md")) != 0:
+                fail(f"S6a's closing archive under {shell} exited {run.returncode}; its copy must be the whole log, "
+                     f"review included, and the active log must be left empty")
+            s6a_closed += 1
+
+    # S6b's static twin (section 6, finding 11): over its live seed,
+    # run-parked, squad-mech's open-run guard lets Stage 1 archive the parked
+    # run, and under a date shim with an archive already at the name the
+    # command gives that log, the command exits nonzero and changes no file.
+    s6b_seed = read(FIXTURES + "run-parked.log.md")
+    open_guard = re.search(r"first run `([^`]+)`\. If it prints a line other than `Next: none`", read(MECH)).group(1)
+    s6b_run = re.search(r"^Run: (\S+)$", s6b_seed, re.MULTILINE).group(1)
+    s6b_target = f"compute-squad-archive/COMPUTE_SQUAD_LOG_{FIXED_STAMP}_{s6b_run}.md"
+    s6b_refused = 0
+    for shell in archive_shells:
+        root = fresh_dir(tmp, f"s6b-{shell}", s6b_seed)
+        guard_run = run_shell(shell, open_guard, root)
+        if guard_run.stdout.strip() != "Next: none":
+            fail(f"{MECH}'s open-run guard under {shell} over S6b's seed printed {guard_run.stdout.strip()!r}; the parked "
+                 f"run reads 'Next: none', so Stage 1 archives it")
+        os.makedirs(os.path.join(root, "compute-squad-archive"))
+        with open(os.path.join(root, s6b_target), "w", encoding="utf-8") as handle:
+            handle.write(s6b_seed.split("\n\n", 1)[0] + "\n")
+        before = tree_hashes(root)
+        run = run_shell(shell, ARCHIVE_FORMS["squad-mech"], root, path_prefix=shim)
+        if run.returncode == 0 or "archived and cleared" in run.stdout or tree_hashes(root) != before:
+            fail(f"squad-mech's archive command under {shell} over S6b's seed, with {s6b_target} already there, must "
+                 f"exit nonzero and change no file; it exited {run.returncode} and printed {run.stdout.strip()!r}")
+        s6b_refused += 1
+example_closed = check_logs.split_entries(list(enumerate(example_entries.splitlines(), 1)))[1]
+if example_closes != len(archive_shells):
+    fail(f"docs/example-log.md: its closing archive ran under {example_closes} of {len(archive_shells)} shells; the "
+         f"example's latest {check_logs.REVIEW_HEADING} must read Result: upheld, so squad-mech's close guard allows it")
+if [e["heading"] for e in example_closed[-2:]] != [check_logs.REVIEW_HEADING, "## Status"]:
+    fail(f"docs/example-log.md: the closing archive copies a log that ends with the upheld {check_logs.REVIEW_HEADING} "
+         f"and the ## Status after it; its last two entries are {[e['heading'] for e in example_closed[-2:]]!r}")
+if not closed or not refused:
+    fail(f"check 8d needs a fixture whose latest review is upheld and one where the close guard refuses; "
+         f"closed {closed}, refused {refused}")
+
+print(
+    f"PASS: check 8: the archive command and the PM's form copied exactly and cleared only after cmp (a failing cmp "
+    f"shim kept the log in {cmp_kept} runs), and changed nothing on a name collision or an unwritable archive "
+    f"directory ({archive_runs} runs under {', '.join(archive_shells)}); squad-mech's close guard allowed the closing archive only after an upheld "
+    f"{check_logs.REVIEW_HEADING} ({closed} closing archives, each holding the review entry, the example log's "
+    f"included, and {refused} refusals); S6a's seed is refused, then closed with its review in the copy once the review "
+    f"from SKILL.md's template is appended ({s6a_closed} runs), and S6b's seed passes the open-run guard but its "
+    f"colliding archive changes no file ({s6b_refused} runs)"
 )
 
 # ---- 8e: codex/update.sh with stubs. The updater runs with stub git

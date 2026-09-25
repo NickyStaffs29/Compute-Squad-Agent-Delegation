@@ -4,8 +4,8 @@ Run: 2026-09-04-export-dry-run
 Attended: yes
 Goal: Add a --dry-run flag to the export command that prints the files it would write and writes nothing.
 Acceptance criteria:
-- export --dry-run writes no file and exits 0.
-- export --dry-run prints one line per file a real run would write.
+- AC1: export --dry-run writes no file and exits 0.
+- AC2: export --dry-run prints one line per file a real run would write.
 Out of scope: the import command.
 Assumptions: none
 
@@ -25,11 +25,20 @@ Timestamp: 2026-09-04T10:03:40Z
 Agent: squad-recon (claude-opus-5-5)
 Attempt: 1
 
-The command is defined in src/cli/export.js (lines 12-58). It writes through
-writeOutputs() in src/cli/write.js (lines 5-31), its only caller. Tests:
-test/export.test.js (6 cases).
-
-Risks: none blocking.
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 0; 6 passed; tree changed: no
+Map:
+- src/cli/export.js:12-58 the export command: parses its flags and calls writeOutputs()
+- src/cli/write.js:5-31 writeOutputs: "function writeOutputs(files, options) {"; writes every output file
+Callers:
+- writeOutputs <- src/cli/export.js:40
+Tests:
+- test/export.test.js: 6 cases on the export command
+Invariants:
+none found
+Open for the PM:
+none found
 
 ## Status
 Timestamp: 2026-09-04T10:03:51Z
@@ -73,11 +82,13 @@ Agent: squad-executor (claude-opus-5-5)
 Attempt: 1
 Plan: r1, work order all
 
-Completed tasks 1 to 3: src/cli/export.js parses --dry-run, src/cli/write.js
-prints each path and skips the write, and test/export.test.js has two new
-tests. `npm test` -> exit 0; 8 passed.
-
-Deviations: none.
+Tasks: 1-3 of 3
+Files changed: src/cli/export.js, src/cli/write.js, test/export.test.js
+Checks:
+- `npm test` -> exit 0; 8 passed
+Deviations: none
+For acceptance: none
+Commit: 1a2b3c4d5e6f, working tree 3 changed files
 
 ## Status
 Timestamp: 2026-09-04T10:16:40Z
@@ -94,11 +105,20 @@ Stop: after the PM verdict
 Timestamp: 2026-09-04T10:24:05Z
 Agent: squad-pm (claude-fable-5-1)
 Attempt: 1
+High-stakes: no
 Rerun: Executor
 
+Tested: 1a2b3c4d5e6f, working tree 3 changed files
+| Criterion | Result | How | Evidence |
+|---|---|---|---|
+| AC1 | not met | reproduced | `node bin/export --dry-run --out /tmp/x` leaves /tmp/x/.export-lock: the lock write at src/cli/write.js:8 runs before the skip |
+| AC2 | met | reproduced | the same run printed 3 paths, the 3 a real run writes |
+Regressions: none
+Outside scope: none
+Executor points: none
 - `npm test` -> exit 0; 8 passed
 - `node bin/export --dry-run --out /tmp/x` -> exit 0; printed 3 paths
-The first criterion fails: a dry run still creates /tmp/x/.export-lock, because
+AC1 fails: a dry run still creates /tmp/x/.export-lock, because
 task 2's skip sits inside the loop and the lock write at src/cli/write.js:8 runs
 before it. The Executor must skip every write when dryRun is set, as task 2 says.
 
@@ -117,14 +137,16 @@ Stop: after the PM verdict
 Timestamp: 2026-09-04T10:31:44Z
 Agent: squad-executor-complex (claude-fable-5-1)
 Attempt: 2
+Answers: ## PM — FAIL 2026-09-04T10:24:05Z
 Plan: r1, work order all
 
-Tasks 1 and 3 stand as the first attempt left them: src/cli/export.js parses
---dry-run and test/export.test.js has the two tests. Task 2 is not done: the
-lock at src/cli/write.js:8 guards concurrent real runs, and the plan does not
-say whether a dry run takes it. `npm test` -> exit 0; 8 passed.
-
-Deviations: none.
+Tasks: 1 and 3 of 3, as the first attempt left them; task 2 is not done
+Files changed: src/cli/export.js, src/cli/write.js, test/export.test.js
+Checks:
+- `npm test` -> exit 0; 8 passed
+Deviations: none
+For acceptance: none
+Commit: 1a2b3c4d5e6f, working tree 3 changed files
 
 BLOCKER:
 - rerun: Plan
@@ -145,6 +167,7 @@ Stop: after the PM verdict
 Timestamp: 2026-09-04T10:38:12Z
 Agent: squad-pm (claude-fable-5-1)
 Attempt: 2
+Answers: ## Executor 2026-09-04T10:31:44Z
 Classification: STANDARD
 High-stakes: no
 Totals: 3 source files changed, 2 tests added.
@@ -172,14 +195,16 @@ Stop: after the PM verdict
 Timestamp: 2026-09-04T10:45:02Z
 Agent: squad-executor-complex (claude-fable-5-1)
 Attempt: 3
+Answers: ## Executor 2026-09-04T10:31:44Z
 Plan: r2, work order all
 
-Completed tasks 1 to 4 of r2: src/cli/export.js parses --dry-run,
-src/cli/write.js returns before the lock and writes nothing when dryRun is set,
-src/cli/lock.js is unchanged, and test/export.test.js has two new tests.
-`npm test` -> exit 0; 8 passed.
-
-Deviations: none.
+Tasks: 1-4 of 4
+Files changed: src/cli/export.js, src/cli/write.js, test/export.test.js
+Checks:
+- `npm test` -> exit 0; 8 passed
+Deviations: none
+For acceptance: none
+Commit: 1a2b3c4d5e6f, working tree 3 changed files
 
 ## Status
 Timestamp: 2026-09-04T10:45:15Z
@@ -196,9 +221,17 @@ Stop: after the PM verdict
 Timestamp: 2026-09-04T10:52:40Z
 Agent: squad-pm (claude-fable-5-1)
 Attempt: 2
+Answers: ## PM — FAIL 2026-09-04T10:24:05Z
+High-stakes: no
 
+Tested: 1a2b3c4d5e6f, working tree 3 changed files
+| Criterion | Result | How | Evidence |
+|---|---|---|---|
+| AC1 | met | reproduced | `node bin/export --dry-run --out /tmp/x` exits 0 and /tmp/x is absent; refutation, a dry run during a real run: the real run keeps its lock |
+| AC2 | met | reproduced | the same run printed 3 paths, the 3 a real run writes |
 - `npm test` -> exit 0; 8 passed
 - `node bin/export --dry-run --out /tmp/x` -> exit 0; printed 3 paths, /tmp/x absent
-Both criteria met. Refutation attempted: a dry run during a real run (the real
-run keeps its lock). High-stakes: no. Verdict: PASS.
+Regressions: none
+Outside scope: none
+Executor points: none
 Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-09-04_105247_2026-09-04-export-dry-run.md

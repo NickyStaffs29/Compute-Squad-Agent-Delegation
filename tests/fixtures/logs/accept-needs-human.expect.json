@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "agents/squad-pm.md",
-      "text": "A pending entry uses `## PM — Accept (pending)`, has no `Rerun:` line, and ends with its `DELEGATE:` or `BLOCKER:` block."
+      "text": "A pending entry uses `## PM — Accept (pending)`, has no `High-stakes:` or `Rerun:` line, carries the criteria block only when it asks the user about a criterion, and ends with its `DELEGATE:` or `BLOCKER:` block."
     },
     {
       "file": "skills/compute-squad/SKILL.md",

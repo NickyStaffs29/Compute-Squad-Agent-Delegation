@@ -1,0 +1,24 @@
+{
+  "note": "The user's waiver of a pre-existing failure is a ## Decision of Type waiver; the PASS's waived row cites its timestamp.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Use `waived` only when a `## Decision` of Type waiver names the ID; cite its timestamp."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Type: <grant | plan-approved | waiver | re-lock | park | abandon>"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

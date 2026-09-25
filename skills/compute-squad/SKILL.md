@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-accept").
 metadata:
-  version: "4.2.0"
+  version: "4.3.0"
   author: "Nick Stafford"
 ---
 
@@ -41,7 +41,7 @@ Do this directly in the main session; never delegate it:
 1. Interrogate the goal: what outcome is actually wanted, what does done look like, what is out of scope, what could this break, is there a higher-leverage framing of the same problem.
 2. Identify gaps: ambiguities, unstated constraints, decisions with irreversible or cost-bearing consequences, conflicts with known project invariants.
 3. Clarify gaps WITH THE USER via the host's question mechanism (AskUserQuestion in Claude; request_user_input in Codex) before the pipeline starts. Batch the questions; do not drip them. If the session is unattended (the user said so, or the question mechanism is unavailable in this session), make the most reasonable call per gap, state each assumption explicitly, write `Attended: no` in the Goal entry, and proceed. This step is the only place an unattended run makes assumptions: once the Goal entry is written, only the user changes them. Recon reports a false goal fact in its entry; one that changes what a criterion checks is a `needs-human:` blocker.
-4. Lock the goal (one sentence) and acceptance criteria (concrete, verifiable). Once locked, no agent may redefine them; changes come back to Stage 0. Changing a command, test, or check that an acceptance criterion names counts as redefining that criterion. A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry with the full template and a `Supersedes: <timestamp of the prior Goal entry>` line. The latest `## Goal — Locked` entry governs; no other entry amends the goal, criteria, or assumptions.
+4. Lock the goal (one sentence) and acceptance criteria (concrete, verifiable), numbered AC1, AC2, and so on. Once locked, no agent may redefine them; changes come back to Stage 0. Changing a command, test, or check that an acceptance criterion names counts as redefining that criterion. A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry with the full template and a `Supersedes: <timestamp of the prior Goal entry>` line. The latest `## Goal — Locked` entry governs; no other entry amends the goal, criteria, or assumptions.
 5. Compose the `## Goal — Locked` entry below, the mandatory first entry of every fresh log. Stage 0 composes it but does not write it — the fresh log doesn't exist yet — so Stage 1 appends it once the archive is done.
 
 ```markdown
@@ -51,7 +51,7 @@ Run: <UTC date and a slug: lowercase letters, digits, hyphens>
 Attended: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
-- <concrete, verifiable item>
+- AC1: <concrete, verifiable item>
 Out of scope: <items>
 Assumptions: <only for unattended runs; otherwise "none">
 ```
@@ -73,7 +73,7 @@ The governing plan revision is the latest one (Hard rules). Revision r<N> is the
 
 Resume is not a mode and grants nothing: it performs the `Next:` action of the latest `## Status` entry. If stage entries follow that entry, first recompute `Next:` from `references/resume.md` and append a fresh `## Status`. If the log has no `## Status`, ask the user what to do next.
 
-Only the main session writes `## Status` and `## Decision`. Stage 1 appends the Goal entry and the first `## Status` in one command. After that, append a `## Status` after every stage entry and every `## Decision`, and before you stop, except after a PASS that cleared the log and at the stops that append nothing: the one-active-run rule's, an `ARCHIVE FAILED` or `ARCHIVE REFUSED` report, and a resume stop whose state the latest `## Status` already records (`references/resume.md` steps 2 and 3). The latest one is the current state; everything above it is history. Print it with `awk '/^## /{s=($0=="## Status"); if(s) b=""} s{b=b $0 "\n"} END{printf "%s", b}' COMPUTE_SQUAD_LOG.md`. A re-lock `## Decision` gets its `## Status` after the new `## Goal — Locked` entry that directly follows it.
+Only the main session writes `## Status` and `## Decision`. Stage 1 appends the Goal entry and the first `## Status` in one command. After that, append a `## Status` after every stage entry and every `## Decision`, and before you stop, except once an archive has cleared the log (an ordinary PASS, or squad-mech's closing archive after an upheld high-stakes review) and at the stops that append nothing: the one-active-run rule's, an `ARCHIVE FAILED` or `ARCHIVE REFUSED` report, and a resume stop whose state the latest `## Status` already records (`references/resume.md` steps 2 and 3). The latest one is the current state; everything above it is history. Print it with `awk '/^## /{s=($0=="## Status"); if(s) b=""} s{b=b $0 "\n"} END{printf "%s", b}' COMPUTE_SQUAD_LOG.md`. A re-lock `## Decision` gets its `## Status` after the new `## Goal — Locked` entry that directly follows it.
 
 ```markdown
 ## Status
@@ -112,11 +112,11 @@ When this invocation starts a new run, spawn `squad-mech` to archive any non-emp
 
 ## Stage 2 — Recon (squad-recon)
 
-Spawn `squad-recon` with the locked goal and criteria. It maps files, functions, line ranges, call sites, and invariants, and appends its entry to the log.
+Spawn `squad-recon` with the locked goal and criteria. It maps files, functions, line ranges, call sites, and invariants, and appends its entry to the log. It also checks the evidence prerequisites (the goal's stated facts, one baseline run of the test or verify command, and the tools the criteria's evidence needs) and raises a `needs-human:` blocker when the criteria cannot be met as locked.
 
 ## Stage 3 — Plan (squad-pm in PLAN mode)
 
-Spawn `squad-pm` with mode PLAN. It produces the spec and ordered task breakdown, and classifies execution as MECHANICAL, STANDARD, or COMPLEX.
+Spawn `squad-pm` with mode PLAN. It produces the spec and ordered task breakdown, and classifies execution as MECHANICAL, STANDARD, or COMPLEX. It starts from Recon's Checks block, reconciles the plan's counts, marks unverified decisions `Assumed:`, and raises a `needs-human:` blocker before removing existing behavior that no Out of scope line or Decision covers.
 
 If the PM logs a `needs-human:` blocker, follow the blocker rule under Escalation rules. Do not guess past it.
 
@@ -132,11 +132,54 @@ When unsure, route up: a wrong answer that forces a re-run costs more than runni
 
 ## Stage 5 — Accept (squad-pm in ACCEPT mode)
 
-Spawn `squad-pm` with mode ACCEPT. It runs on the top rung, so it is never below the execution it reviews and is a rung above it by default. When execution ran on the top rung (COMPLEX work, or after escalation), acceptance shares that rung, and four controls stand in for the missing one: ACCEPT is a fresh spawn that never saw the Executor's working context, it derives its expectations from the locked criteria before it reads the Executor's entry, every criterion it marks met is reproduced rather than inspected, and a high-stakes change still gets the main-session review before archive. Its spawn prompt names the mode and the repo root and nothing else: no reading list, no checklist, and no summary of the plan or of the Executor's account.
+Spawn `squad-pm` with mode ACCEPT. It runs on the top rung, so it is never below the execution it reviews and is a rung above it by default. When execution ran on the top rung (COMPLEX work, or after escalation), acceptance shares that rung, and four controls stand in for the missing one: ACCEPT is a fresh spawn that never saw the Executor's working context, it derives its expectations from the locked criteria before it reads the Executor's entry, every criterion it marks met is reproduced rather than inspected (its criteria block's How column), and a high-stakes change still gets the main-session review before archive. Its spawn prompt names the mode and the repo root and nothing else: no reading list, no checklist, and no summary of the plan or of the Executor's account.
 
-- **PASS:** the PM appends its PASS entry, archives the full log to `compute-squad-archive/` with the archive command (Hard rules), which verifies the copy with `cmp`, then clears the active log only if the change is not high-stakes. If it flagged the change high-stakes (auth, payments, migrations, privacy, production config), the PM leaves the active log intact: do the final review directly in the main session, then close the run by running the archive command yourself, which archives the log as it then stands and clears it only after `cmp` succeeds, before declaring the run complete. This closing archive is the main session's own step, not a stage's work, so the Hard rule against doing a stage's work yourself does not cover it. Report outcome and evidence to the user either way. A PASS on a work order that is not the last of the governing plan revision archives and clears nothing, whatever its stakes: append a `## Status` naming the next work order, which outside `full` mode needs its own grant. After a high-stakes review of such a PASS, the closing archive waits for the PASS on the last work order.
+- **PASS, ordinary:** when no line in the log reads `High-stakes: yes` and no work orders remain, the PM appends its PASS entry and runs the archive command, which clears the active log only after `cmp` verifies the copy. Report outcome and evidence to the user.
+- **PASS, high-stakes:** when any line in the log reads `High-stakes: yes`, the PM appends its PASS entry and archives and clears nothing. Run the high-stakes review below before anything else. The log is archived only after an upheld review is in it.
+- **PASS, earlier work order:** a PASS on a work order that is not the last of the governing plan revision archives and clears nothing, whatever its stakes: append a `## Status` naming the next work order, which outside `full` mode needs its own grant. In a high-stakes run that Status follows an upheld review of this PASS, and the closing archive waits for an upheld review of the last work order's PASS.
 - **FAIL:** the FAIL entry's `Rerun:` line names exactly one stage (Recon, Plan, or Executor). Re-run that stage and all stages after it with the log intact; each re-run is a new attempt (Hard rules).
-- **PM — Accept (pending):** the PM needed delegated work before it could decide. Run the `DELEGATE:` block, append the results, and re-spawn the PM in ACCEPT mode for the verdict.
+- **PM — Accept (pending):** the PM needed delegated work or a user decision before it could decide. Run its `DELEGATE:` block and append the results, or put its `needs-human:` question to the user and record the answer as a `## Decision` followed by a `## Status`; then re-spawn the PM in ACCEPT mode for the verdict.
+
+Every PASS and FAIL entry, and every pending entry that asks the user about a criterion, carries the PM's criteria block, one row per criterion ID in the latest `## Goal — Locked` entry:
+
+```
+Tested: <commit SHA>, working tree <clean | N changed files>
+| Criterion | Result | How | Evidence |
+|---|---|---|---|
+| AC1 | met | reproduced | <the check run and the refutation attempted, and what each showed> |
+Regressions: <none | defects this change introduced>
+Outside scope: <none | defects no criterion covers that also exist on the base commit>
+Executor points:
+- F1: <the check you ran> -> <what it showed>
+```
+
+Before reporting a PASS, read that block (in the archive if the PM cleared the log). If an ID has no row, a row reads anything but `met` or `waived` (or `not checked` for a criterion only a later work order covers), a `waived` row has no matching `## Decision` of Type waiver, or `Regressions:` is not `none`, report the run as not accepted and name the rows. PASS means local acceptance of the tested tree, not PR readiness, merge, deploy, or live verification.
+
+### High-stakes review procedure
+
+Run this in the main session on every high-stakes PASS; never delegate it.
+
+1. Before reading the PASS entry, list from the latest `## Goal — Locked` entry what could go wrong in each class the change touches: auth (who reaches the changed path; what another account or an anonymous caller sees), payments (amount, currency, rounding, retry idempotency), migrations (forward and backward run, locks, existing rows), privacy (personal data newly reaching logs, errors, analytics, third parties), production config (defaults, secrets, blast radius).
+2. Read the full diff against the run's base commit and re-run the plan's verification commands yourself, recording each as a check line. Fill `Tested:` as ACCEPT does: `git rev-parse --short=12 HEAD`, and `clean` or the number of paths `git status --porcelain` lists outside the log and archive.
+3. For each risk, record what rules it out (a diff line, or a check line), or write `open`.
+4. List every decision after the first `## Goal — Locked` entry that changed a criterion, a verification command, or the scope. Only a `## Decision` entry quoting the user approves one; your own earlier agreement does not. Put unapproved ones to the user if present and record each answer as a `## Decision`; in an unattended run they stay unapproved.
+5. Append the entry below with the Bash heredoc form. `upheld` needs every risk ruled out and every decision approved. `overturned` means a defect; only then write `Rerun:`, naming the earliest stage that must fix it. `held` means an open risk or an unapproved decision, and no defect.
+6. Append a `## Status` after the entry, as after every entry. On `upheld`, spawn `squad-mech` to close the run: its archive command copies the log, now ending with your review and that Status, verifies the copy with `cmp`, and clears the active log. If the governing plan revision has a work order after the one this PASS accepted, spawn nothing: that Status names the next work order instead. On `overturned`, the entry counts as a FAIL: re-run the named stage and every later stage with the log intact; the next high-stakes PASS gets a new review. On `held`, leave the log intact and hand the open items to the user. Then report the result and its evidence to the user.
+
+```markdown
+## High-stakes review
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Agent: main session (<model ID as your context states it>)
+Result: <upheld | overturned | held>
+Rerun: <Recon|Plan|Executor>
+Tested: <commit SHA>, working tree <clean | N changed files>
+Checked:
+- `<command>` -> exit <code>; <summary line>
+Risks:
+- <risk> | <diff line or check line; or open>
+Decisions after lock:
+- <none, or: decision | approving `## Decision` timestamp, or unapproved>
+```
 
 ## Intra-stage delegation (the DELEGATE protocol)
 
@@ -176,9 +219,9 @@ When the user asks for an audit, adversarial review, or says "be thorough": afte
 
 ## Hard rules
 
-- Coordination happens only through `COMPUTE_SQUAD_LOG.md`; every stage appends, no stage rewrites history, and it is cleared only after a PASS on the last work order of the governing plan revision: by the PM itself, or by the main session once a high-stakes review is done.
-- Every append is a single Bash heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ... EOF`), never a Read-then-Write of the whole file — that race can silently drop entries another stage appended in between. Clearing the active log is legitimate in exactly three places, each chained after a successful `cmp` in the archive command below: `squad-mech` at Stage 1, the PM on an ordinary PASS of the last work order, and the main session when it closes a high-stakes run after its review.
-- Every archive copy is written by this command and nothing else, in one Bash call. It names the copy from `date -u` and the run ID, refuses to overwrite an existing file (`set -C`), verifies the copy byte for byte with `cmp`, and clears the active log only after `cmp` succeeds. The PM's form inserts `test ! -e "$t" && echo "Archive target: $t" >> COMPUTE_SQUAD_LOG.md && ` at the start of the second line; on a high-stakes PASS it also ends with `echo "archived, log kept: $t"` in place of the clear and its message. An archive file is never overwritten, appended to, or edited once written. If the command does not print `archived and cleared:` (or `archived, log kept:` in the PM's high-stakes form), the agent reports `ARCHIVE FAILED:` and the error; append nothing, report it to the user, and stop.
+- Coordination happens only through `COMPUTE_SQUAD_LOG.md`; every stage appends and no stage rewrites history. Exactly two agents clear it, each only after its verified archive: `squad-mech` at Stage 1 and for the closing archive after an upheld high-stakes review, and the PM after an ordinary PASS on the last work order of the governing plan revision.
+- Every append is a single Bash heredoc (`cat >> COMPUTE_SQUAD_LOG.md <<'EOF' ... EOF`), never a Read-then-Write of the whole file — that race can silently drop entries another stage appended in between. Clearing the active log is legitimate in exactly two places, each chained after a successful `cmp` in the archive command below: `squad-mech` (Stage 1, and the closing archive after an upheld `## High-stakes review`) and the PM (an ordinary PASS of the last work order).
+- Every archive copy is written by this command and nothing else, in one Bash call. It names the copy from `date -u` and the run ID, refuses to overwrite an existing file (`set -C`), verifies the copy byte for byte with `cmp`, and clears the active log only after `cmp` succeeds. The PM's form inserts `test ! -e "$t" && echo "Archive target: $t" >> COMPUTE_SQUAD_LOG.md && ` at the start of the second line. An archive file is never overwritten, appended to, or edited once written. If the command does not print `archived and cleared:`, the agent reports `ARCHIVE FAILED:` and the error; append nothing, report it to the user, and stop.
 
 ```bash
 run=$(sed -n 's/^Run: //p' COMPUTE_SQUAD_LOG.md | head -n 1); t="compute-squad-archive/COMPUTE_SQUAD_LOG_$(date -u +%Y-%m-%d_%H%M%S)_${run:-norun}.md"
@@ -188,9 +231,9 @@ mkdir -p compute-squad-archive && (set -C; cat COMPUTE_SQUAD_LOG.md > "$t") && c
 - Every entry's `Timestamp:` line is the output of `date -u +%Y-%m-%dT%H:%M:%SZ` from a Bash call made just before the append, never a typed or estimated time; the main session's entries follow the same rule.
 - On Claude Code a plugin hook appends each subagent's model, elapsed seconds and token counts, plus a running total for the main session, to `compute-squad-archive/usage.jsonl`. When a run ends or stops, print this run's records with `grep '"run":"<run ID>"' compute-squad-archive/usage.jsonl | awk '!/"agent":"main"/ {print} /"agent":"main"/ {m=$0} END {print m}'` and report for each line the agent, model, elapsed seconds, billed input (input + cache_write + cache_read) and output. If no line matches, as in a Codex run, say usage is unavailable; never estimate it.
 - Every fresh log opens with a `## Goal — Locked` entry and a `## Status` entry, appended together by Stage 1 before Recon spawns. A re-lock appends another `## Goal — Locked` entry. No stage acts on a goal it did not read from the latest `## Goal — Locked` entry.
-- Log entries use only these headings: `## Goal — Locked`, `## Status`, `## Decision`, `## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS`, `## PM — FAIL`, `## Delegated — <stage>`. Only `## Recon`, `## PM — Plan`, and `## Executor` may add ` (cont.)`, and only for a stage continuing after its own `BLOCKING` `DELEGATE:` block; that entry covers only the remainder and extends the stage's latest attempt. Any other heading or suffix is a protocol violation.
-- A re-run after a FAIL or a `rerun:` blocker is a new attempt under the plain heading, never `(cont.)`, and complete on its own. The latest attempt of each stage governs; earlier attempts are history no stage acts on. The governing plan revision is the latest `## PM — Plan` entry with its `(cont.)` entries, and the next `## Status` names it on its `Plan:` line.
-- Routing values sit on fixed lines at the top of an entry, one value each, in this order under the `Agent:` line: `Attempt:` on every stage entry (a plan's attempt number is its revision); `Plan:` on Executor entries; `Classification:` and `High-stakes:` on PM Plan entries; `Rerun:` on PM FAIL entries. Route and count from these lines and from `- rerun:` blocker lines, never from prose or a final message.
+- Log entries use only these headings: `## Goal — Locked`, `## Status`, `## Decision`, `## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS`, `## PM — FAIL`, `## Delegated — <stage>`, `## High-stakes review`. Only `## Recon`, `## PM — Plan`, and `## Executor` may add ` (cont.)`, and only for a stage continuing after its own `BLOCKING` `DELEGATE:` block; that entry covers only the remainder and extends the stage's latest attempt. Any other heading or suffix is a protocol violation.
+- A re-run after a FAIL, a `rerun:` blocker, or an overturned high-stakes review is a new attempt under the plain heading, never `(cont.)`, and complete on its own. The latest attempt of each stage governs; earlier attempts are history no stage acts on. The governing plan revision is the latest `## PM — Plan` entry with its `(cont.)` entries, and the next `## Status` names it on its `Plan:` line.
+- Routing values sit on fixed lines at the top of an entry, one value each, in this order under the `Agent:` line: `Attempt:` on every stage entry (a plan's attempt number is its revision), then `Answers:` from attempt 2; `Plan:` on Executor entries; `Classification:` and `High-stakes:` on PM Plan entries; `High-stakes:` on PM PASS and FAIL entries, followed on a FAIL by `Rerun:`; `Result:`, plus `Rerun:` when overturned, on high-stakes reviews. Route and count from these lines and from `- rerun:` blocker lines, never from prose or a final message.
 - A run is high-stakes once any line in the log reads `High-stakes: yes`; no later entry lowers it.
 - No stage skips within a mode: even a one-line change gets Recon and Plan entries.
 - The Executor never accepts its own work; the PM never writes product code; the intern never makes judgment calls.

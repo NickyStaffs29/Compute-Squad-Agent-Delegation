@@ -1,0 +1,13 @@
+{
+  "name": "pricing-site",
+  "version": "2.3.0",
+  "private": true,
+  "description": "Marketing site: the plans and pricing page",
+  "scripts": {
+    "test": "node --test",
+    "check:overflow": "node scripts/check-overflow.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

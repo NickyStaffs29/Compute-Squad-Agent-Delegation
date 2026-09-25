@@ -3,9 +3,20 @@ Timestamp: 2026-09-01T10:03:40Z
 Agent: squad-recon (claude-sonnet-5)
 Attempt: 1
 
-The command is defined in src/cli/export.js (lines 12-58). It writes through
-writeOutputs() in src/cli/write.js (lines 5-31), its only caller. Tests:
-test/export.test.js (6 cases).
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 0; 6 passed; tree changed: no
+Map:
+- src/cli/export.js:12-58 the export command: parses its flags and calls writeOutputs()
+- src/cli/write.js:5-31 writeOutputs: "function writeOutputs(files, options) {"; writes every output file
+Callers:
+- writeOutputs <- src/cli/export.js:40
+Tests:
+- test/export.test.js: 6 cases on the export command
+Invariants:
+none found
+Open for the PM:
+none found
 
 ## PM — Plan
 Timestamp: 2026-09-01T10:08:02Z

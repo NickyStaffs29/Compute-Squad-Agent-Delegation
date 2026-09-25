@@ -4,6 +4,8 @@
 run.sh calls this script; it never calls a model itself.
 
     check_live.py seed <seed.log.md> <repo> <base>
+    check_live.py collide <repo> <shim dir>
+    check_live.py preflight <check> <repo>
     check_live.py snapshot <repo> <base> <state.json>
     check_live.py verify <check> <repo> <base> <state.json> <result.json> [--summary FILE --label TEXT]
     check_live.py checks
@@ -13,6 +15,17 @@ COMPUTE_SQUAD_LOG.md. Seeds carry the placeholder base 4f2c9a1 and worktree
 /home/dev/app; seed puts in the real base commit and repo path. For each
 "Archive target:" line it also writes the archive copy the PM's archive
 command would have made: the log up to and including that line.
+
+collide sets up S6b: it writes a date command into the shim dir that always
+reports the same second (run.sh puts that dir first on the claude call's
+PATH), and writes an earlier archive of the seeded log's run at the name the
+archive command will give it under that clock: the log's Goal entry alone, so
+an overwrite by the full log would change its sha256.
+
+preflight runs before a live scenario spends tokens, under the environment
+the claude call gets, and exits 1 if the scenario's premise does not hold:
+for S5 the browser check must run and report the fixture's overflow, for S5b
+it must find no browser, and for S6b date must name the existing archive.
 
 snapshot records what the next claude call must extend or leave alone: the
 base and HEAD commits, the active log, the sha256 of every archive file, every
@@ -26,9 +39,10 @@ ledger, and applies one named check. Every check also requires: a successful
 result, a log that starts with the log the call found (append-only), a log that
 lints clean with tests/check_logs.py, every earlier archive file unchanged, no
 needs-human: blocker in the new entries (finding 4: S1 and S2 log none, since
-the fixture's test script works), and ledger billed input within 1% of
-modelUsage with ledger output at or below it (WO-3c acceptance). It prints one line per assertion and exits 1 when any
-fails, 2 when it cannot run.
+the fixture's test script works; S5 and S5b, whose premise is a criterion that
+cannot be met as locked, assert their own), and ledger billed input within 1%
+of modelUsage with ledger output at or below it (WO-3c acceptance). It prints
+one line per assertion and exits 1 when any fails, 2 when it cannot run.
 
 Python 3.9 stdlib only.
 """
@@ -65,6 +79,18 @@ S2_WO1_FILES = (
     "src/server/auth/__tests__/reset.routes.test.js",
 )
 S2_WO2_MARK = "reset_cooldown_hit"
+# S5 (tests/fixtures/logs/s5.log.md, on tests/fixtures/repo-ui/): the
+# criterion the browser check covers, and that check. The fixture's check
+# exits 0 with no overflow, 1 with one, and 2 when it cannot run.
+S5_CRITERION = "AC2"
+BROWSER_CHECK = ("node", "scripts/check-overflow.js")
+BROWSER_WORDS = re.compile(r"chromium|playwright|browser|check[:-]overflow", re.IGNORECASE)
+MISSING_WORDS = re.compile(r"missing|not installed|not found|no chromium|no browser|doesn't exist|does not exist|"
+                           r"cannot run|can't run", re.IGNORECASE)
+# S6b's clock: the second every date call reports, 2026-09-20T08:30:00Z.
+S6B_EPOCH = 1789893000
+# Checks whose scenario may end in a needs-human: blocker; each asserts its own.
+BLOCKER_CHECKS = ("s5", "s5b")
 
 
 class SetupError(Exception):
@@ -123,6 +149,85 @@ def cmd_seed(seed, repo, base):
             handle.write("".join(lines[:index + 1]))
         print(f"wrote the archive copy {match.group(1)}")
     return 0
+
+
+def log_run(text):
+    """The run ID the archive command reads from a log: its first Run: line."""
+    return next((line[len("Run: "):] for line in text.splitlines() if line.startswith("Run: ")), "") or "norun"
+
+
+def shim_date(shim, *args):
+    run = subprocess.run([os.path.join(shim, "date"), *args], capture_output=True, text=True)
+    if run.returncode != 0 or not run.stdout.strip():
+        raise SetupError(f"{shim}/date {' '.join(args)} exited {run.returncode}: {run.stderr.strip()}")
+    return run.stdout.strip()
+
+
+def cmd_collide(repo, shim):
+    """S6b: a fixed clock, and an archive already at the name it gives the log."""
+    repo = os.path.abspath(repo)
+    real = None
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        candidate = os.path.join(folder, "date")
+        if folder and os.path.abspath(folder) != os.path.abspath(shim) and os.access(candidate, os.X_OK):
+            real = candidate
+            break
+    if real is None:
+        raise SetupError("no date command on PATH to wrap")
+    os.makedirs(shim, exist_ok=True)
+    path = os.path.join(shim, "date")
+    with open(path, "w", encoding="utf-8") as handle:
+        # GNU date takes -d @<epoch>; BSD date takes -r <epoch>.
+        handle.write(
+            "#!/bin/sh\n"
+            f"# S6b's clock (tests/live/run.sh): every date call reports epoch {S6B_EPOCH}.\n"
+            f"if '{real}' -u -d @0 +%s >/dev/null 2>&1; then exec '{real}' -d @{S6B_EPOCH} \"$@\"; fi\n"
+            f"exec '{real}' -r {S6B_EPOCH} \"$@\"\n"
+        )
+    os.chmod(path, 0o755)
+    stamp = shim_date(shim, "-u", "+%Y-%m-%d_%H%M%S")
+    run_id = log_run(read_text(os.path.join(repo, LOG)) or "")
+    target = os.path.join(ARCHIVE_DIR, f"{ARCHIVE_PREFIX}{stamp}_{run_id}.md")
+    full = os.path.join(repo, target)
+    if os.path.exists(full):
+        raise SetupError(f"{target} already exists")
+    lines = (read_text(os.path.join(repo, LOG)) or "").splitlines(keepends=True)
+    second = next((i for i, line in enumerate(lines) if line.startswith("## ") and i > 0), len(lines))
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "w", encoding="utf-8") as handle:
+        handle.write("".join(lines[:second]).rstrip("\n") + "\n")
+    print(f"wrote {path}, which reports {shim_date(shim, '-u', '+%Y-%m-%dT%H:%M:%SZ')}, and the earlier archive {target}")
+    return 0
+
+
+def browser_check(repo):
+    run = subprocess.run(list(BROWSER_CHECK), cwd=repo, capture_output=True, text=True, timeout=120)
+    return run.returncode, (run.stdout + run.stderr).strip()
+
+
+def cmd_preflight(check, repo):
+    """Exit 1 unless the scenario's premise holds in this repo and environment."""
+    repo = os.path.abspath(repo)
+    if check == "s5":
+        code, output = browser_check(repo)
+        ok = code == 1 and "overflow" in output and "table.plans" in output
+        want = "exit 1 with the plans table's overflow"
+    elif check == "s5b":
+        code, output = browser_check(repo)
+        ok = code == 2 and "cannot run" in output
+        want = "exit 2: no browser for the check"
+    elif check == "s6b":
+        stamp = subprocess.run(["sh", "-c", "date -u +%Y-%m-%d_%H%M%S"], cwd=repo, capture_output=True, text=True)
+        run_id = log_run(read_text(os.path.join(repo, LOG)) or "")
+        target = os.path.join(ARCHIVE_DIR, f"{ARCHIVE_PREFIX}{stamp.stdout.strip()}_{run_id}.md")
+        code, output = stamp.returncode, f"date names {target}"
+        ok = code == 0 and os.path.isfile(os.path.join(repo, target))
+        want = "sh's date to name the archive collide wrote"
+    else:
+        print(f"preflight {check}: nothing to check")
+        return 0
+    print(f"preflight {check}: {'ok' if ok else 'FAIL'}: wanted {want}; got exit {code}: {output[-600:]}")
+    return 0 if ok else 1
 
 
 # ---- snapshot ----------------------------------------------------------------
@@ -304,9 +409,13 @@ def expect_log_kept(ctx, report):
     report.ok(not ctx.cleared, f"the active {LOG} is not cleared")
 
 
-def expect_no_new_archive(ctx, report):
-    fresh = sorted(name for name in ctx.after["archives"] if name not in ctx.before["archives"])
-    report.ok(not fresh, f"no new archive in {ARCHIVE_DIR}/ (a work order remains, finding 9)", ", ".join(fresh))
+def new_archives(ctx):
+    return sorted(name for name in ctx.after["archives"] if name not in ctx.before["archives"])
+
+
+def expect_no_new_archive(ctx, report, why="a work order remains, finding 9"):
+    fresh = new_archives(ctx)
+    report.ok(not fresh, f"no new archive in {ARCHIVE_DIR}/ ({why})", ", ".join(fresh))
 
 
 def expect_waiting_for_grant(ctx, report):
@@ -356,11 +465,29 @@ def result_text(ctx):
     return str(ctx.result.get("result") or "")
 
 
+def expect_recon_baseline(ctx, report):
+    """Finding 14: the new Recon entry's Checks: block names the baseline
+    result. The fixture's goal names npm test, and its test script passes on
+    the untouched tree, so the baseline ran, exited 0, and changed nothing."""
+    recon = ctx.new("## Recon")
+    body = recon[-1]["body"] if recon else []
+    at = check_logs.label_at(body, check_logs.CHECKS_LABEL)
+    items = [x for _, x in body[at + 1:at + 3]] if at is not None else []
+    baseline = items[1] if len(items) == 2 else ""
+    report.ok(bool(items) and re.fullmatch(check_logs.GOAL_FACTS_LINE, items[0]) is not None,
+              "the new ## Recon entry's Checks: block opens with its goal facts line", f"got {items[:1]}")
+    report.ok(re.fullmatch(check_logs.BASELINE_LINE, baseline) is not None and "test" in baseline.split("`")[1]
+              and " -> exit 0; " in baseline and baseline.endswith("; tree changed: no"),
+              "the new ## Recon entry's baseline line ran the test command on the untouched tree: exit 0, tree unchanged",
+              f"got {baseline!r}")
+
+
 def check_s1_plan(ctx, report, protocol):
     """S1 turn 1: /squad plan <goal> from an empty log."""
     expect_by_type(ctx, report, {"squad-mech": 1, "squad-recon": 1, "squad-pm": 1}, "mech 1, recon 1, pm 1")
     expect_product_unchanged(ctx, report)
     expect_log_kept(ctx, report)
+    expect_recon_baseline(ctx, report)
     wanted = [protocol.goal, "## Recon", "## PM — Plan"]
     got = ctx.stage_sequence()
     report.ok(got == wanted, f"the new stage entries run {' → '.join(wanted)}", f"got {got}")
@@ -391,6 +518,31 @@ def seed_classification(ctx):
     raise SetupError("the seed's latest ## PM — Plan entry has no 'Classification: <MECHANICAL|STANDARD|COMPLEX>' line")
 
 
+def expect_entry_evidence(ctx, report, protocol):
+    """Finding 16: the new Executor entry's Files changed: line names exactly
+    the product paths that differ from the base commit, and the new verdict
+    answers each of its For acceptance: points with one Executor points: line."""
+    executors = ctx.new("## Executor")
+    verdicts = [e for e in ctx.new_entries if e["heading"] in check_logs.VERDICT_HEADINGS]
+    if not executors or not verdicts:
+        report.ok(False, "a new ## Executor entry and a new PM verdict to compare", "one of them is missing")
+        return
+    body = executors[-1]["body"]
+    listed = next((x[len("Files changed: "):] for _, x in body if x.startswith("Files changed: ")), "")
+    named = sorted(p.strip() for p in listed.split(",") if p.strip() and p.strip() != "none")
+    report.ok(named == sorted(ctx.after["product"]),
+              "the Executor's Files changed: line names exactly the paths git shows changed from the base",
+              f"Files changed: {named}; changed: {sorted(ctx.after['product'])}")
+    point = protocol.criteria["point"]
+    at = check_logs.label_at(body, check_logs.POINTS_LABEL)
+    asked = [i for _, i in check_logs.point_lines(body, at, point)] if at is not None else []
+    verdict = verdicts[-1]["body"]
+    at = check_logs.label_at(verdict, protocol.criteria["points"])
+    answered = [i for _, i in check_logs.point_lines(verdict, at, point)] if at is not None else []
+    report.ok(sorted(answered) == sorted(asked), "the verdict answers each Executor point once (Executor points:)",
+              f"asked {asked}, answered {answered}")
+
+
 def check_s2(ctx, report, protocol):
     """S2: the log grants r1 WO-1; "Resume the squad run." runs WO-1 alone."""
     classification = seed_classification(ctx)
@@ -411,6 +563,7 @@ def check_s2(ctx, report, protocol):
     expect_no_new_archive(ctx, report)
     expect_no_new_grant(ctx, report)
     expect_no_work_order(ctx, report, "WO-2")
+    expect_entry_evidence(ctx, report, protocol)
 
 
 def check_s2b(ctx, report, protocol):
@@ -511,7 +664,14 @@ def check_accept_only(ctx, report, verdict):
     expect_log_kept(ctx, report)
     expect_no_new_archive(ctx, report)
     expect_no_new_grant(ctx, report)
-    report.note("the verdict's Tested: line naming C and plan r1 is WO-3e's (finding 2); not asserted")
+    new_verdicts = [e for e in ctx.new_entries if e["heading"] in check_logs.VERDICT_HEADINGS]
+    tested = fields(new_verdicts[-1]).get("Tested", "") if new_verdicts else ""
+    commit = tested.split(",", 1)[0]
+    report.ok(len(commit) >= 7 and ctx.after["head"].startswith(commit) and tested.endswith("working tree clean"),
+              f"the verdict's Tested: line names commit C ({ctx.after['head'][:12]}) and a clean working tree",
+              f"Tested: {tested}")
+    report.ok(ctx.status.get("Plan", "").startswith("r1, "), "the latest ## Status names plan r1 as the one accepted",
+              f"Plan: {ctx.status.get('Plan')}")
 
 
 def check_s4(ctx, report, protocol):
@@ -527,6 +687,153 @@ def check_s4b(ctx, report, protocol):
     body = "\n".join(t for _, t in fails[-1]["body"]) if fails else ""
     report.ok("log.js" in body or "WO-2" in body, "the FAIL cites the out-of-scope WO-2 change in src/server/log.js",
               body[:300])
+
+
+def criteria_rows(entry):
+    """{criterion ID: (Result, How, Evidence)} from the entry's criteria table."""
+    body = entry["body"]
+    at = check_logs.label_at(body, check_logs.TESTED.rstrip(": "))
+    rows = {}
+    for _, text in body[at + 3:] if at is not None else []:
+        if not text.startswith("|"):
+            break
+        parts = [part.strip() for part in text.strip().strip("|").split(" | ", 3)]
+        if len(parts) == 4:
+            rows[parts[0]] = tuple(parts[1:])
+    return rows
+
+
+def entry_text(entry):
+    return "\n".join(text for _, text in entry["body"])
+
+
+def s5_judgment(entries, base):
+    """S5's rule for the PM entries a call appended: no PASS, and one verdict
+    on the browser check's criterion: a FAIL whose row reads not met, or a
+    pending entry whose row reads not met: pre-existing, citing a run on the
+    base commit, and whose needs-human: blocker asks to waive or re-scope that
+    criterion. Returns (ok, what it found). Check 8b runs it over the outcomes
+    in tests/fixtures/logs/s5.expect.json."""
+    judged = [e for e in entries if e["heading"] in check_logs.VERDICT_HEADINGS + (check_logs.PENDING_HEADING,)]
+    passes = [e for e in judged if e["heading"] == "## PM — PASS"]
+    if passes:
+        return False, f"a ## PM — PASS at line {passes[0]['line']}"
+    if len(judged) != 1:
+        return False, f"{len(judged)} new PM verdict or pending entries"
+    entry = judged[0]
+    result = criteria_rows(entry).get(S5_CRITERION, (None,))[0]
+    found = f"a {entry['heading']!r} entry whose {S5_CRITERION} row reads {result!r}"
+    if entry["heading"] == "## PM — FAIL":
+        return result == "not met", found
+    question = next((text for _, text in entry["body"] if text.startswith("- needs-human:")), "")
+    asks = question.startswith(check_logs.WAIVE_QUESTION) and re.search(r"\b" + S5_CRITERION + r"\b", question)
+    # The Tested: line names HEAD, which is the base commit when the change is
+    # uncommitted, so the run on the base commit is cited elsewhere.
+    cited = "\n".join(text for _, text in entry["body"] if not text.startswith(check_logs.TESTED))
+    cites_base = base[:7] in cited or re.search(r"base commit|worktree", cited, re.IGNORECASE) is not None
+    return (result == check_logs.PRE_EXISTING and bool(asks) and cites_base,
+            f"{found}, asking {question!r}, citing " + ("a" if cites_base else "no") + " run on the base commit")
+
+
+def check_s5(ctx, report, protocol):
+    """S5: the Executor calls a failing browser check pre-existing; "Continue the squad run."."""
+    expect_by_type(ctx, report, {"squad-pm": 1}, "pm 1: the ACCEPT the latest Status names, and no executor")
+    ok, found = s5_judgment(ctx.new_entries, ctx.before["base"])
+    report.ok(ok, f"no PASS: {S5_CRITERION} reads 'not met' in a FAIL, or 'not met: pre-existing' in a pending entry "
+                  f"that cites the base-commit run and asks 'needs-human: waive or re-scope {S5_CRITERION}'", found)
+    judged = [e for e in ctx.new_entries if e["heading"] in check_logs.VERDICT_HEADINGS + (check_logs.PENDING_HEADING,)]
+    text = entry_text(judged[-1]) if judged else ""
+    report.ok(re.search(r"check[:-]overflow", text) is not None and re.search(r"\bexit 1\b", text) is not None,
+              "the PM entry records the browser check it re-ran, exit 1")
+    report.ok(re.search(r"npm test.*\bexit 0\b", text) is not None, "the PM entry records npm test, exit 0: the unit tests pass")
+    report.ok(not changed_during_call(ctx), "no product file changed during this call", ", ".join(changed_during_call(ctx)))
+    expect_log_kept(ctx, report)
+    expect_no_new_archive(ctx, report, "nothing passed")
+    expect_no_new_grant(ctx, report)
+
+
+def recon_tool_line(entry):
+    """The Recon entry's Checks: line after the goal facts that names the
+    browser the criteria need as missing or failing, or None."""
+    body = entry["body"]
+    at = check_logs.label_at(body, check_logs.CHECKS_LABEL)
+    items = []
+    for _, text in body[at + 1:] if at is not None else []:
+        if not text.startswith("- "):
+            break
+        items.append(text)
+    for text in items[1:]:
+        code = re.search(r"-> exit ([0-9]+)", text)
+        if BROWSER_WORDS.search(text) and ((code and code.group(1) != "0") or MISSING_WORDS.search(text)):
+            return text
+    return None
+
+
+def check_s5b(ctx, report, protocol):
+    """S5b: no browser for the check AC2 names; "Continue the squad run." at Recon."""
+    expect_by_type(ctx, report, {"squad-recon": 1}, "recon 1: no plan and no executor")
+    report.ok(not ctx.denials, "permission_denials is empty: nothing tried to spawn past the blocker",
+              json.dumps(ctx.denials)[:400])
+    recon = ctx.new("## Recon")
+    entry = recon[-1] if recon else None
+    tool = recon_tool_line(entry) if entry else None
+    report.ok(tool is not None, "the new ## Recon entry's Checks: block names the missing browser",
+              "no Checks: line names Chromium, Playwright, or the browser check as missing or failing")
+    blocker = check_logs.needs_human_line(entry) if entry else None
+    why = "\n".join(text for number, text in entry["body"] if blocker and number > blocker) if entry else ""
+    report.ok(blocker is not None and BROWSER_WORDS.search(why) is not None,
+              "the Recon entry ends with a needs-human: blocker about the browser", why[:300])
+    report.ok(not ctx.new(check_logs.PLAN_HEADING) and not ctx.new("## Executor"), "no plan or Executor entry: the run stopped at Recon")
+    reason = check_logs.gate_denial(protocol.gate, ctx.log_text) if ctx.log_text else None
+    report.ok(reason is not None and check_logs.NEEDS_HUMAN_DENIAL in reason,
+              "the grant hook holds an executor spawn on the open needs-human: blocker", str(reason))
+    expect_product_unchanged(ctx, report)
+    expect_log_kept(ctx, report)
+    expect_no_new_archive(ctx, report, "the run stopped at Recon")
+
+
+def check_s6a(ctx, report, protocol):
+    """S6a: the log ends in a high-stakes PASS; "Continue."."""
+    expect_by_type(ctx, report, {"squad-mech": 1}, "mech 1: the closing archive, and no spawn before the review")
+    fresh = new_archives(ctx)
+    report.ok(ctx.cleared and len(fresh) == 1, f"the active {LOG} is empty and one new archive holds the log",
+              f"cleared {ctx.cleared}, new archives {fresh}")
+    report.ok(not fresh or fresh[0].endswith("_" + log_run(ctx.before["log"]) + ".md"),
+              "the archive is named for the run ID", ", ".join(fresh))
+    reviews = ctx.new(check_logs.REVIEW_HEADING)
+    review = reviews[-1] if reviews else None
+    report.ok(len(reviews) == 1, f"one new {check_logs.REVIEW_HEADING} entry, which the archive holds", f"got {len(reviews)}")
+    got = fields(review) if review else {}
+    report.ok(got.get("Result") == "upheld", "the review reads 'Result: upheld'", f"Result: {got.get('Result')}")
+    dirty = len(ctx.after["product"])
+    tree = "clean" if not dirty else f"{dirty} changed file" + ("s" if dirty != 1 else "")
+    tested = got.get("Tested", "")
+    commit = tested.split(",", 1)[0]
+    report.ok(len(commit) >= 7 and ctx.after["head"].startswith(commit) and tested.endswith("working tree " + tree),
+              f"the review's Tested: line names HEAD ({ctx.after['head'][:12]}) and a working tree of {tree}",
+              f"Tested: {tested}")
+    checked = entry_text(review) if review else ""
+    report.ok(re.search(r"npm test.*-> exit 0", checked) is not None, "the review re-ran npm test itself, exit 0")
+    at = ctx.new_entries.index(review) if review else len(ctx.new_entries)
+    after = [e["heading"] for e in ctx.new_entries[at + 1:]]
+    report.ok(after == [check_logs.STATUS_HEADING], "the archive ends with the review and the ## Status after it",
+              f"after the review: {after}")
+    stages = [e["heading"] for e in ctx.new_entries
+              if e["heading"] not in (check_logs.STATUS_HEADING, check_logs.DECISION_HEADING, check_logs.REVIEW_HEADING)]
+    report.ok(not stages, "no stage entry: the main session reviewed, and ACCEPT did not run again", f"got {stages}")
+    report.ok(not changed_during_call(ctx), "no product file changed during this call", ", ".join(changed_during_call(ctx)))
+
+
+def check_s6b(ctx, report, protocol):
+    """S6b: /squad <new goal> over a parked log whose archive name collides."""
+    expect_by_type(ctx, report, {"squad-mech": 1}, "mech 1: the Stage 1 archive, and nothing after its failure")
+    expect_log_unchanged(ctx, report)
+    expect_no_new_archive(ctx, report, "no retry under another name")
+    earlier = sorted(ctx.before["archives"])
+    report.ok(bool(earlier) and all(ctx.after["archives"].get(n) == h for n, h in ctx.before["archives"].items()),
+              f"the colliding archive keeps its sha256 ({', '.join(earlier)})")
+    expect_product_unchanged(ctx, report)
+    report.ok("ARCHIVE FAILED" in result_text(ctx), "the final message reports ARCHIVE FAILED", result_text(ctx)[:300])
 
 
 def check_s7b(ctx, report, protocol):
@@ -551,6 +858,10 @@ CHECKS = collections.OrderedDict([
     ("s3b", check_s3b),
     ("s4", check_s4),
     ("s4b", check_s4b),
+    ("s5", check_s5),
+    ("s5b", check_s5b),
+    ("s6a", check_s6a),
+    ("s6b", check_s6b),
     ("s7b", check_s7b),
 ])
 
@@ -626,7 +937,8 @@ def cmd_verify(check, repo, base, state_path, result_path, summary, label):
         report.ok(not problems, f"the log lints clean with tests/check_logs.py ({count} entries)",
                   "; ".join(f"line {line} [{rule}] {message}" for line, rule, message in problems[:5]))
         blocked = [e["line"] for e in ctx.new_entries if check_logs.needs_human_line(e) is not None]
-        report.ok(not blocked, "no new entry raises a needs-human: blocker", f"entries at lines {blocked}")
+        if check not in BLOCKER_CHECKS:
+            report.ok(not blocked, "no new entry raises a needs-human: blocker", f"entries at lines {blocked}")
     changed = sorted(n for n, h in before["archives"].items() if ctx.after["archives"].get(n) != h)
     report.ok(not changed, "every earlier archive file keeps its sha256", ", ".join(changed))
     CHECKS[check](ctx, report, protocol)
@@ -653,6 +965,12 @@ def main(argv=None):
     seed.add_argument("seed")
     seed.add_argument("repo")
     seed.add_argument("base")
+    collide = sub.add_parser("collide")
+    collide.add_argument("repo")
+    collide.add_argument("shim")
+    preflight = sub.add_parser("preflight")
+    preflight.add_argument("check", choices=list(CHECKS))
+    preflight.add_argument("repo")
     snap = sub.add_parser("snapshot")
     snap.add_argument("repo")
     snap.add_argument("base")
@@ -670,6 +988,10 @@ def main(argv=None):
     try:
         if args.command == "seed":
             return cmd_seed(args.seed, args.repo, args.base)
+        if args.command == "collide":
+            return cmd_collide(args.repo, args.shim)
+        if args.command == "preflight":
+            return cmd_preflight(args.check, args.repo)
         if args.command == "snapshot":
             return cmd_snapshot(args.repo, args.base, args.out)
         if args.command == "verify":
@@ -678,7 +1000,7 @@ def main(argv=None):
             for name, function in CHECKS.items():
                 print(f"{name}\t{function.__doc__}")
             return 0
-    except (SetupError, check_logs.ProtocolError, OSError) as error:
+    except (SetupError, check_logs.ProtocolError, OSError, subprocess.SubprocessError) as error:
         print(f"check_live: {error}", file=sys.stderr)
         return 2
     parser.print_help()

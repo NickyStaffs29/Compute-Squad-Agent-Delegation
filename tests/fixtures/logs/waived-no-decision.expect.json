@@ -1,0 +1,26 @@
+{
+  "note": "Finding 2's static twin: a waived row with no ## Decision of Type waiver covering its criterion.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Use `waived` only when a `## Decision` of Type waiver names the ID; cite its timestamp."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "a `waived` row has no matching `## Decision` of Type waiver"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "waiver"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

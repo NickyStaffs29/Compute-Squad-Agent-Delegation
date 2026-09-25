@@ -7,7 +7,7 @@
     },
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "Run the `DELEGATE:` block, append the results, and re-spawn the PM in ACCEPT mode for the verdict."
+      "text": "Run its `DELEGATE:` block and append the results, or put its `needs-human:` question to the user and record the answer as a `## Decision` followed by a `## Status`; then re-spawn the PM in ACCEPT mode for the verdict."
     }
   ],
   "lint": {

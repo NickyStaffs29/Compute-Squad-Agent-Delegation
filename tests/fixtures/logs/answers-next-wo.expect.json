@@ -1,0 +1,24 @@
+{
+  "note": "Finding 13 with finding 9's whole-log verdict count: after the review upholds WO-1's PASS and the user grants WO-2, the first verdict on WO-2 is attempt 2, but no FAIL or overturned review sent ACCEPT back, so its Answers: line reads none.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "`Attempt: <n>` counts the `## PM — PASS` and `## PM — FAIL` entries in the log, this one included"
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "or reads `Answers: none` when there is none, as on the first verdict of a later work order."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "run the high-stakes review procedure",
+      "via": "row: `## PM — PASS` in a high-stakes run"
+    }
+  ]
+}

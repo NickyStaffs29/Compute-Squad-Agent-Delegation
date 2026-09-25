@@ -4,8 +4,8 @@ Run: 2026-09-03-reset-cooldown
 Attended: no
 Goal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.
 Acceptance criteria:
-- A second reset request for the same account within 60 seconds sends no email.
-- npm test passes.
+- AC1: A second reset request for the same account within 60 seconds sends no email.
+- AC2: npm test passes.
 Out of scope: per-IP throttling.
 Assumptions: the cooldown is per-account, since the request names no other key.
 
@@ -25,13 +25,21 @@ Timestamp: 2026-09-03T08:04:41Z
 Agent: squad-recon (claude-opus-5-5)
 Attempt: 1
 
-The endpoint is POST /api/auth/reset-request in src/server/auth/routes.js
-(lines 12-40), calling requestReset() in src/server/auth/reset.service.js
-(lines 3-38). Tests: src/server/auth/reset.test.js (6 cases).
-
-Risks: npm test runs "node --test src/", which fails on the untouched base
-under the installed Node 22 before any change, so the second criterion cannot
-pass unless its command changes.
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 1; 0 tests run; tree changed: no
+Map:
+- src/server/auth/routes.js:12-40 POST /api/auth/reset-request: calls requestReset()
+- src/server/auth/reset.service.js:3-38 requestReset: creates and mails the reset token
+- package.json:7 the test script: "node --test src/"
+Callers:
+- requestReset <- src/server/auth/routes.js:20
+Tests:
+- src/server/auth/reset.test.js: 6 cases
+Invariants:
+none found
+Open for the PM:
+none found
 
 BLOCKER:
 - needs-human: whether to change the npm test script that the second acceptance criterion names
@@ -61,7 +69,7 @@ Attended: yes
 Supersedes: 2026-09-03T08:00:05Z
 Goal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.
 Acceptance criteria:
-- A second reset request for the same account within 60 seconds sends no email.
-- npm test passes, with the test script changed to "node --test src/**/*.test.js".
+- AC1: A second reset request for the same account within 60 seconds sends no email.
+- AC2: npm test passes, with the test script changed to "node --test src/**/*.test.js".
 Out of scope: per-IP throttling.
 Assumptions: the cooldown is per-account, since the request names no other key.

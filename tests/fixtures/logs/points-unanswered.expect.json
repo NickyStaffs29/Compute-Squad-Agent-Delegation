@@ -1,0 +1,26 @@
+{
+  "note": "The Executor names two points for acceptance; the PASS answers only F1.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Never PASS with an unanswered point."
+    },
+    {
+      "file": "agents/squad-executor.md",
+      "text": "`For acceptance:` numbers each point you are least sure of as F1, F2, and so on, or reads `none`; the PM answers each one."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "executor-points"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

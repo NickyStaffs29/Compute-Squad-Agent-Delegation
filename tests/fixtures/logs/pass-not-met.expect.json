@@ -1,0 +1,26 @@
+{
+  "note": "Finding 2's static twin of S5: a PASS whose criteria table has a not met row. A PASS has only met or waived rows.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "PASS requires every row `met` or `waived`, apart from a later work order's `not checked` rows, and `Regressions: none`; any `not met` row or any regression is a FAIL."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If an ID has no row, a row reads anything but `met` or `waived`"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "criteria"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

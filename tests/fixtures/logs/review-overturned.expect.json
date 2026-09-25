@@ -1,0 +1,24 @@
+{
+  "note": "Finding 3: the review finds a defect the PM missed. The overturned entry counts as a FAIL, so the Executor, which ran on the mid rung, re-runs one rung up.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Run this in the main session on every high-stakes PASS; never delegate it."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "On `overturned`, the entry counts as a FAIL: re-run the named stage and every later stage with the log intact"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-run Executor with squad-executor-complex, then every later stage",
+      "via": "row: `## High-stakes review` reading `Result: overturned`"
+    }
+  ]
+}

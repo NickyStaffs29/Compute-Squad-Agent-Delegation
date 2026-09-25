@@ -4,8 +4,8 @@ Run: 2026-09-04-release-notes-refused
 Attended: yes
 Goal: Add release notes for 2.4.0 that list every public function whose body changed since v2.3.0.
 Acceptance criteria:
-- docs/release-notes/2.4.0.md lists exactly the exports from src/index.js whose files changed since v2.3.0.
-- npm test passes.
+- AC1: docs/release-notes/2.4.0.md lists exactly the exports from src/index.js whose files changed since v2.3.0.
+- AC2: npm test passes.
 Out of scope: notes for earlier releases.
 Assumptions: none
 
@@ -25,10 +25,21 @@ Timestamp: 2026-09-04T12:03:18Z
 Agent: squad-recon (claude-opus-5-5)
 Attempt: 1
 
-Public functions are exported from src/index.js (lines 1-40). The notes live in
-docs/release-notes/, one file per release. Tests: test/exports.test.js (4 cases).
-
-Risks: none blocking.
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 0; 4 passed; tree changed: no
+- `git tag --list v2.3.0` -> exit 0; v2.3.0
+Map:
+- src/index.js:1-40 the public exports: every public function is exported here
+- docs/release-notes/: one file per release; 2.4.0.md does not exist yet
+Callers:
+none found
+Tests:
+- test/exports.test.js: 4 cases on the export list
+Invariants:
+none found
+Open for the PM:
+none found
 
 ## Status
 Timestamp: 2026-09-04T12:03:30Z

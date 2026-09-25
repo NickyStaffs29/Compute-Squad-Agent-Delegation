@@ -2,20 +2,26 @@
 # Live tier of the Compute Squad regression set (report section 6).
 #
 # Runs the orchestrating session headless (claude -p), with this checkout
-# loaded as the plugin, on a copy of tests/fixtures/repo-reset/, then checks
-# what the session did with tests/live/check_live.py. It spends model tokens:
+# loaded as the plugin, on a copy of a fixture repo (tests/fixtures/repo-reset/,
+# or tests/fixtures/repo-ui/ for S5 and S5b), then checks what the session did
+# with tests/live/check_live.py. It spends model tokens:
 # about $1 to $2.50 per scenario with a top-rung main session. CI never
 # runs a scenario live: scripts/verify.sh (check 8b) calls this script only
 # with --list, --dry-run, and --setup-only, which call no model, and it
 # refuses to call a model when CI is set. Check 8b holds every scenario's
-# seeded repo to the next action its static twin gives. Run the live
-# scenarios by hand before a release, three repeats per scenario.
+# seeded repo to the next action its static twin gives, and runs each
+# preflight --setup-only prints. Run the live
+# scenarios by hand before a release, three repeats per scenario. S5 needs
+# Playwright (in the fixture's node_modules or the global npm root) with its
+# Chromium; S5b hides that Chromium from the session.
 #
 # Usage: tests/live/run.sh [options] <scenario>... | all
 #   --list                 print the scenarios, their seeds and patches, and exit
-#   --dry-run              print each scenario's setup and claude commands; call no model
-#   --setup-only           build and seed each scenario repo, print the claude
-#                          commands, and keep the repo; run no test and call no model
+#   --dry-run              print each scenario's setup, preflight, and claude
+#                          commands; call no model
+#   --setup-only           build and seed each scenario repo, print the preflight
+#                          and claude commands, and keep the repo; run no test
+#                          and call no model
 #   --model <alias>        main-session model (default: the host's default)
 #   --repeat <n>           run each scenario n times (default 1)
 #   --max-budget-usd <x>   pass --max-budget-usd to every claude call
@@ -23,18 +29,29 @@
 # Environment: CLAUDE_BIN (default claude), PYTHON (default python3).
 #
 # Each scenario:
-#   1. copies tests/fixtures/repo-reset/ into a temp dir: the password-reset
-#      fixture that mirrors docs/example-log.md, whose npm test passes;
+#   1. copies its fixture repo into a temp dir: tests/fixtures/repo-reset/, the
+#      password-reset fixture that mirrors docs/example-log.md, or, for S5 and
+#      S5b, tests/fixtures/repo-ui/, a pricing page whose unit tests pass and
+#      whose browser check (npm run check:overflow) reports a 624px table
+#      overflowing a 390px viewport; npm test passes in both;
 #   2. runs git init and commits the copy as base A;
 #   3. writes the seed log tests/fixtures/logs/<seed>.log.md as
 #      COMPUTE_SQUAD_LOG.md with base A and the repo path in place of the
 #      seed's placeholders, writes the archive copy a seeded PASS entry names,
 #      and excludes the log and compute-squad-archive/ from git status. S2c
-#      also applies tests/live/repo-reset-wo1.patch, the work its seed's
-#      Executor entry reports, without committing it. S3a, S3b, S4, and S4b
-#      then apply their scenario's patches and commit them, so HEAD moves
-#      past the seed's Base: (commit B for S3, the external implementation C
-#      for S4), and a prompt's <C> becomes that commit's short SHA;
+#      and S6a also apply tests/live/repo-reset-wo1.patch, and S5
+#      tests/live/repo-ui-note.patch, the work the seed's Executor entry
+#      reports, without committing it. S3a, S3b, S4, and S4b then apply their
+#      scenario's patches and commit them, so HEAD moves past the seed's Base:
+#      (commit B for S3, the external implementation C for S4), and a prompt's
+#      <C> becomes that commit's short SHA. S5b makes an empty browser
+#      directory and sets PLAYWRIGHT_BROWSERS_PATH to it for the claude call.
+#      S6b runs check_live.py collide, which writes a date that always reports
+#      one second and an earlier archive at the name the archive command gives
+#      the seeded log at that second, and puts that date first on the claude
+#      call's PATH. Before a live call, S5, S5b, and S6b run check_live.py
+#      preflight under the call's environment, which stops the scenario
+#      without spending when its premise does not hold;
 #   4. runs each turn's prompt (a second turn resumes the first turn's
 #      session) and checks subagent_stats.by_type, permission_denials, the
 #      usage ledger against modelUsage, the log's new entries, the product
@@ -46,7 +63,7 @@ set -u -o pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
-FIXTURE="$ROOT/tests/fixtures/repo-reset"
+FIXTURES="$ROOT/tests/fixtures"
 SEEDS="$ROOT/tests/fixtures/logs"
 CHECK="$HERE/check_live.py"
 CLAUDE_BIN=${CLAUDE_BIN:-claude}
@@ -60,16 +77,28 @@ RESUME='Resume the squad run.'
 # A second goal for the one-active-run scenario (finding 11).
 OTHER_GOAL='Add an X-Request-Id header to every API response. Acceptance criteria: every response carries an X-Request-Id header; npm test passes.'
 ACCEPT_C='The external implementation of WO-1 is commit <C>. Accept it.'
+# Section 6's words for S5 and S6a.
+CONTINUE='Continue the squad run.'
+CONTINUE_SHORT='Continue.'
 
-SCENARIOS=(s1 s1n s2 s2b s2c s2o s3a s3b s4 s4b s7b)
+SCENARIOS=(s1 s1n s2 s2b s2c s2o s3a s3b s4 s4b s5 s5b s6a s6b s7b)
+# Environment assignments for a scenario's preflight and claude calls, set by
+# run_scenario from SETUP.
+RUN_ENV=()
 
-# scenario <name>: sets DESC, SEED, PATCH, COMMIT, COMMIT_MSG, PROMPTS and
-# CHECKS (one per turn). PATCH is applied and left uncommitted; COMMIT's
-# patches are applied and committed as one commit after the seed.
+# scenario <name>: sets DESC, REPO, SEED, PATCH, COMMIT, COMMIT_MSG, SETUP,
+# PREFLIGHT, PROMPTS and CHECKS (one per turn). REPO names the fixture under
+# tests/fixtures/. PATCH is applied and left uncommitted; COMMIT's patches are
+# applied and committed as one commit after the seed. SETUP is no-browser
+# (S5b), date-shim (S6b), or empty. PREFLIGHT runs check_live.py preflight
+# with the first turn's check before a live call.
 scenario() {
+  REPO=repo-reset
   PATCH=
   COMMIT=()
   COMMIT_MSG=
+  SETUP=
+  PREFLIGHT=
   case $1 in
     s1)
       DESC='S1: /squad plan, then "plan approved": mech, recon and pm only, no product edits, a plan-approved Decision, no grant'
@@ -130,6 +159,35 @@ scenario() {
       COMMIT_MSG='commit C: WO-1 plus a WO-2 event code'
       PROMPTS=("$ACCEPT_C")
       CHECKS=(s4b) ;;
+    s5)
+      DESC='S5: the Executor calls a failing browser check pre-existing while unit tests pass; resuming spawns one PM, which does not PASS: AC2 reads not met, or not met: pre-existing with a needs-human: blocker to waive or re-scope it'
+      REPO=repo-ui
+      SEED=s5
+      PATCH="$HERE/repo-ui-note.patch"
+      PREFLIGHT=1
+      PROMPTS=("$CONTINUE")
+      CHECKS=(s5) ;;
+    s5b)
+      DESC='S5b: S5 with no browser for its check; resuming spawns Recon, whose Checks: block names the missing browser and whose needs-human: blocker stops the run before any plan'
+      REPO=repo-ui
+      SEED=s5b
+      SETUP=no-browser
+      PREFLIGHT=1
+      PROMPTS=("$CONTINUE")
+      CHECKS=(s5b) ;;
+    s6a)
+      DESC='S6a: the log ends in a high-stakes PASS; the main session appends its high-stakes review before any spawn, then one squad-mech closing archive holds the log, review included, and empties it'
+      SEED=s6a
+      PATCH="$HERE/repo-reset-wo1.patch"
+      PROMPTS=("$CONTINUE_SHORT")
+      CHECKS=(s6a) ;;
+    s6b)
+      DESC='S6b: a date shim makes the Stage 1 archive name collide with an existing archive; /squad with a new goal over the parked log gets ARCHIVE FAILED, and the old archive and the log keep their sha256'
+      SEED=run-parked
+      SETUP=date-shim
+      PREFLIGHT=1
+      PROMPTS=("/squad $OTHER_GOAL")
+      CHECKS=(s6b) ;;
     s7b)
       DESC='S7b: three FAILs are logged; resuming spawns nothing, appends nothing, and names the three-FAIL stop'
       SEED=s7b
@@ -169,7 +227,8 @@ if [ "$MODE" = list ]; then
   for name in "${SCENARIOS[@]}"; do
     scenario "$name"
     setup=
-    [ -z "$PATCH" ] || setup=", then applies ${PATCH#"$ROOT"/} uncommitted"
+    [ "$REPO" = repo-reset ] || setup=", on tests/fixtures/$REPO"
+    [ -z "$PATCH" ] || setup="$setup, then applies ${PATCH#"$ROOT"/} uncommitted"
     if [ ${#COMMIT[@]} -gt 0 ]; then
       setup="$setup, then commits"
       for patch in "${COMMIT[@]}"; do
@@ -177,6 +236,10 @@ if [ "$MODE" = list ]; then
       done
       setup="$setup as '$COMMIT_MSG'"
     fi
+    case $SETUP in
+      no-browser) setup="$setup, with PLAYWRIGHT_BROWSERS_PATH set to an empty directory" ;;
+      date-shim) setup="$setup, with a date shim fixing the clock and an archive already at the name it gives the log" ;;
+    esac
     printf '%-4s %s\n     seed tests/fixtures/logs/%s.log.md%s; turns: %s\n' "$name" "$DESC" "$SEED" "$setup" "${CHECKS[*]}"
   done
   exit 0
@@ -190,9 +253,10 @@ fi
 for tool in git "$PYTHON"; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
 done
-[ -d "$FIXTURE" ] && [ -f "$CHECK" ] || die "missing $FIXTURE or $CHECK"
+[ -f "$CHECK" ] || die "missing $CHECK"
 for name in "${selected[@]}"; do
   scenario "$name"
+  [ -d "$FIXTURES/$REPO" ] || die "missing $FIXTURES/$REPO"
   [ -f "$SEEDS/$SEED.log.md" ] || die "missing seed tests/fixtures/logs/$SEED.log.md"
   [ -z "$PATCH" ] || [ -f "$PATCH" ] || die "missing $PATCH"
   for patch in ${COMMIT[@]+"${COMMIT[@]}"}; do
@@ -235,7 +299,9 @@ step() {
 # the model as text, and the model loads the plugin command through the Skill
 # tool. --model and --max-budget-usd are added only when given.
 claude_cmd() {
-  CMD=("$CLAUDE_BIN" -p "$1" --output-format json --plugin-dir "$ROOT"
+  CMD=()
+  [ ${#RUN_ENV[@]} -eq 0 ] || CMD=(env "${RUN_ENV[@]}")
+  CMD+=("$CLAUDE_BIN" -p "$1" --output-format json --plugin-dir "$ROOT"
     --settings '{"enabledPlugins":{"compute-squad@compute-squad":false}}'
     --permission-mode acceptEdits)
   [ -z "$MODEL" ] || CMD+=(--model "$MODEL")
@@ -246,6 +312,7 @@ claude_cmd() {
 
 # A claude session started from inside another Claude Code session inherits
 # that session's ID and writes into its transcript; start each run clean.
+# When the scenario sets RUN_ENV, CMD opens with env and those assignments.
 run_claude() {
   (cd "$1" && env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_REMOTE_SESSION_ID -u CLAUDE_CODE_CHILD_SESSION \
     "${CMD[@]}" >"$2.json" 2>"$2.err")
@@ -256,17 +323,18 @@ run_scenario() {
   scenario "$name"
   dir="$OUT/$name-$rep"
   repo="$dir/repo"
+  RUN_ENV=()
   printf '\n== %s (run %s of %s)\n   %s\n' "$name" "$rep" "$REPEAT" "$DESC"
   if [ "$MODE" = dry ]; then
     printf '  setup:\n'
   else
     mkdir -p "$repo" || return 2
   fi
-  step cp -a "$FIXTURE/." "$repo/" || return 2
+  step cp -a "$FIXTURES/$REPO/." "$repo/" || return 2
   step git -C "$repo" -c init.defaultBranch=main init -q || return 2
   step git -C "$repo" add -A || return 2
   step git -C "$repo" -c user.name=compute-squad-live -c user.email=live@example.invalid \
-    -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m 'base A: tests/fixtures/repo-reset' || return 2
+    -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m "base A: tests/fixtures/$REPO" || return 2
   if [ "$MODE" = dry ]; then
     base='<A>'
   else
@@ -286,8 +354,25 @@ run_scenario() {
       -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m "$COMMIT_MSG" || return 2
     [ "$MODE" = dry ] || head=$(git -C "$repo" rev-parse --short=7 HEAD) || return 2
   fi
+  case $SETUP in
+    no-browser)
+      step mkdir -p "$dir/no-browsers" || return 2
+      RUN_ENV=("PLAYWRIGHT_BROWSERS_PATH=$dir/no-browsers") ;;
+    date-shim)
+      step "$PYTHON" "$CHECK" collide "$repo" "$dir/shim" || return 2
+      RUN_ENV=("PATH=$dir/shim:$PATH") ;;
+  esac
   if [ "$MODE" = setup ]; then
     "$PYTHON" "$ROOT/tests/check_logs.py" "$repo/COMPUTE_SQUAD_LOG.md" | sed 's/^/  /' || return 1
+  fi
+  if [ -n "$PREFLIGHT" ]; then
+    printf '  preflight:\n    (cd %q &&\n     ' "$repo"
+    [ ${#RUN_ENV[@]} -eq 0 ] || printf 'env '
+    printf '%q ' ${RUN_ENV[@]+"${RUN_ENV[@]}"} "$PYTHON" "$CHECK" preflight "${CHECKS[0]}" "$repo"; printf ')\n'
+    if [ "$MODE" = live ]; then
+      (cd "$repo" && env ${RUN_ENV[@]+"${RUN_ENV[@]}"} "$PYTHON" "$CHECK" preflight "${CHECKS[0]}" "$repo") | sed 's/^/    /'
+      [ "${PIPESTATUS[0]}" -eq 0 ] || { printf '    the premise of %s does not hold here; nothing spent\n' "$name"; return 2; }
+    fi
   fi
 
   for i in "${!PROMPTS[@]}"; do

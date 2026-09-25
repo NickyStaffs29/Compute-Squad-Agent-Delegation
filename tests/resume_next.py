@@ -55,6 +55,7 @@ EXECUTOR = check_logs.EXECUTOR_HEADING
 PENDING = check_logs.PENDING_HEADING
 PASS = "## PM — PASS"
 FAIL = "## PM — FAIL"
+REVIEW = check_logs.REVIEW_HEADING
 CONT = check_logs.CONT
 FAIL_LINE = re.compile(r"^(Rerun: |- rerun: )")
 # A helper result that refused a step or reports one not run (DELEGATE steps 2 and 4).
@@ -62,6 +63,10 @@ REFUSAL = re.compile(r"REFUSED:|\bnot run:")
 REFUSED_SOURCE = ", a step refused or not run"
 HOSTS = ("Claude Code", "Codex")
 RUN_STATE = ("COMPUTE_SQUAD_LOG.md", "compute-squad-archive/")
+FILES_CHANGED = "Files changed: "   # the Executor entry's line the tree check reads (finding 16)
+# Recon's baseline run may leave files behind, which it names on its baseline
+# line and never cleans up (finding 14); the tree check reads those too.
+TREE_CHANGED = "; tree changed: "
 CLASS_RUNG = {"MECHANICAL": 0, "STANDARD": 1, "COMPLEX": 2}
 
 # The table's rows, in order: the first column exactly, and a phrase its
@@ -77,8 +82,12 @@ ROWS = (
     ("`## Executor`", "Then spawn `squad-pm` in ACCEPT mode."),
     ("`## PM — Accept (pending)`", "spawn `squad-pm` in ACCEPT mode for the verdict."),
     ("`## PM — FAIL`", "Re-run the stage on its `Rerun:` line at the rung the escalation rules give"),
-    ("`## PM — PASS` in a high-stakes run", "Never spawn ACCEPT again for this verdict."),
+    ("`## PM — PASS` in a high-stakes run", "Run the high-stakes review procedure (Stage 5) before anything else. "
+                                            "Never spawn ACCEPT again for this verdict."),
     ("`## PM — PASS` in any other run", "Otherwise the PM's archive or clear did not finish: hand back to the user."),
+    ("`## High-stakes review` reading `Result: upheld`", "Otherwise spawn `squad-mech` to close the run."),
+    ("`## High-stakes review` reading `Result: held`", "then run a new review. An unattended run stops."),
+    ("`## High-stakes review` reading `Result: overturned`", "It counts as a FAIL: re-run the stage on its `Rerun:` line"),
 )
 # Text of the steps this model implements, which resume.md must still carry.
 STEPS = (
@@ -95,7 +104,8 @@ STEPS = (
     ("DELEGATE row", "If it is not, but a result reports a step `REFUSED:` or `not run:`, re-spawn that stage for a "
                      "new, complete entry (DELEGATE steps 2 and 4)."),
     ("tree check", "A listed path other than `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` that no "
-                   "`## Executor` entry of this run names"),
+                   "`Files changed:` line of this run names, and that no `## Recon` baseline line of this run names "
+                   "after `tree changed:`, means"),
     ("base check", "Base check, when `Base:` names a commit that differs from `git rev-parse HEAD`"),
     ("base check", "If no listed path is in the governing plan's must-NOT-change list or among the files and tests "
                    "of the work order about to run, append a `## Status` with the new `Base:` and continue."),
@@ -300,7 +310,11 @@ class Run(object):
     # -- the checks before an executor spawn ---------------------------------
     def executor_spawn(self, action, work_order):
         """Run the tree check and the base check, then the action."""
-        explained = "\n".join(body_text(e) for e in self.entries if base_heading(e["heading"]) == EXECUTOR)
+        explained = "\n".join(text for e in self.entries if base_heading(e["heading"]) == EXECUTOR
+                              for _, text in e["body"] if text.startswith(FILES_CHANGED))
+        explained += "\n" + "\n".join(text.rsplit(TREE_CHANGED, 1)[1] for e in self.entries
+                                       if base_heading(e["heading"]) == RECON
+                                       for _, text in e["body"] if re.fullmatch(check_logs.BASELINE_LINE, text))
         unlogged = [p for p in self.state.get("dirty", [])
                     if not p.startswith(RUN_STATE) and not named(p, explained)]
         if unlogged:
@@ -336,9 +350,15 @@ class Run(object):
             return f"stop: the entry names no stage to re-run ({stage or 'nothing'}); show it to the user", None
         return f"re-run {stage} ({spawn}), then every later stage", None
 
-    def next_work_order(self):
+    def next_work_order(self, at=None):
+        """The work order after the one the latest Status names, or, with
+        at, the latest Status above the entry at that index."""
         orders = self.work_orders()
         current = self.work_order()
+        if at is not None:
+            status = next((e for e in reversed(self.entries[:at]) if e["heading"] == STATUS), None)
+            match = re.fullmatch(r"r[0-9]+, work order (\S+)", (field(status, "Plan") or "") if status else "")
+            current = match.group(1) if match else "all"
         if current in orders and orders.index(current) + 1 < len(orders):
             return orders[orders.index(current) + 1]
         return None
@@ -432,16 +452,32 @@ def heading_row(run, index):
     if base == PASS:
         following = run.next_work_order()
         if run.high_stakes:
-            first = ROWS[9][0]
-            if following is None:
-                return "run the main-session high-stakes review, then close the run with the archive command", first, None
-            action, extra = run.grant_rule(following)
-            return f"run the main-session high-stakes review, append a Status naming {following}, then {action}", first, extra
+            return "run the high-stakes review procedure", ROWS[9][0], None
         first = ROWS[10][0]
         if following is None:
             return "hand back to the user: the PM's archive or clear did not finish", first, None
         action, extra = run.grant_rule(following)
         return f"append a Status naming {following}, then {action}", first, extra
+    if base == REVIEW:
+        result = field(entry, "Result")
+        if result == "upheld":
+            first = ROWS[11][0]
+            accepted = max((i for i in range(index) if run.entries[i]["heading"] == PASS), default=None)
+            following = run.next_work_order(accepted) if accepted is not None else None
+            if following is None:
+                return "spawn squad-mech to close the run", first, None
+            action, extra = run.grant_rule(following)
+            return f"append a Status naming {following}, then {action}", first, extra
+        if result == "held":
+            first = ROWS[12][0]
+            attended = (field(run.goal, "Attended") or "yes") if run.goal else "yes"
+            if attended == "no":
+                return "stop: an unattended run leaves the review's open items to the user", first, None
+            return ("ask the user about the review's open items, record each answer as a Decision, then run a new "
+                    "high-stakes review"), first, None
+        if result == "overturned":
+            action, extra = run.rerun(field(entry, "Rerun") or "")
+            return action, ROWS[13][0], extra
     return f"stop: no row for {heading!r}; show the entry to the user", "no row", None
 
 

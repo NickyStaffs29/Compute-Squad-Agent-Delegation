@@ -4,8 +4,8 @@ Run: 2026-09-01-avatar-size
 
 Goal: Store uploaded avatars at most 512 pixels on the long side.
 Acceptance criteria:
-- An upload larger than 512 pixels is stored scaled to 512 on the long side.
-- npm test passes.
+- AC1: An upload larger than 512 pixels is stored scaled to 512 on the long side.
+- AC2: npm test passes.
 Out of scope: existing avatars.
 Assumptions: none.
 
@@ -25,9 +25,21 @@ Timestamp: 2026-09-01T11:04:09Z
 Agent: squad-recon (claude-sonnet-5)
 Attempt: 1
 
-Uploads land in src/avatar/upload.js (lines 20-61), which calls sharp through
-resize() in src/avatar/image.js (lines 3-18). Tests: test/avatar.test.js (5
-cases).
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 0; 5 passed; tree changed: no
+Map:
+- src/avatar/upload.js:20-61 the upload handler: calls resize() on every upload
+- src/avatar/image.js:3-18 resize: "function resize(input, options) {"; wraps sharp
+Callers:
+- resize <- src/avatar/upload.js:31
+- resize <- src/avatar/upload.js:44
+Tests:
+- test/avatar.test.js: 5 cases on uploads
+Invariants:
+none found
+Open for the PM:
+none found
 
 ## PM — Plan
 Timestamp: 2026-09-01T11:09:33Z
@@ -47,11 +59,14 @@ Agent: squad-executor-mechanical (claude-sonnet-5)
 Attempt: 1
 Plan: r1, work order all
 
-Implemented tasks 1 and 2 in src/avatar/image.js and test/avatar.test.js.
-`npm test` -> exit 0; 6 passed.
-
-Deviations: none. For acceptance: the test fixture is a PNG; JPEG uploads take
-the same path.
+Tasks: 1-2 of 2
+Files changed: src/avatar/image.js, test/avatar.test.js
+Checks:
+- `npm test` -> exit 0; 6 passed
+Deviations: none
+For acceptance:
+- F1: the test fixture is a PNG; JPEG uploads take the same path
+Commit: 1a2b3c4d5e6f, working tree 2 changed files
 
 ## PM — Accept (pending)
 Timestamp: 2026-09-01T11:22:31Z

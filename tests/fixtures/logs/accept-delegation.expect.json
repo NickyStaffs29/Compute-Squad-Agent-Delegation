@@ -7,7 +7,7 @@
     },
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "**PM — Accept (pending):** the PM needed delegated work before it could decide. Run the `DELEGATE:` block, append the results, and re-spawn the PM in ACCEPT mode for the verdict."
+      "text": "**PM — Accept (pending):** the PM needed delegated work or a user decision before it could decide. Run its `DELEGATE:` block and append the results"
     },
     {
       "file": "agents/squad-helper.md",

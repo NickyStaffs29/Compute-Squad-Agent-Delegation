@@ -1,0 +1,30 @@
+{
+  "note": "Finding 14: S2's seed with the Recon entry's baseline line dropped. AC5 depends on npm test, so Recon runs the baseline once on the untouched tree and logs it as the second Checks: line, or says why it did not run.",
+  "cites": [
+    {
+      "file": "agents/squad-recon.md",
+      "text": "Unless no criterion depends on a command's result, run the project's canonical test or verify command once on the untouched tree"
+    },
+    {
+      "file": "agents/squad-recon.md",
+      "text": "If you skip it, write `- baseline: not run, <why>`."
+    },
+    {
+      "file": "agents/squad-recon.md",
+      "text": "- `<baseline command>` -> exit <code>; <last summary line>; tree changed: <no | the paths>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "recon-checks"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: spawn squad-executor (STANDARD) for WO-1",
+      "via": "step 4: perform Next"
+    }
+  ]
+}

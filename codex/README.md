@@ -85,7 +85,7 @@ Then run the sessions in order:
 | Order | Prompt file | Stage | Model (rung) |
 |---|---|---|---|
 | 1 | `01-archive.md` | Archive the prior log | `gpt-5.6-luna` max (bottom) |
-| 2 | `02-recon.md` | Read-only codebase mapping | `gpt-5.6-terra` max (mid) |
+| 2 | `02-recon.md` | Codebase mapping and baseline check | `gpt-5.6-terra` max (mid) |
 | 3 | `03-pm-plan.md` | Spec + task breakdown, no code | `gpt-5.6-sol` max (top) |
 | 4 | `04-execute.md` | Implementation, exactly per plan | STANDARD `gpt-5.6-terra` max (mid); MECHANICAL `gpt-5.6-luna` max (bottom); COMPLEX `gpt-5.6-sol` max (top) |
 | 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | `gpt-5.6-sol` max (top) |
@@ -106,7 +106,7 @@ Run: <UTC date and a slug: lowercase letters, digits, hyphens>
 Attended: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
-- <concrete, verifiable item>
+- AC1: <concrete, verifiable item>
 Out of scope: <items>
 Assumptions: <only for unattended runs; otherwise "none">
 ```
@@ -146,12 +146,31 @@ returns there. Record that change as a `## Decision` entry of
 Type re-lock followed by a new full `## Goal — Locked` entry with a `Supersedes:` line; sessions 2
 through 5 read the latest one.
 
-**On PASS:** the accept session archives the log, verifies the copy, then clears the active log —
-unless it flagged the change high-stakes, in which case it leaves the log intact for your own review.
-Once that review is done, close the run with the archive command in the Hard rules of
-[`skills/compute-squad/SKILL.md`](../skills/compute-squad/SKILL.md), which archives the log again and
-clears it only after `cmp` succeeds. While the plan has a work order after the one accepted, the
-accept session archives and clears nothing, and the next work order waits for your grant.
+**On PASS:** on an ordinary change the accept session archives the log, verifies the copy, and
+clears the active log. On a high-stakes change it archives and clears nothing: run the high-stakes
+review procedure in Stage 5 of `skills/compute-squad/SKILL.md` yourself and append its entry, then a `## Status`:
+
+```markdown
+## High-stakes review
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Agent: main session (<model ID as your context states it>)
+Result: <upheld | overturned | held>
+Rerun: <Recon|Plan|Executor>
+Tested: <commit SHA>, working tree <clean | N changed files>
+Checked:
+- `<command>` -> exit <code>; <summary line>
+Risks:
+- <risk> | <diff line or check line; or open>
+Decisions after lock:
+- <none, or: decision | approving `## Decision` timestamp, or unapproved>
+```
+
+On `Result: upheld`, paste `01-archive.md` followed by "Close the run after an upheld high-stakes
+review." On `overturned`, treat the entry as a FAIL naming the stage on its `Rerun:` line. On
+`held`, leave the log intact until you have settled the open items. While the plan has a work order
+after the one accepted, the accept session archives and clears nothing, and the next work order
+waits for your grant; in a high-stakes run it also waits for an upheld review, and the closing
+archive waits for an upheld review of the last work order's PASS.
 
 **Resuming, or taking over a run from the other host:** before pasting the next prompt, follow [`skills/compute-squad/references/resume.md`](../skills/compute-squad/references/resume.md), which maps the log's latest state to the next session to run. When you hand a work order to Claude Code or back to Codex, append the `## Status` handoff entry yourself (template in [`SKILL.md`](../skills/compute-squad/SKILL.md)) before closing the session.
 

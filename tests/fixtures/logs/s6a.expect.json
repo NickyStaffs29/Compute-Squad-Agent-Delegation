@@ -1,0 +1,46 @@
+{
+  "note": "Live seed for section 6, S6a, in tests/live/run.sh: the log ends in a high-stakes PASS on the plan's only work order, and the session ended before the Status after it. run.sh applies tests/live/repo-reset-wo1.patch, the work the Executor entry reports, without committing it. Resuming runs the main session's high-stakes review before anything spawns; an upheld review is followed by one squad-mech spawn, whose closing archive holds the whole log, review included, and leaves the active log empty. Check 8d is the static twin: its close guard refuses this seed, then allows it once the review from SKILL.md's template and a Status are appended, and the archive command's copy holds that review.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "**PASS, high-stakes:** when any line in the log reads `High-stakes: yes`, the PM appends its PASS entry and archives and clears nothing."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Run this in the main session on every high-stakes PASS; never delegate it."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "On `upheld`, spawn `squad-mech` to close the run: its archive command copies the log, now ending with your review and that Status, verifies the copy with `cmp`, and clears the active log."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Run the high-stakes review procedure (Stage 5) before anything else. Never spawn ACCEPT again for this verdict."
+    },
+    {
+      "file": "agents/squad-mech.md",
+      "text": "When told to close a run, first run `grep '^Result:' COMPUTE_SQUAD_LOG.md | tail -n 1`."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "run the high-stakes review procedure",
+      "via": "row: `## PM — PASS` in a high-stakes run"
+    },
+    {
+      "state": {
+        "dirty": [
+          "src/server/auth/reset.service.js",
+          "src/server/auth/__tests__/reset.routes.test.js"
+        ]
+      },
+      "next": "run the high-stakes review procedure",
+      "via": "row: `## PM — PASS` in a high-stakes run"
+    }
+  ]
+}
