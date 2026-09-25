@@ -110,9 +110,12 @@
 #      colliding archive changing nothing (8d),
 #      codex/update.sh with stubs (8e), which must install the plugin,
 #      agents, and profiles from one build that carries the account's saved
-#      Codex model choices, ask for choices only on a terminal, reject a model
-#      the catalog does not offer, change nothing in CODEX_HOME when it stops,
-#      and whose catalog validator must apply its effort, retirement,
+#      Codex model choices, only from main at origin/main or an approved
+#      commit it never pulls, ask for choices only on a terminal, reject a
+#      model the catalog does not offer, change nothing in CODEX_HOME when it
+#      stops, fail an install that differs from the source, and whose --check
+#      must name each difference while writing nothing, and whose catalog
+#      validator must apply its effort, retirement,
 #      upgrade, and format rules,
 #      and the usage ledger hook on synthetic transcripts (8f), whose records
 #      must hold exact token sums, including a final message written after
@@ -664,10 +667,29 @@ with open(".codex-plugin/plugin.json", encoding="utf-8") as handle:
 if manifest.get("skills") != "./skills/":
     fail(".codex-plugin/plugin.json does not point at ./skills/")
 
+
+# codex/update.sh installs, and --check compares, the manifest plus skills/:
+# a component path the manifest declares beyond that would be loaded by
+# Codex but neither installed from the source nor checked.
+def declared_paths(value):
+    if isinstance(value, str):
+        return [value] if value.startswith("./") else []
+    items = value.values() if isinstance(value, dict) else value if isinstance(value, list) else []
+    return [path for item in items for path in declared_paths(item)]
+
+
+declared = {key: declared_paths(value) for key, value in manifest.items() if declared_paths(value)}
+if declared != {"skills": ["./skills/"]}:
+    fail(
+        f".codex-plugin/plugin.json declares component paths {declared!r}; codex/update.sh and its --check cover "
+        "only ./skills/, so extend codex/build-agents.py --render-codex before adding another"
+    )
+
 print(
     f"PASS: check 6: models.conf parses and holds the routing policy on both hosts, {len(malformed)} malformed "
-    f"copies fail to parse, the {len(actual)} Codex agent TOMLs and 5 manual prompts are valid, and "
-    f"codex/build-agents.py --check finds every generated file in sync"
+    f"copies fail to parse, the {len(actual)} Codex agent TOMLs and 5 manual prompts are valid, "
+    f"codex/build-agents.py --check finds every generated file in sync, and .codex-plugin/plugin.json declares "
+    f"no component path but ./skills/"
 )
 PYEOF
 
@@ -3579,11 +3601,25 @@ print(
 # overlapping updates (a review while a scheduled update installs, and a
 # scheduled update while a review waits for answers), driven in lockstep by
 # the stub's pause point, where the second must stop at the lock with the
-# saved choices byte for byte; the catalog fingerprint; a changed catalog without and with a terminal;
+# saved choices byte for byte; the catalog fingerprint; a changed catalog
+# without and with a terminal;
 # unreadable saved choices; and a saved model the catalog retires or drops.
+# The source (the stub git answers rev-parse from STUB_GIT_* variables): by
+# default main tracking origin/main is confirmed before the pull and HEAD must
+# equal origin/main after it; --source-sha installs an approved commit from
+# any branch without a pull. Source drift (another branch, another or no
+# upstream, a local commit, a checkout not at the approved commit) stops
+# before any codex call. --check must report a match, then name on its own
+# each of a stale main skill, a stale referenced file, a hook without its
+# executable bit, an extra cached file, a changed agent, a missing profile, a
+# second copy of the plugin, a drifted approved commit, and uncommitted
+# changes, while leaving CODEX_HOME byte for byte, this checkout's status,
+# and every git and codex call read-only. An install the stub lands with the
+# wrong content must fail without the success line.
 # Every install must put the plugin, agents, and profiles from one build that
-# carries the saved choices, remove the remote plugin, prune the retired
-# agents, and leave the user's files and this checkout as they were. Every
+# carries the saved choices, check them against a fresh render, remove the
+# remote plugin, prune the retired agents, and leave the user's files and
+# this checkout as they were. Every
 # cancelled, refused, or stopped run must leave CODEX_HOME byte for byte as
 # it was and make no codex plugin call beyond `plugin list`. Every run has a
 # timeout. Last, codex/build-agents.py --validate-catalog runs on its own
@@ -3792,10 +3828,30 @@ with tempfile.TemporaryDirectory() as tmp:
         mutating = [c for c in calls if c.startswith("codex plugin") and c != "codex plugin list --json"]
         expect(label, not mutating, f"it made codex plugin calls {mutating!r}", rc, out, err, calls)
 
-    def expect_pull_first(label, rc, out, err, calls):
-        git_call = re.fullmatch(r"git -C (.+) pull --ff-only", calls[0]) if calls else None
-        expect(label, git_call and os.path.realpath(git_call.group(1)) == os.path.realpath(REPO),
-               "its first call should be git pull on this repo", rc, out, err, calls)
+    def git_call(call):
+        """A stub git call on this repo, as the words after its -C option."""
+        match = re.fullmatch(r"git -C (\S+) (.*)", call)
+        if not match or os.path.realpath(match.group(1)) != os.path.realpath(REPO):
+            return None
+        return match.group(2)
+
+    # The default source: main tracking origin/main is checked before the
+    # pull, and HEAD must equal origin/main after it; the checkout's cleanliness
+    # is read last. Every read passes --no-optional-locks, so it never writes
+    # the index.
+    DEFAULT_SOURCE = [
+        "--no-optional-locks rev-parse --abbrev-ref HEAD",
+        "--no-optional-locks rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+        "pull --ff-only",
+        "--no-optional-locks rev-parse HEAD",
+        "--no-optional-locks rev-parse @{upstream}",
+        "--no-optional-locks status --porcelain --untracked-files=no",
+    ]
+
+    def expect_default_source(label, rc, out, err, calls):
+        git_calls = [git_call(c) for c in calls if c.startswith("git ")]
+        expect(label, git_calls[:len(DEFAULT_SOURCE)] == DEFAULT_SOURCE,
+               f"its first git calls on this repo should be {DEFAULT_SOURCE!r}", rc, out, err, calls)
 
     def saved_choices():
         text = read(choices_path)
@@ -3879,6 +3935,8 @@ with tempfile.TemporaryDirectory() as tmp:
         expect(label, now_status == repo_status, "it changed this checkout's git status", rc, out, err, calls)
         expect(label, "Start a new Codex session." in out, "it should end by asking for a new Codex session",
                rc, out, err, calls)
+        expect(label, "check: OK" in out and out.index("check: OK") < out.index("Start a new Codex session."),
+               "it should check the install against the source before it reports success", rc, out, err, calls)
 
     typed_choices = "stub-top\nmax\nstub-mid\nxhigh\nstub-low\nmax\nhigh\n"
     write_catalog(catalog_path, BASE_ENTRIES)
@@ -3898,25 +3956,29 @@ with tempfile.TemporaryDirectory() as tmp:
     expect("--review-models without a terminal", rc == 2 and "needs a terminal" in err and not calls,
            "it should exit 2 before any call", rc, out, err, calls)
     expect_untouched("--review-models without a terminal", before, rc, out, err, calls)
-    rc, out, err, calls = run_update("an unknown argument", ["--check"])
-    expect("an unknown argument", rc == 2 and "usage:" in err and not calls, "it should exit 2 with the usage line",
-           rc, out, err, calls)
+    for label, args in (("an unknown argument", ["--status"]), ("--check with --review-models", ["--check", "--review-models"]),
+                        ("a malformed --source-sha", ["--source-sha", "abc123"]), ("--source-sha with no commit", ["--source-sha"]),
+                        ("--source-sha twice", ["--source-sha", "1" * 40, "--source-sha", "1" * 40])):
+        rc, out, err, calls = run_update(label, args)
+        expect(label, rc == 2 and "usage:" in err and not calls, "it should exit 2 with the usage line and no call",
+               rc, out, err, calls)
     ran.append("--review-models without a terminal exits 2")
 
     # The setup gap.
     rc, out, err, calls = run_update("no saved choices, no terminal")
     expect("no saved choices, no terminal", rc == 3 and "setup gap: no Codex model choices saved" in err
            and "--review-models" in err, "it should exit 3 with the setup-gap line", rc, out, err, calls)
-    expect_pull_first("no saved choices, no terminal", rc, out, err, calls)
+    expect_default_source("no saved choices, no terminal", rc, out, err, calls)
     expect_untouched("no saved choices, no terminal", before, rc, out, err, calls)
     ran.append("no choices and no terminal exits 3")
 
     # A dirty checkout.
     rc, out, err, calls = run_update("a dirty checkout", answers=typed_choices + "yes\n",
                                      extra_env={"STUB_GIT_STATUS": " M README.md\n"})
-    expect("a dirty checkout", rc == 1 and "uncommitted changes" in err and len(calls) == 2
-           and calls[1].endswith("status --porcelain --untracked-files=no"),
-           "it should stop after git pull and a git status that ignores untracked files", rc, out, err, calls)
+    expect("a dirty checkout", rc == 1 and "uncommitted changes" in err
+           and [git_call(c) for c in calls] == DEFAULT_SOURCE,
+           "it should stop after selecting the source and a git status that ignores untracked files",
+           rc, out, err, calls)
     expect_untouched("a dirty checkout", before, rc, out, err, calls)
     ran.append("a dirty checkout stops")
 
@@ -3984,13 +4046,14 @@ with tempfile.TemporaryDirectory() as tmp:
     # First setup.
     rc, out, err, calls = run_update("first setup", answers=typed_choices + "yes\n")
     expect("first setup", rc == 0, "it should succeed", rc, out, err, calls)
-    expect_pull_first("first setup", rc, out, err, calls)
+    expect_default_source("first setup", rc, out, err, calls)
     want_calls = [
         "codex plugin list --json",
         "codex debug models",
         f"codex plugin marketplace add {build_dir}",
         "codex plugin add compute-squad@compute-squad-local",
         "codex plugin remove compute-squad@compute-squad",
+        "codex plugin list --json",
     ]
     expect("first setup", [c for c in calls if c.startswith("codex")] == want_calls,
            f"its codex calls should be {want_calls!r}", rc, out, err, calls)
@@ -4020,6 +4083,160 @@ with tempfile.TemporaryDirectory() as tmp:
            rc, out, err, calls)
     expect_installed("a routine update", rc, out, err, calls)
     ran.append("a routine update asks nothing and keeps the choices")
+
+    # The source an update installs from, and the read-only check. The stub
+    # git's HEAD is forty 1s unless a scenario sets STUB_GIT_HEAD.
+    stub_head, other_sha = "1" * 40, "2" * 40
+
+    git_index = subprocess.run(["git", "rev-parse", "--git-path", "index"], capture_output=True, text=True,
+                               timeout=120).stdout.strip()
+
+    def stat_snapshot(root, extra=()):
+        """Every entry's type, size, mode, and mtime in nanoseconds, the root
+        included: creating and removing even a temporary entry changes its
+        directory's mtime, so a write that cleans up after itself still shows."""
+        state = {}
+        for path in [root, *extra]:
+            info = os.stat(path)
+            state[path] = (info.st_mode, info.st_size, info.st_mtime_ns)
+        for dirpath, dirnames, filenames in os.walk(root):
+            for name in dirnames + filenames:
+                info = os.lstat(os.path.join(dirpath, name))
+                state[os.path.join(dirpath, name)] = (info.st_mode, info.st_size, info.st_mtime_ns)
+        return state
+
+    def run_check(label, args=(), extra_env=None):
+        """--check must only read: every entry of CODEX_HOME and this
+        checkout's git index keep their content, mode, and mtime, and it makes
+        no pull or other git write and no codex call but plugin list."""
+        before = snapshot(codex_home)
+        before_stat = stat_snapshot(codex_home, [git_index])
+        rc, out, err, calls = run_update(label, ["--check", *args], extra_env=extra_env)
+        expect(label, snapshot(codex_home) == before,
+               f"--check changed CODEX_HOME: {changed_paths(before, snapshot(codex_home))!r}", rc, out, err, calls)
+        after_stat = stat_snapshot(codex_home, [git_index])
+        touched = sorted(p for p in set(before_stat) | set(after_stat) if before_stat.get(p) != after_stat.get(p))
+        expect(label, not touched, f"--check wrote, even if only for a moment, in {touched!r}", rc, out, err, calls)
+        writes = [c for c in calls if c.startswith("git ")
+                  and not re.match(r"(--no-optional-locks (rev-parse|status) |ls-files )", git_call(c) or "")]
+        codex_calls = [c for c in calls if c.startswith("codex ")]
+        expect(label, not writes and codex_calls == ["codex plugin list --json"],
+               f"--check may only read: git calls {writes!r} and codex calls {codex_calls!r} are not reads",
+               rc, out, err, calls)
+        now_status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, timeout=120).stdout
+        expect(label, now_status == repo_status, "--check changed this checkout's git status", rc, out, err, calls)
+        return rc, out, err, calls
+
+    rc, out, err, calls = run_check("--check on a matching install")
+    expect("--check on a matching install", rc == 0 and out.rstrip().endswith("check: OK") and "MISMATCH" not in out
+           and "FAILED" not in out and f"main at {stub_head}" in out,
+           "it should name the source and end on check: OK", rc, out, err, calls)
+    ran.append("--check reports a matching install and changes nothing")
+
+    # Each kind of difference alone: --check exits 1, names exactly that
+    # difference, and changes nothing. CODEX_HOME and the stub's plugin state
+    # are restored after each one.
+    version = json.loads(read(".codex-plugin/plugin.json"))["version"]
+    skill = os.path.join(codex_home, "plugins", "cache", "compute-squad-local", "compute-squad", version,
+                         "skills", "compute-squad")
+
+    def append(path, text="a stale line\n"):
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(text)
+
+    hook = os.path.join(skill, "hooks", "grant-gate.sh")
+    differences = (
+        ("a stale main skill", lambda: append(os.path.join(skill, "SKILL.md")), (), {},
+         os.path.join(skill, "SKILL.md") + ": differs from the source"),
+        ("a stale referenced file", lambda: append(os.path.join(skill, "references", "resume.md")), (), {},
+         os.path.join(skill, "references", "resume.md") + ": differs from the source"),
+        ("a hook that lost its executable bit", lambda: os.chmod(hook, 0o644), (), {},
+         hook + ": executable bit differs from the source"),
+        ("an extra file in the cached skill", lambda: append(os.path.join(skill, "references", "old-notes.md")), (), {},
+         os.path.join(skill, "references", "old-notes.md") + ": extra"),
+        ("a changed agent", lambda: append(os.path.join(agents_dir, "squad-pm.toml")), (), {},
+         os.path.join(agents_dir, "squad-pm.toml") + ": differs from the source"),
+        ("a missing profile", lambda: os.remove(os.path.join(codex_home, "compute-squad-pm.config.toml")), (), {},
+         os.path.join(codex_home, "compute-squad-pm.config.toml") + ": missing"),
+        ("a second copy of the plugin",
+         lambda: append(os.path.join(stub_state, "installed", "compute-squad@compute-squad"), "4.4.0\n"), (), {},
+         "compute-squad@compute-squad is also installed and enabled"),
+        ("an approved commit the checkout has drifted from", lambda: None, ("--source-sha", other_sha), {},
+         f"HEAD is {stub_head}, not the approved {other_sha}"),
+        ("uncommitted changes in the checkout", lambda: None, (), {"STUB_GIT_STATUS": " M README.md\n"},
+         "has uncommitted changes"),
+        ("an update lock left behind", lambda: os.mkdir(os.path.join(codex_home, "compute-squad.lock")), (), {},
+         "compute-squad.lock exists"),
+    )
+    pristine_home, pristine_state = os.path.join(tmp, "pristine-home"), os.path.join(tmp, "pristine-state")
+    shutil.copytree(codex_home, pristine_home, symlinks=True)
+    shutil.copytree(stub_state, pristine_state, symlinks=True)
+    for label, damage, args, extra, named in differences:
+        damage()
+        rc, out, err, calls = run_check(f"--check with {label}", args, extra)
+        found = [line for line in out.splitlines() if line.startswith("check: MISMATCH")]
+        verdict = [line for line in out.splitlines() if line.startswith(("check: OK", "check: FAILED"))]
+        expect(f"--check with {label}", rc == 1 and len(found) == 1 and named in found[0]
+               and verdict == [verdict[-1]] and verdict[-1].startswith("check: FAILED")
+               and out.rstrip().endswith(verdict[-1]),
+               f"it should exit 1, name only {named!r}, and end on one check: FAILED line", rc, out, err, calls)
+        for live, pristine in ((codex_home, pristine_home), (stub_state, pristine_state)):
+            shutil.rmtree(live)
+            shutil.copytree(pristine, live, symlinks=True)
+    ran.append("--check names, on its own, " + ", ".join(label for label, *_ in differences))
+
+    # An approved local commit installs from any branch, with no upstream and
+    # no pull, and --review-models works with it.
+    approved = {"STUB_GIT_BRANCH": "wo-2-review", "STUB_GIT_UPSTREAM": ""}
+    rc, out, err, calls = run_update("an approved local source", ["--source-sha", stub_head], extra_env=approved)
+    git_calls = [git_call(c) for c in calls if c.startswith("git ")]
+    expect("an approved local source", rc == 0 and "pull --ff-only" not in git_calls
+           and git_calls[:2] == ["--no-optional-locks rev-parse HEAD",
+                                 "--no-optional-locks status --porcelain --untracked-files=no"],
+           "it should read HEAD and the status, never pull, and install", rc, out, err, calls)
+    expect_installed("an approved local source", rc, out, err, calls)
+    rc, out, err, calls = run_update("a review of an approved local source", ["--review-models", "--source-sha", stub_head],
+                                     answers="\n" * 7 + "yes\n", extra_env=approved)
+    _text, tiers, main, _fp = saved_choices()
+    expect("a review of an approved local source", rc == 0 and "listing is availability" in out and tiers == CHOSEN
+           and main == MAIN_EFFORT, "it should ask, keep the entered values, and install", rc, out, err, calls)
+    expect_installed("a review of an approved local source", rc, out, err, calls)
+    with open(choices_path, "w", encoding="utf-8") as f:
+        f.write(first_text)
+    ran.append("an approved local source installs without a pull, with or without --review-models")
+
+    # Source drift stops before any codex call; only the default source pulls,
+    # and only once main tracking origin/main is confirmed.
+    drift = (
+        ("an approved commit the checkout is not at", ["--source-sha", other_sha], {}, f"not the approved {other_sha}", False),
+        ("a checkout on another branch", [], {"STUB_GIT_BRANCH": "wo-2-review"}, "on wo-2-review tracking origin/main", False),
+        ("a checkout tracking another remote", [], {"STUB_GIT_UPSTREAM": "fork/main"}, "on main tracking fork/main", False),
+        ("a checkout with no upstream", [], {"STUB_GIT_UPSTREAM": ""}, "on main tracking nothing", False),
+        ("a checkout not at origin/main after the pull", [], {"STUB_GIT_UPSTREAM_HEAD": other_sha},
+         f"is at {stub_head}, not origin/main, after the pull", True),
+    )
+    for label, args, extra, message, pulled in drift:
+        before = snapshot(codex_home)
+        rc, out, err, calls = run_update(label, args, extra_env=extra)
+        git_calls = [git_call(c) for c in calls if c.startswith("git ")]
+        expect(label, rc == 1 and message in err and ("pull --ff-only" in git_calls) == pulled
+               and not any(c.startswith("codex") for c in calls),
+               f"it should stop before any codex call{' after' if pulled else ' without'} pulling", rc, out, err, calls)
+        expect_untouched(label, before, rc, out, err, calls)
+    ran.append("source drift stops before installing (" + "; ".join(label for label, *_ in drift) + ")")
+
+    # An install that lands content the source lacks fails and never reports
+    # success; the next update repairs it.
+    rc, out, err, calls = run_update("an install that lands the wrong content", extra_env={"STUB_CORRUPT_INSTALL": "1"})
+    expect("an install that lands the wrong content", rc == 1
+           and os.path.join(skill, "references", "resume.md") + ": differs from the source" in out
+           and "does not match the source" in err and "installed from" not in out
+           and "Start a new Codex session." not in out, "it should name the difference and exit 1 without success",
+           rc, out, err, calls)
+    rc, out, err, calls = run_update("the update after a wrong install")
+    expect("the update after a wrong install", rc == 0, "it should succeed", rc, out, err, calls)
+    expect_installed("the update after a wrong install", rc, out, err, calls)
+    ran.append("an install that lands the wrong content fails without reporting success")
 
     # A routine update whose `codex debug models` fails warns and installs
     # the saved choices.

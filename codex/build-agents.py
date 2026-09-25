@@ -33,6 +33,9 @@ fills each tier, shows the result, and saves it only on a literal `yes`.
 --render-codex OUTDIR CHOICES writes the effective Codex build into a new
 directory: a local marketplace holding the plugin payload, the agents, and the
 profile files. None of the three writes the repository.
+--compare-install EXPECTED CODEX_HOME names every difference between a build
+--render-codex wrote and what CODEX_HOME runs, reading `codex plugin list
+--json` on stdin; it reads only, and exits 1 on any difference.
 """
 
 from __future__ import annotations
@@ -1169,9 +1172,86 @@ def render_codex(outdir: str, choices_path: str) -> int:
     return 0
 
 
+def compare_install(expected: str, codex_home: str) -> int:
+    """Name every difference between a rendered build and what a Codex home
+    runs: the plugin state `codex plugin list --json` reports on stdin, every
+    file of the cached plugin payload (the manifest and the whole skill with
+    its references and hooks, in both directions, executable bits included),
+    the agents, and the profiles. It reads and never writes."""
+    build = pathlib.Path(expected)
+    home = pathlib.Path(codex_home)
+    plugin = build / "plugins" / "compute-squad"
+    version = json.loads((plugin / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
+    local_id = "compute-squad@compute-squad-local"
+    want_source = home / "compute-squad" / "build" / "plugins" / "compute-squad"
+    problems = []
+
+    try:
+        installed = json.load(sys.stdin)["installed"]
+        if not isinstance(installed, list) or not all(isinstance(p, dict) for p in installed):
+            raise ValueError
+    except Exception:
+        installed = None
+        problems.append("plugins: codex plugin list --json printed nothing this script reads")
+    if installed is not None:
+        ours = [p for p in installed if p.get("name") == "compute-squad" and p.get("enabled", True) is not False]
+        local = next((p for p in ours if p.get("pluginId") == local_id), None)
+        if local is None:
+            problems.append(f"plugins: {local_id} is not installed and enabled")
+        else:
+            source = (local.get("source") or {}).get("path")
+            if not source or os.path.realpath(source) != os.path.realpath(want_source):
+                problems.append(f"plugins: {local_id} is installed from {source or 'an unknown source'}, not {want_source}")
+            if local.get("version") != version:
+                problems.append(f"plugins: {local_id} is version {local.get('version')}, not {version}")
+        for other in ours:
+            if other.get("pluginId") != local_id:
+                problems.append(f"plugins: {other.get('pluginId')} is also installed and enabled; two copies of the skill load")
+
+    def files_under(root: pathlib.Path) -> set:
+        return {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()} if root.is_dir() else set()
+
+    cache = home / "plugins" / "cache" / "compute-squad-local" / "compute-squad" / version
+    if not cache.is_dir():
+        problems.append(f"{cache}: missing; the plugin is not in Codex's cache")
+    else:
+        want, have = files_under(plugin), files_under(cache)
+        for relpath in sorted(want | have):
+            installed_path = cache / relpath
+            if relpath not in have:
+                problems.append(f"{installed_path}: missing")
+            elif relpath not in want:
+                problems.append(f"{installed_path}: extra; the source has no such file")
+            elif installed_path.read_bytes() != (plugin / relpath).read_bytes():
+                problems.append(f"{installed_path}: differs from the source")
+            elif os.access(plugin / relpath, os.X_OK) != os.access(installed_path, os.X_OK):
+                problems.append(f"{installed_path}: executable bit differs from the source")
+
+    pairs = [(path, home / "agents" / path.name) for path in sorted((build / "agents").glob("*.toml"))]
+    pairs += [(path, home / path.name) for path in sorted((build / "profiles").glob("*.config.toml"))]
+    for source_path, installed_path in pairs:
+        if not installed_path.is_file():
+            problems.append(f"{installed_path}: missing")
+        elif installed_path.read_bytes() != source_path.read_bytes():
+            problems.append(f"{installed_path}: differs from the source")
+
+    for problem in problems:
+        print(f"check: MISMATCH {problem}")
+    if problems:
+        return 1
+    agents = sum(1 for _ in (build / "agents").glob("*.toml"))
+    profiles = sum(1 for _ in (build / "profiles").glob("*.config.toml"))
+    print(
+        f"check: the installed plugin ({len(files_under(plugin))} files), {agents} agents, and {profiles} profiles "
+        "match a fresh render of the source with your saved choices"
+    )
+    return 0
+
+
 USAGE = (
     "usage: build-agents.py [--check | --parse-manifest PATH | --validate-catalog PATH [--strict] [--choices CHOICES]"
-    " | --choose CATALOG CHOICES | --catalog-status CATALOG CHOICES | --render-codex OUTDIR CHOICES]"
+    " | --choose CATALOG CHOICES | --catalog-status CATALOG CHOICES | --render-codex OUTDIR CHOICES"
+    " | --compare-install EXPECTED CODEX_HOME]"
 )
 
 
@@ -1192,7 +1272,8 @@ def main(args: list) -> int:
         except BuildError as error:
             print(f"FAIL: {error}", file=sys.stderr)
             return 1
-    for flag, run in (("--choose", choose), ("--catalog-status", catalog_status), ("--render-codex", render_codex)):
+    for flag, run in (("--choose", choose), ("--catalog-status", catalog_status), ("--render-codex", render_codex),
+                      ("--compare-install", compare_install)):
         if args[:1] == [flag]:
             if len(args) != 3:
                 print(USAGE, file=sys.stderr)

@@ -66,6 +66,6 @@ To change the release defaults:
 3. Edit the `[rung]` lines in `models.conf`, confirm each Codex effort is in the model's supported levels, and set `reviewed` to today.
 4. If a Codex model is new, raise the CLI floor in `README.md` and `codex/README.md` to the first release whose `codex debug models --bundled` lists it.
 5. Run `python3 codex/build-agents.py`, `bash scripts/build-plugin.sh`, then `bash scripts/verify.sh`.
-6. Commit, because the updater installs only from a clean checkout. Then, on a logged-in machine, run `codex/update.sh --review-models` and type the new defaults for each tier (once choices are saved, Enter keeps those, not the release defaults), then run one `codex exec -m <id> -c model_reasoning_effort=<effort> "Reply ok"` per distinct model and effort pair.
+6. Commit, because the updater installs only from a clean checkout. Then, on a logged-in machine, run `codex/update.sh --review-models --source-sha "$(git rev-parse HEAD)"` (a branch other than `main` installs only as an approved commit) and type the new defaults for each tier (once choices are saved, Enter keeps those, not the release defaults), then run one `codex exec -m <id> -c model_reasoning_effort=<effort> "Reply ok"` per distinct model and effort pair.
 7. Run one live squad run per host and compare the model ID on each stage entry's `Agent:` line with `models.conf`.
 8. Bump the version and name the old and new models in `CHANGELOG.md`.

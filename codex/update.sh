@@ -4,18 +4,40 @@
 # $CODEX_HOME/compute-squad/choices.conf) into $CODEX_HOME/compute-squad/build,
 # installs the plugin from that local marketplace, and copies the agents and
 # profiles from the same build. --review-models asks for the choices again.
+# The source is this checkout on main, fast-forwarded to origin/main, or with
+# --source-sha exactly that commit, not pulled. --check changes nothing: it
+# reports every difference between that source (with the saved choices) and
+# what Codex runs.
 set -euo pipefail
 
-usage="usage: codex/update.sh [--review-models]"
+usage="usage: codex/update.sh [--review-models | --check] [--source-sha <40-hex commit>]"
 review=0
-case "$#:${1:-}" in
-  0:) ;;
-  1:--review-models) review=1 ;;
-  *)
-    echo "$usage" >&2
-    exit 2
-    ;;
-esac
+check=0
+source_sha=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --review-models | --check)
+      if [[ $review -eq 1 || $check -eq 1 ]]; then
+        echo "$usage" >&2
+        exit 2
+      fi
+      if [[ "$1" == --check ]]; then check=1; else review=1; fi
+      ;;
+    --source-sha)
+      if [[ $# -lt 2 || -n "$source_sha" || ! "$2" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "$usage" >&2
+        exit 2
+      fi
+      source_sha="$2"
+      shift
+      ;;
+    *)
+      echo "$usage" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
@@ -42,11 +64,83 @@ state="$codex_home/compute-squad"
 choices="$state/choices.conf"
 build="$state/build"
 review_command="bash $(printf '%q' "$repo_root/codex/update.sh") --review-models"
+if [[ -n "$source_sha" ]]; then
+  review_command="$review_command --source-sha $source_sha"
+fi
 unchanged="$codex_home is unchanged"
+lock="$codex_home/compute-squad.lock"
 
 if [[ $review -eq 1 && ! -t 0 ]]; then
   echo "update: --review-models needs a terminal; $unchanged" >&2
   exit 2
+fi
+
+# Git reads that never write, not even the index git status may refresh.
+git_read() {
+  "$git_bin" -C "$repo_root" --no-optional-locks "$@"
+}
+
+# Compares what Codex runs with a fresh render of the source and the saved
+# choices: the plugin state, every file of the cached plugin (manifest, skill,
+# references, hooks), the seven agents, and the four profiles. It writes only
+# a temporary directory outside $codex_home, prints one MISMATCH line per
+# difference and a final verdict, and returns 1 on any mismatch.
+expected=""
+have_lock=0
+check_install() {
+  local head branch dirty listed mismatch=0
+  if [[ $have_lock -eq 0 && -d "$lock" ]]; then
+    echo "check: MISMATCH $lock exists: an update is running, or one was killed"
+    mismatch=1
+  fi
+  if ! head="$(git_read rev-parse HEAD)" || ! branch="$(git_read rev-parse --abbrev-ref HEAD)" \
+      || ! dirty="$(git_read status --porcelain --untracked-files=no)"; then
+    echo "check: MISMATCH source: git cannot read $repo_root"
+    mismatch=1
+  else
+    echo "check: source $repo_root, $branch at $head"
+    if [[ -n "$source_sha" && "$head" != "$source_sha" ]]; then
+      echo "check: MISMATCH source: HEAD is $head, not the approved $source_sha"
+      mismatch=1
+    fi
+    if [[ -n "$dirty" ]]; then
+      echo "check: MISMATCH source: $repo_root has uncommitted changes"
+      mismatch=1
+    fi
+  fi
+  if [[ ! -f "$choices" ]]; then
+    echo "check: MISMATCH choices: none saved in $choices, so there is nothing to compare"
+    mismatch=1
+  else
+    expected="$(mktemp -d)"
+    if ! "$python_bin" "$build_agents" --render-codex "$expected/build" "$choices" > /dev/null; then
+      echo "check: MISMATCH source: rendering it with your choices failed"
+      mismatch=1
+    else
+      if ! listed="$("$codex_bin" plugin list --json)"; then
+        listed=""
+      fi
+      if ! printf '%s' "$listed" | "$python_bin" "$build_agents" --compare-install "$expected/build" "$codex_home"; then
+        mismatch=1
+      fi
+    fi
+    rm -rf "$expected"
+    expected=""
+  fi
+  if [[ $mismatch -eq 0 ]]; then
+    echo "check: OK"
+  else
+    echo "check: FAILED: each MISMATCH line above is a difference; rerun codex/update.sh to install the source"
+  fi
+  return $mismatch
+}
+
+if [[ $check -eq 1 ]]; then
+  trap 'if [[ -n "$expected" ]]; then rm -rf "$expected"; fi' EXIT
+  if check_install; then
+    exit 0
+  fi
+  exit 1
 fi
 
 # One update at a time. The lock is taken before anything below reads the
@@ -55,12 +149,13 @@ fi
 # update validates, renders, or installs a build from the old ones. An update
 # that cannot take it stops here with nothing saved or installed. It sits
 # beside $state, not in it, so a refusal never creates or removes $state.
-lock="$codex_home/compute-squad.lock"
 catalog=""
-have_lock=0
 cleanup() {
   if [[ -n "$catalog" ]]; then
     rm -f "$catalog"
+  fi
+  if [[ -n "$expected" ]]; then
+    rm -rf "$expected"
   fi
   if [[ $have_lock -eq 1 ]]; then
     rmdir "$lock" 2>/dev/null || true
@@ -77,8 +172,33 @@ if ! mkdir "$lock" 2>/dev/null; then
 fi
 have_lock=1
 
-"$git_bin" -C "$repo_root" pull --ff-only
-if ! dirty="$("$git_bin" -C "$repo_root" status --porcelain --untracked-files=no)"; then
+# Select the source before anything is installed. An approved commit is never
+# pulled: the checkout must already be exactly that commit. Otherwise the
+# checkout must be main tracking origin/main, and after the fast-forward it
+# must be exactly origin/main, so no local commit rides along.
+if [[ -n "$source_sha" ]]; then
+  if ! head="$(git_read rev-parse HEAD)" || [[ "$head" != "$source_sha" ]]; then
+    echo "update: $repo_root is at ${head:-an unknown commit}, not the approved $source_sha; check out that commit or drop --source-sha. $unchanged" >&2
+    exit 1
+  fi
+else
+  branch="$(git_read rev-parse --abbrev-ref HEAD || true)"
+  upstream="$(git_read rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
+  if [[ "$branch" != main || "$upstream" != origin/main ]]; then
+    echo "update: $repo_root is on ${branch:-no branch} tracking ${upstream:-nothing}; updates install main tracking origin/main. To install an approved commit instead, use --source-sha <commit>. $unchanged" >&2
+    exit 1
+  fi
+  if ! "$git_bin" -C "$repo_root" pull --ff-only; then
+    echo "update: git pull --ff-only failed in $repo_root; $unchanged" >&2
+    exit 1
+  fi
+  head="$(git_read rev-parse HEAD)"
+  if [[ "$head" != "$(git_read rev-parse '@{upstream}')" ]]; then
+    echo "update: $repo_root is at $head, not origin/main, after the pull (a local commit?); updates install origin/main exactly. $unchanged" >&2
+    exit 1
+  fi
+fi
+if ! dirty="$(git_read status --porcelain --untracked-files=no)"; then
   echo "update: git status failed in $repo_root; $unchanged" >&2
   exit 1
 fi
@@ -221,6 +341,10 @@ done
 
 step cp "$build"/profiles/*.config.toml "$codex_home/"
 
+if ! check_install; then
+  echo "update: the installed setup does not match the source (see the mismatches above); rerun the updater. Codex may load a mix of old and new files until it matches." >&2
+  exit 1
+fi
 echo "update: Codex plugin, agents, and profiles installed from $build"
 echo "update: tiers: $tiers"
 echo "Start a new Codex session. Running sessions keep the skill and agents they loaded; a run resumed in a new session uses these models from its next stage."
