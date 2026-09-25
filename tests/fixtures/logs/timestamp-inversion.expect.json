@@ -1,0 +1,22 @@
+{
+  "note": "A typed time earlier than the entry above it, as in the two inversions of a 3.9.2 live-run archive.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Every entry's `Timestamp:` line is the output of `date -u +%Y-%m-%dT%H:%M:%SZ` from a Bash call made just before the append, never a typed or estimated time"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "timestamp-order"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    }
+  ]
+}

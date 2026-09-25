@@ -1,0 +1,24 @@
+{
+  "note": "A PM FAIL whose Rerun: line names Plan, with no Status after it. Resuming re-runs Plan, which appends a new, complete plan with Attempt: 2 (fail-names-plan.log.md is this run after that re-run), then every later stage.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Re-run the stage on its `Rerun:` line at the rung the escalation rules give, then every later stage."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "the FAIL entry's `Rerun:` line names exactly one stage (Recon, Plan, or Executor)."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-run Plan (squad-pm in PLAN mode), then every later stage",
+      "via": "row: `## PM — FAIL`"
+    }
+  ]
+}

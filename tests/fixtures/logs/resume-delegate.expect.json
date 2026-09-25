@@ -1,0 +1,35 @@
+{
+  "note": "The PM's plan ends in a BLOCKING DELEGATE: block, the helper's result is logged under Delegated, and the session stopped before continuing the PM. A new session cannot message the PM it did not spawn, so resuming re-spawns the PM for its (cont.) entry; the session that spawned it continues it instead.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Otherwise recompute `Next:` from the last entry that is neither a `## Status` nor a `## Delegated — <stage>` entry"
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Then, if the block is `BLOCKING`, continue or re-spawn that stage to finish (a `(cont.)` entry, or the verdict after a pending entry), as DELEGATE step 2 says; only the session that spawned the stage's agent can continue it, so any other session re-spawns it."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "re-spawn the stage only when the host cannot message a finished agent or the message fails."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-spawn squad-pm in PLAN mode for a (cont.) entry",
+      "via": "row: Ends in a `DELEGATE:` block"
+    },
+    {
+      "state": {
+        "continuable": true
+      },
+      "next": "continue squad-pm with SendMessage for a (cont.) entry",
+      "via": "row: Ends in a `DELEGATE:` block"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "note": "Finding 3: the review cannot rule out a risk and finds no defect, so it is held and the log stays intact.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Run this in the main session on every high-stakes PASS; never delegate it."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`held` means an open risk or an unapproved decision, and no defect."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user about the review's open items, record each answer as a Decision, then run a new high-stakes review",
+      "via": "row: `## High-stakes review` reading `Result: held`"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "note": "An ACCEPT-mode delegation: the pending entry ends with a DELEGATE: block, the helper results go under the Stage 5 name, and the re-spawned PM issues its verdict as a normal PASS entry.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "## Stage 5 — Accept (squad-pm in ACCEPT mode)"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "**PM — Accept (pending):** the PM needed delegated work or a user decision before it could decide. Run its `DELEGATE:` block and append the results"
+    },
+    {
+      "file": "agents/squad-helper.md",
+      "text": "The orchestrating session appends your results to the log under `## Delegated — <requesting stage>`."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "A PM continued or re-spawned after a `## PM — Accept (pending)` delegation does not extend that entry: it issues the verdict as a normal `## PM — PASS` or `## PM — FAIL` entry."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

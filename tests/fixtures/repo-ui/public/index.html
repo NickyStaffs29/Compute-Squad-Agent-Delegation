@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plans and pricing</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Plans and pricing</h1>
+    <p class="lede">Pick the plan that fits your team. Change plans at any time.</p>
+  </header>
+  <main>
+    <table class="plans">
+      <thead>
+        <tr><th scope="col">Plan</th><th scope="col">Seats</th><th scope="col">Price per month</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Starter</th><td>1</td><td data-cents="900"></td></tr>
+        <tr><th scope="row">Team</th><td>10</td><td data-cents="4900"></td></tr>
+        <tr><th scope="row">Business</th><td>50</td><td data-cents="19900"></td></tr>
+      </tbody>
+    </table>
+  </main>
+  <script src="price.js"></script>
+  <script>
+    for (const cell of document.querySelectorAll('[data-cents]')) {
+      cell.textContent = formatPrice(Number(cell.dataset.cents));
+    }
+  </script>
+</body>
+</html>

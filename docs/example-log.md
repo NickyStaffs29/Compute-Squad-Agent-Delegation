@@ -2,121 +2,203 @@
 
 A complete worked run so you can see every entry format. Goal: add a 60-second resend cooldown to a password-reset email endpoint.
 
-Stage 0 (strategy) happens in the main session before the log starts: the goal gets interrogated, one gap gets clarified with the user ("should the cooldown apply per-account or per-IP?" → per-account), and the goal + acceptance criteria get locked into the `## Goal — Locked` entry below. Then `squad-mech` archives any prior log, appends that entry as the first line of the fresh log, and the pipeline writes the rest of these entries in order.
+Stage 0 (strategy) happens in the main session before the log starts: the goal gets interrogated, one gap gets clarified with the user ("should the cooldown apply per-account or per-IP?" → per-account), and the goal + acceptance criteria get locked into the `## Goal — Locked` entry below. Then `squad-mech` archives any prior log, the main session appends that entry and the first `## Status` to the fresh log, and the pipeline writes the rest of these entries in order. For brevity the example shows four of the main session's `## Status` entries; a real run appends one wherever the skill's Status rule calls for it, such as after the Recon and Executor entries.
 
 ---
 
 ```markdown
 ## Goal — Locked
-2026-07-25 13:58 UTC
+Timestamp: 2026-07-25T13:58:41Z
+Run: 2026-07-25-reset-cooldown
+Attended: yes
 
 Goal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.
 Acceptance criteria:
-- A second reset request for the same account within 60 seconds of the first sends no new email and creates no new token row.
-- A second reset request after the 60-second window creates a new token and sends the email as normal.
-- No response or log reveals whether an account exists (existing invariant preserved).
+- AC1: A second reset request for the same account within 60 seconds of the first sends no new email and creates no new token row.
+- AC2: A second reset request after the 60-second window creates a new token and sends the email as normal.
+- AC3: No response or log reveals whether an account exists (existing invariant preserved).
 Out of scope: per-IP throttling; admin-triggered resets (different service path).
 Assumptions: none.
 ```
 
 ```markdown
-## Recon
-2026-07-25 14:02 UTC
-Agent: squad-recon (Sonnet)
-
-The reset endpoint is POST /api/auth/reset-request in src/server/auth/auth.routes.ts
-(lines 141-168), calling requestPasswordReset() in src/server/auth/reset.service.ts
-(lines 22-74). That service creates a hashed token row in password_reset_tokens
-(prisma/schema.prisma line 210) and dispatches mail via sendEmail() in
-src/server/email/send.ts. Call sites of requestPasswordReset(): the route (only one).
-Existing rate limiting: the global IP flood limiter in src/server/middleware/
-rateLimit.ts applies at 300/5min; there is no per-account throttle. Relevant tests:
-src/server/auth/__tests__/reset.routes.test.ts (14 cases). Invariant flagged in
-CLAUDE.md: auth responses must be generic (no account-existence leaks), and logs
-carry codes only, never addresses.
-
-Blockers/risks: none blocking. The PM must decide where the cooldown state lives —
-the password_reset_tokens table already stores created_at per account, so a query
-against the newest row avoids a schema change. Ambiguity for the plan: whether a
-cooldown rejection returns 429 or the endpoint's existing generic 200 (the
-account-existence invariant suggests the generic response).
-
-DELEGATE:
-- [intern] List every test file under src/server/auth/__tests__/ with test-case
-  counts (procedure: grep -c "it(" per file). Non-blocking; context for the PM.
+## Status
+Timestamp: 2026-07-25T13:58:41Z
+Run: 2026-07-25-reset-cooldown
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 4f2c9a1
+Plan: none
+Grant: all revisions, full-mode request
+Next: spawn squad-recon
+Stop: after the closing archive
 ```
 
 ```markdown
-## Delegated — Recon
-2026-07-25 14:04 UTC
+## Recon
+Timestamp: 2026-07-25T14:02:17Z
+Agent: squad-recon (claude-sonnet-5)
+Attempt: 1
 
-reset.routes.test.ts: 14 · login.routes.test.ts: 22 · session.service.test.ts: 11 ·
-mfa.service.test.ts: 19 (procedure ran as specified; no judgment applied).
+Checks:
+- goal facts: all confirmed
+- `npm test` -> exit 0; 2,751 passed / 12 skipped; tree changed: no
+- `node --version` -> exit 0; v22
+- `grep -c "it(" src/server/auth/__tests__/*.test.ts` -> exit 0; reset 14, login 22, session 11, mfa 19
+Map:
+- src/server/auth/auth.routes.ts:141-168 POST /api/auth/reset-request: the route; returns requestPasswordReset()'s result
+- src/server/auth/reset.service.ts:22-74 requestPasswordReset: "export async function requestPasswordReset(email: string): Promise<ResetResult> {"; creates the hashed token row and sends the mail
+- prisma/schema.prisma:210 password_reset_tokens: stores created_at per account, so the newest row gives the cooldown with no schema change
+- src/server/email/send.ts:9-37 sendEmail: the mail a cooldown hit must not send
+- src/server/middleware/rateLimit.ts:14-29 ipFloodLimiter: the global IP flood limiter, 300/5min; there is no per-account throttle
+Callers:
+- requestPasswordReset <- src/server/auth/auth.routes.ts:152
+Tests:
+- src/server/auth/__tests__/reset.routes.test.ts: 14 cases on the reset route
+- Test files under src/server/auth/__tests__/: reset 14, login 22, session 11, mfa 19 (grep -c "it(" per file)
+Invariants:
+- CLAUDE.md:3 "Auth responses are generic: no response may reveal whether an account exists.": at risk: a cooldown hit must return the same body as a normal request
+- CLAUDE.md:4 "Logs carry codes only, never addresses.": at risk: any new log event carries a code only
+Open for the PM:
+- where the cooldown state lives: the newest password_reset_tokens row avoids a schema change
+- whether a cooldown hit returns 429 or the endpoint's generic 200; the account-existence invariant suggests the generic response
 ```
 
 ```markdown
 ## PM — Plan
-2026-07-25 14:09 UTC
-Agent: squad-pm (Opus)
+Timestamp: 2026-07-25T14:09:33Z
+Agent: squad-pm (claude-opus-5-5)
+Attempt: 1
+Classification: STANDARD
+High-stakes: yes
+Totals: 1 service file changed, 1 log event, 4 tests
 
-Classification: STANDARD. Spec: enforce a per-account 60s cooldown inside
-requestPasswordReset(), not the route, so every future call site inherits it.
+Spec: enforce a per-account 60s cooldown inside requestPasswordReset(), not the
+route, so every future call site inherits it. Task 1 spells out the one concurrency rule and test (d) pins it.
 
 Tasks, in order:
-1. reset.service.ts: after the account lookup, query the newest
+1. reset.service.ts: after the account lookup, open one transaction, lock the
+   account row (SELECT ... FOR UPDATE), and query the newest
    password_reset_tokens row for the account; if created_at is within 60s, return
    the existing generic-success result WITHOUT creating a token or sending mail
-   (preserves the no-account-existence-leak invariant; no 429). No schema change.
+   (preserves the no-account-existence-leak invariant; no 429). Otherwise insert
+   the token in that transaction and send mail after it commits. No schema change.
 2. Add structured log event reset_cooldown_hit { code only } per the log-hygiene
    invariant.
 3. Tests (reset.routes.test.ts): (a) second request within 60s returns the generic
    200 and creates no second token row; (b) second request after 60s (fake timers)
-   creates a token; (c) cooldown hit emits reset_cooldown_hit and never an address.
+   creates a token; (c) cooldown hit emits reset_cooldown_hit and never an address;
+   (d) two concurrent first requests create exactly one token row and one email.
 
 Must NOT change: response envelope shape, the global IP limiter, schema,
 migrations. Verification plan: npm test (auth suite), npm run ci:verify, grep the
-diff for logged addresses. Non-goals: per-IP throttling, admin-triggered resets
+diff for logged addresses. Criteria: AC1 tests (a), (d); AC2 test (b); AC3 test (c) and the diff grep. Non-goals: per-IP throttling, admin-triggered resets
 (different service path). Risks: none material; fake-timer flake is the main test
-risk — use the suite's existing clock helper. No blockers.
+risk — use the suite's existing clock helper.
+Assumed: the suite's clock helper drives created_at; test (b) confirms it.
+```
+
+```markdown
+## Status
+Timestamp: 2026-07-25T14:10:02Z
+Run: 2026-07-25-reset-cooldown
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 4f2c9a1
+Plan: r1, work order all
+Grant: all revisions, full-mode request
+Next: spawn squad-executor (STANDARD)
+Stop: after the closing archive
 ```
 
 ```markdown
 ## Executor
-2026-07-25 14:21 UTC
-Agent: squad-executor (Sonnet)
+Timestamp: 2026-07-25T14:21:52Z
+Agent: squad-executor (claude-sonnet-5)
+Attempt: 1
+Plan: r1, work order all
 
-Implemented tasks 1-3 exactly as specified: cooldown check added to
-reset.service.ts (lines 31-42) using the newest-token query; short-circuit returns
-the existing generic result; reset_cooldown_hit logged code-only. Three tests added
-to reset.routes.test.ts using the suite's clock helper. Commands: auth suite 17/17
-green; npm run ci:verify GREEN (2,754 passed / 12 skipped); diff grep clean of
-addresses.
-
-Deviations: none. Blockers: none. For acceptance: scrutinize the timezone handling
-on the created_at comparison (I used the DB's UTC timestamps directly) and confirm
-the no-second-token assertion actually queries the table rather than trusting the
-response.
+Tasks: 1-3 of 3
+Files changed: src/server/auth/reset.service.ts, src/server/auth/__tests__/reset.routes.test.ts
+Checks:
+- `npm test -- src/server/auth/__tests__/reset.routes.test.ts` -> exit 0; 18 passed
+- `npm run ci:verify` -> exit 0; 2,755 passed / 12 skipped
+- `git diff | grep -nE 'email|address'` -> exit 1; no match
+Deviations: none
+For acceptance:
+- F1: the created_at comparison uses the DB's UTC timestamps directly; check the timezone handling
+- F2: the no-second-token assertion in test (a) should query the table rather than trust the response
+Commit: 4f2c9a1d07e3, working tree 2 changed files
 ```
 
 ```markdown
 ## PM — PASS
-2026-07-25 14:33 UTC
-Agent: squad-pm (Opus)
+Timestamp: 2026-07-25T14:33:04Z
+Agent: squad-pm (claude-opus-5-5)
+Attempt: 1
+High-stakes: yes
 
-Re-ran npm test and npm run ci:verify independently: GREEN (2,754/12, matching).
-Verified invariants: response bodies byte-identical between cooldown-hit and normal
-paths (no existence leak); no address in any new log call; schema untouched; global
-limiter untouched. Refutations attempted: (1) two concurrent first requests — both
-create tokens (pre-existing behavior, out of locked scope, noted for the user);
-(2) clock skew — comparison uses DB UTC consistently; (3) account-enumeration
-timing — the cooldown path still performs the token query, timing delta negligible.
-Diff review: no scope creep, no dead code. HIGH-STAKES: yes — the change sits on the
-password-reset auth path and the no-account-existence-leak invariant. Verdict: PASS.
-Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md.
-Leaving the active log intact for the main session's high-stakes review; the
-orchestrating session clears it afterwards.
+Tested: 4f2c9a1d07e3, working tree 2 changed files
+| Criterion | Result | How | Evidence |
+|---|---|---|---|
+| AC1 | met | reproduced | test (a) counts password_reset_tokens rows: one; refutation, two concurrent first requests (test (d), plus 20 in a scratch run): one row, one email |
+| AC2 | met | reproduced | test (b): a request at 61s creates a token and sends mail; refutation, clock skew: both sides of the comparison use DB UTC |
+| AC3 | met | reproduced | cooldown-hit and normal bodies byte-identical; no address in any new log call; refutation, enumeration timing: the cooldown path still runs the token query |
+- `npm test` -> exit 0; 2,755 passed / 12 skipped
+- `npm run ci:verify` -> exit 0; 2,755 passed / 12 skipped, matching the Executor
+Regressions: none
+Outside scope: none.
+Executor points:
+- F1: read the comparison in reset.service.ts and ran test (b) at 59s and 61s -> both sides use DB UTC; 59s refused, 61s sent
+- F2: read test (a) -> it counts password_reset_tokens rows in the test database, not the response
+Diff review: schema, global limiter, and response envelope untouched; no scope creep, no dead code.
+The change sits on the password-reset auth path and the no-account-existence-leak
+invariant, so the log stays intact for the main session's high-stakes review.
+```
+
+```markdown
+## Status
+Timestamp: 2026-07-25T14:34:10Z
+Run: 2026-07-25-reset-cooldown
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 4f2c9a1
+Plan: r1, work order all
+Grant: all revisions, full-mode request
+Next: main-session high-stakes review, then the closing archive
+Stop: after the closing archive
+```
+
+```markdown
+## High-stakes review
+Timestamp: 2026-07-25T14:41:27Z
+Agent: main session (claude-opus-5-5)
+Result: upheld
+Tested: 4f2c9a1d07e3, working tree 2 changed files
+Checked:
+- `npm test -- src/server/auth/__tests__/reset.routes.test.ts` -> exit 0; 18 passed
+- `git diff | grep -nE 'email|address'` -> exit 1; no match
+Risks:
+- a caller learns whether an account exists | cooldown and normal paths return the same generic body (reset.service.ts:31-42); the reset.routes check
+- an address reaches a log | reset_cooldown_hit carries a code only; the diff grep check
+- one account's cooldown blocks another | the newest-token query filters on the account id (reset.service.ts:33)
+Decisions after lock:
+- none
+```
+
+```markdown
+## Status
+Timestamp: 2026-07-25T14:41:40Z
+Run: 2026-07-25-reset-cooldown
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 4f2c9a1
+Plan: r1, work order all
+Grant: all revisions, full-mode request
+Next: spawn squad-mech for the closing archive
+Stop: after the closing archive
 ```
 
 ---
 
-The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM then makes the copy, reads it back to verify it matches, and reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and clears `COMPUTE_SQUAD_LOG.md` itself as the last step of the run. On an ordinary, non-high-stakes change the PM would clear the log itself right after the verified archive. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.
+The PASS entry reads `High-stakes: yes`, so the PM archives nothing, clears nothing, and says in its final message that the log awaits the main session's high-stakes review. The main session lists the auth and privacy risks from the Goal entry before reading the PASS, reads the diff, re-runs the auth suite and the address grep, finds no decision after the lock that lacks a `## Decision`, and appends the `## High-stakes review` entry above and a `## Status`. Because the result is `upheld`, it spawns `squad-mech`, whose archive command copies the log to `compute-squad-archive/`, verifies it with `cmp`, and clears the active log; the main session then reports the outcome to the user. An `overturned` result would have counted as a FAIL and re-run the stage on its `Rerun:` line with the log intact; `held` would have left the log intact for the user. On an ordinary change the PASS entry reads `High-stakes: no` and names its archive target as intent, because it is written before the copy exists; the PM's archive command writes the copy, verifies it with `cmp`, and clears the log, and the PM reports the verification in its final message, not in the append-only log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and a `Rerun:` line naming exactly one stage, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: task 1's row lock is not supported by the test database`, which re-runs Plan and everything after it without waiting for a PM verdict. A delegation worth its turns looks different: an Executor facing 40 fixture files to regenerate from an exact template ends its entry with `DELEGATE:` / `- [intern] <procedure>; return at most 5 lines. BLOCKING.`, and the main session continues the Executor once its `## Delegated — <stage>` entry is appended.

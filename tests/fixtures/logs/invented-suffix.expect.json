@@ -1,0 +1,22 @@
+{
+  "note": "A suffix on a listed heading, as in the '## Goal — Locked (addendum)' entry of a 3.9.2 live-run archive.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Any other heading or suffix is a protocol violation."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "heading"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    }
+  ]
+}

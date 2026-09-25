@@ -1,0 +1,24 @@
+{
+  "note": "Recon's DELEGATE: block is not BLOCKING and asks for six helpers. The session ran five, the cap, and logged the sixth as not run: helper cap reached, then stopped. Resuming re-spawns Recon, which does that subtask itself in a new, complete entry (Attempt: 2), instead of taking the Recon row and spawning the PM on a map that is missing a package.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Never spawn a sixth: append `## Delegated — <stage>` listing each subtask left undone as `not run: helper cap reached`, and re-spawn the stage (or continue it, as step 2 does for a `BLOCKING` block); it does those subtasks itself under step 2's heading rule."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "If it is not, but a result reports a step `REFUSED:` or `not run:`, re-spawn that stage for a new, complete entry (DELEGATE steps 2 and 4)."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-spawn squad-recon for a new, complete entry",
+      "via": "row: Ends in a `DELEGATE:` block, a step refused or not run"
+    }
+  ]
+}

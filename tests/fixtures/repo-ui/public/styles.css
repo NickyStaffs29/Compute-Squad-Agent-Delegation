@@ -1,0 +1,35 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #1d1d1f;
+  line-height: 1.5;
+}
+
+.site-header {
+  padding: 24px 16px 8px;
+}
+
+.lede {
+  margin: 0;
+  color: #55555f;
+}
+
+main {
+  padding: 16px 16px 32px;
+}
+
+.plans {
+  width: 624px;
+  border-collapse: collapse;
+}
+
+.plans th,
+.plans td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #d0d0d7;
+  text-align: left;
+}

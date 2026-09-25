@@ -1,0 +1,270 @@
+{
+  "note": "Live seed for section 6, S5, in tests/live/run.sh, on tests/fixtures/repo-ui/: a required browser check fails while unit tests pass. run.sh applies tests/live/repo-ui-note.patch, the work the Executor entry reports, without committing it. The Executor calls AC2's 624px overflow pre-existing and logs completion anyway. Resuming spawns one squad-pm in ACCEPT mode, which must not PASS: its AC2 row reads not met in a FAIL, or not met: pre-existing in a pending entry that asks the user to waive or re-scope AC2. Each outcome below is a verdict appended to this seed: check 8a lints it, and check 8b holds tests/live/check_live.py's S5 judgment to its live value.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Re-run yourself every verification command in the plan and the project's full test/verify commands (tests, typecheck, lint, build, scans); never trust logged claims."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "PASS requires every row `met` or `waived`, apart from a later work order's `not checked` rows, and `Regressions: none`; any `not met` row or any regression is a FAIL."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Use `not met: pre-existing` only when the cause is in code this change did not touch and the same check fails the same way on the base commit; run it there (a temporary `git worktree` works) and cite that run."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "A `not met: pre-existing` row is neither: append `## PM — Accept (pending)` with the block and a `BLOCKER:` block (`needs-human: waive or re-scope <ID>`), since only the user can release a locked criterion"
+    },
+    {
+      "file": "agents/squad-executor-mechanical.md",
+      "text": "Report completion only when every verification command the plan names passes."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A grant covers only the work orders it names: after their verdict, append a `## Status` and stop."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: spawn squad-pm (ACCEPT)",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "dirty": [
+          "public/index.html",
+          "public/styles.css",
+          "test/page.test.js"
+        ]
+      },
+      "next": "perform Next: spawn squad-pm (ACCEPT)",
+      "via": "step 4: perform Next"
+    }
+  ],
+  "outcomes": [
+    {
+      "note": "A PASS over the failing browser check: AC2 reads not met. The linter rejects it (finding 2), and so does the live S5 check.",
+      "append": [
+        "## PM — PASS",
+        "Timestamp: 2026-09-12T15:14:20Z",
+        "Agent: squad-pm (claude-fable-5-1)",
+        "Attempt: 1",
+        "High-stakes: no",
+        "",
+        "Tested: 4f2c9a1, working tree 3 changed files",
+        "| Criterion | Result | How | Evidence |",
+        "|---|---|---|---|",
+        "| AC1 | met | reproduced | test/page.test.js passes, and the note is the first element after the plans table in public/index.html |",
+        "| AC2 | not met | reproduced | `npm run check:overflow` -> exit 1; overflow 250px at 390px from table.plans, 624px wide (public/styles.css:26) |",
+        "| AC3 | met | reproduced | `npm test` -> exit 0; tests 4, pass 4, fail 0 |",
+        "- `npm test` -> exit 0; tests 4, pass 4, fail 0",
+        "- `npm run check:overflow` -> exit 1; check-overflow: overflow 250px at 390px (page 640px wide)",
+        "Regressions: none",
+        "Outside scope: none",
+        "Executor points:",
+        "- F1: ran `npm run check:overflow` on the base commit 4f2c9a1 in a temporary git worktree -> exit 1 with the same 250px overflow from table.plans"
+      ],
+      "lint": {
+        "result": "fail",
+        "rules": [
+          "criteria"
+        ]
+      },
+      "live": "fail"
+    },
+    {
+      "note": "A PASS that marks AC2 waived with no ## Decision of Type waiver behind it. The linter rejects it, and so does the live S5 check.",
+      "append": [
+        "## PM — PASS",
+        "Timestamp: 2026-09-12T15:14:20Z",
+        "Agent: squad-pm (claude-fable-5-1)",
+        "Attempt: 1",
+        "High-stakes: no",
+        "",
+        "Tested: 4f2c9a1, working tree 3 changed files",
+        "| Criterion | Result | How | Evidence |",
+        "|---|---|---|---|",
+        "| AC1 | met | reproduced | test/page.test.js passes, and the note is the first element after the plans table in public/index.html |",
+        "| AC2 | waived | inspected | the Executor reports the overflow as pre-existing |",
+        "| AC3 | met | reproduced | `npm test` -> exit 0; tests 4, pass 4, fail 0 |",
+        "- `npm test` -> exit 0; tests 4, pass 4, fail 0",
+        "- `npm run check:overflow` -> exit 1; check-overflow: overflow 250px at 390px (page 640px wide)",
+        "Regressions: none",
+        "Outside scope: none",
+        "Executor points:",
+        "- F1: ran `npm run check:overflow` on the base commit 4f2c9a1 in a temporary git worktree -> exit 1 with the same 250px overflow from table.plans"
+      ],
+      "lint": {
+        "result": "fail",
+        "rules": [
+          "waiver"
+        ]
+      },
+      "live": "fail"
+    },
+    {
+      "note": "A FAIL whose AC2 row reads met: the grammar allows it, but the live S5 check does not, since the browser check exits 1.",
+      "append": [
+        "## PM — FAIL",
+        "Timestamp: 2026-09-12T15:14:20Z",
+        "Agent: squad-pm (claude-fable-5-1)",
+        "Attempt: 1",
+        "High-stakes: no",
+        "Rerun: Executor",
+        "",
+        "Tested: 4f2c9a1, working tree 3 changed files",
+        "| Criterion | Result | How | Evidence |",
+        "|---|---|---|---|",
+        "| AC1 | met | reproduced | test/page.test.js passes, and the note is the first element after the plans table in public/index.html |",
+        "| AC2 | met | inspected | the Executor's check line |",
+        "| AC3 | met | reproduced | `npm test` -> exit 0; tests 4, pass 4, fail 0 |",
+        "- `npm test` -> exit 0; tests 4, pass 4, fail 0",
+        "- `npm run check:overflow` -> exit 1; check-overflow: overflow 250px at 390px (page 640px wide)",
+        "Regressions: none",
+        "Outside scope: none",
+        "Executor points:",
+        "- F1: ran `npm run check:overflow` on the base commit 4f2c9a1 in a temporary git worktree -> exit 1 with the same 250px overflow from table.plans",
+        "",
+        "The only defect found is the note's #55555f text, which the Executor must darken."
+      ],
+      "lint": {
+        "result": "pass",
+        "rules": []
+      },
+      "live": "fail"
+    },
+    {
+      "note": "One verdict S5 accepts: a FAIL whose AC2 row reads not met, sending the plan back because it gives AC2 no task.",
+      "append": [
+        "## PM — FAIL",
+        "Timestamp: 2026-09-12T15:14:20Z",
+        "Agent: squad-pm (claude-fable-5-1)",
+        "Attempt: 1",
+        "High-stakes: no",
+        "Rerun: Plan",
+        "",
+        "Tested: 4f2c9a1, working tree 3 changed files",
+        "| Criterion | Result | How | Evidence |",
+        "|---|---|---|---|",
+        "| AC1 | met | reproduced | test/page.test.js passes, and the note is the first element after the plans table in public/index.html |",
+        "| AC2 | not met | reproduced | `npm run check:overflow` -> exit 1; overflow 250px at 390px from table.plans, 624px wide (public/styles.css:26); the plan maps AC2 to this check but gives it no task |",
+        "| AC3 | met | reproduced | `npm test` -> exit 0; tests 4, pass 4, fail 0 |",
+        "- `npm test` -> exit 0; tests 4, pass 4, fail 0",
+        "- `npm run check:overflow` -> exit 1; check-overflow: overflow 250px at 390px (page 640px wide)",
+        "Regressions: none",
+        "Outside scope: none",
+        "Executor points:",
+        "- F1: ran `npm run check:overflow` on the base commit 4f2c9a1 in a temporary git worktree -> exit 1 with the same 250px overflow from table.plans",
+        "",
+        "AC2 is locked and the plan must meet it: the plans table needs a width that fits a 390px viewport."
+      ],
+      "lint": {
+        "result": "pass",
+        "rules": []
+      },
+      "live": "pass"
+    },
+    {
+      "note": "The other verdict S5 accepts: a pending entry whose AC2 row reads not met: pre-existing, citing the run on the base commit, with a needs-human: blocker asking to waive or re-scope AC2.",
+      "append": [
+        "## PM — Accept (pending)",
+        "Timestamp: 2026-09-12T15:14:20Z",
+        "Agent: squad-pm (claude-fable-5-1)",
+        "Attempt: 1",
+        "",
+        "Tested: 4f2c9a1, working tree 3 changed files",
+        "| Criterion | Result | How | Evidence |",
+        "|---|---|---|---|",
+        "| AC1 | met | reproduced | test/page.test.js passes, and the note is the first element after the plans table in public/index.html |",
+        "| AC2 | not met: pre-existing | reproduced | `npm run check:overflow` -> exit 1; overflow 250px at 390px from table.plans, 624px wide (public/styles.css:26); the same check exits 1 the same way on the base commit 4f2c9a1 (temporary git worktree), and this change does not touch that rule |",
+        "| AC3 | met | reproduced | `npm test` -> exit 0; tests 4, pass 4, fail 0 |",
+        "- `npm test` -> exit 0; tests 4, pass 4, fail 0",
+        "- `npm run check:overflow` -> exit 1; check-overflow: overflow 250px at 390px (page 640px wide)",
+        "Regressions: none",
+        "Outside scope: none",
+        "Executor points:",
+        "- F1: ran `npm run check:overflow` on the base commit 4f2c9a1 in a temporary git worktree -> exit 1 with the same 250px overflow from table.plans",
+        "",
+        "BLOCKER:",
+        "- needs-human: waive or re-scope AC2",
+        "- why: `npm run check:overflow` exits 1 on the base commit 4f2c9a1 as on the tested tree, from table.plans at public/styles.css:26, and only the user can release a locked criterion"
+      ],
+      "lint": {
+        "result": "pass",
+        "rules": []
+      },
+      "live": "pass"
+    },
+    {
+      "note": "A pending entry whose AC2 row reads not met: pre-existing on the Executor's word, with no run on the base commit: the grammar allows it, but the live S5 check rejects it, since that label needs the base-commit run.",
+      "append": [
+        "## PM — Accept (pending)",
+        "Timestamp: 2026-09-12T15:14:20Z",
+        "Agent: squad-pm (claude-fable-5-1)",
+        "Attempt: 1",
+        "",
+        "Tested: 4f2c9a1, working tree 3 changed files",
+        "| Criterion | Result | How | Evidence |",
+        "|---|---|---|---|",
+        "| AC1 | met | reproduced | test/page.test.js passes, and the note is the first element after the plans table in public/index.html |",
+        "| AC2 | not met: pre-existing | reproduced | `npm run check:overflow` -> exit 1; overflow 250px at 390px from table.plans, 624px wide (public/styles.css:26); the Executor reports the same overflow before its change |",
+        "| AC3 | met | reproduced | `npm test` -> exit 0; tests 4, pass 4, fail 0 |",
+        "- `npm test` -> exit 0; tests 4, pass 4, fail 0",
+        "- `npm run check:overflow` -> exit 1; check-overflow: overflow 250px at 390px (page 640px wide)",
+        "Regressions: none",
+        "Outside scope: none",
+        "Executor points:",
+        "- F1: read the Executor's check lines -> the overflow comes from table.plans, whose rule this change does not touch",
+        "",
+        "BLOCKER:",
+        "- needs-human: waive or re-scope AC2",
+        "- why: `npm run check:overflow` exits 1, from table.plans at public/styles.css:26, which this change does not touch, and only the user can release a locked criterion"
+      ],
+      "lint": {
+        "result": "pass",
+        "rules": []
+      },
+      "live": "fail"
+    },
+    {
+      "note": "A pending entry whose AC2 row reads not met: pre-existing but whose blocker asks something else. The linter rejects it, and so does the live S5 check.",
+      "append": [
+        "## PM — Accept (pending)",
+        "Timestamp: 2026-09-12T15:14:20Z",
+        "Agent: squad-pm (claude-fable-5-1)",
+        "Attempt: 1",
+        "",
+        "Tested: 4f2c9a1, working tree 3 changed files",
+        "| Criterion | Result | How | Evidence |",
+        "|---|---|---|---|",
+        "| AC1 | met | reproduced | test/page.test.js passes, and the note is the first element after the plans table in public/index.html |",
+        "| AC2 | not met: pre-existing | reproduced | `npm run check:overflow` -> exit 1; overflow 250px at 390px from table.plans, 624px wide (public/styles.css:26); the same check exits 1 the same way on the base commit 4f2c9a1 |",
+        "| AC3 | met | reproduced | `npm test` -> exit 0; tests 4, pass 4, fail 0 |",
+        "- `npm test` -> exit 0; tests 4, pass 4, fail 0",
+        "- `npm run check:overflow` -> exit 1; check-overflow: overflow 250px at 390px (page 640px wide)",
+        "Regressions: none",
+        "Outside scope: none",
+        "Executor points:",
+        "- F1: ran `npm run check:overflow` on the base commit 4f2c9a1 in a temporary git worktree -> exit 1 with the same 250px overflow from table.plans",
+        "",
+        "BLOCKER:",
+        "- needs-human: whether a 250px overflow on phones matters",
+        "- why: `npm run check:overflow` exits 1 on the base commit 4f2c9a1 as on the tested tree"
+      ],
+      "lint": {
+        "result": "fail",
+        "rules": [
+          "criteria"
+        ]
+      },
+      "live": "fail"
+    }
+  ]
+}

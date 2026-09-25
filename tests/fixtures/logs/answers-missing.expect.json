@@ -1,0 +1,26 @@
+{
+  "note": "Finding 13: fail-reruns with the re-run Executor's Answers: line dropped. The Executor's second attempt answers the FAIL that named it, so the entry must say so under its Attempt: line; without it, the re-run's first objective is unstated.",
+  "cites": [
+    {
+      "file": "agents/squad-executor.md",
+      "text": "From attempt 2 on, write `Answers:` directly under your `Attempt:` line, naming by heading and timestamp what sent this stage back: the latest `## PM — FAIL` or overturned `## High-stakes review` whose `Rerun:` line names this stage"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`Attempt:` on every stage entry (a plan's attempt number is its revision), then `Answers:` from attempt 2"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "answers"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

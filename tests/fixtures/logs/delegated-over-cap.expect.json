@@ -1,0 +1,30 @@
+{
+  "note": "The blocking-delegation log with a 2-line cap on its one subtask, answered by a Delegated entry of 6 lines: more than the cap plus the one line DELEGATE step 2 allows.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "each with an exact procedure, a target tier (`intern` for zero-judgment work, `execution` for tightly-specced work), and the most output lines the helper may return."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Each appended result keeps to its subtask's line cap, plus one line saying how the procedure ran and how many lines were cut."
+    },
+    {
+      "file": "agents/squad-mech.md",
+      "text": "If the procedure caps the output, return at most that many lines of it (the last ones, for command output) and say how many lines you cut."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "delegate-cap"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

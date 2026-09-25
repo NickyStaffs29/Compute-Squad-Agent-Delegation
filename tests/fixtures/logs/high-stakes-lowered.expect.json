@@ -1,0 +1,26 @@
+{
+  "note": "Revision r1 is high-stakes and the re-plan after a FAIL lowers it to no.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A run is high-stakes once any line in the log reads `High-stakes: yes`; no later entry lowers it."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "or when any earlier line in the log reads `High-stakes: yes`; otherwise `High-stakes: no`."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "high-stakes"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-executor for r2, work order all",
+      "via": "row: `## PM — Plan`"
+    }
+  ]
+}

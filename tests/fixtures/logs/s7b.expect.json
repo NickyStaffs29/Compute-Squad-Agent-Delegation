@@ -1,0 +1,35 @@
+{
+  "note": "Live seed for section 6, S7b, in tests/live/run.sh: three PM FAILs, each naming Executor, and a Status after the third that hands the run back. Resuming spawns nothing and appends nothing, so the log's sha256 is unchanged; a new goal over it is refused until the user parks or abandons the run.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Three total FAILs on one run → stop, summarize the log history, and hand back to the user."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Count FAILs over the whole log, including those earlier sessions wrote, by the SKILL.md formula: lines matching `^(Rerun: |- rerun: )`. At three, stop and hand back to the user; append a `## Status` only when none follows the third FAIL."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A resumed or handed-over session continues the same run: it never runs Stage 1 on that log, and FAILs logged by earlier sessions count toward the three-FAIL stop."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "stop and hand back to the user: three FAILs",
+      "via": "step 2"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "refuse the archive: ask the user to resume, park, or abandon the open run",
+      "via": "new run: refuse"
+    }
+  ]
+}

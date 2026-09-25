@@ -1,0 +1,22 @@
+{
+  "note": "A BLOCKER: block with no why: item.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "- why: <one sentence, with evidence refs>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "blocker"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-run Plan (squad-pm in PLAN mode), then every later stage",
+      "via": "row: Ends in a `BLOCKER:` block"
+    }
+  ]
+}

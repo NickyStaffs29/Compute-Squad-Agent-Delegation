@@ -1,0 +1,26 @@
+{
+  "note": "A Recon entry written as two paragraphs of prose instead of the template's labels.",
+  "cites": [
+    {
+      "file": "agents/squad-recon.md",
+      "text": "Never omit a label: under a label with nothing to report, write `none found`."
+    },
+    {
+      "file": "agents/squad-recon.md",
+      "text": "Exactly one entry under a `## Recon` heading, in the template's order"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "labels"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: spawn squad-executor (STANDARD)",
+      "via": "step 4: perform Next"
+    }
+  ]
+}

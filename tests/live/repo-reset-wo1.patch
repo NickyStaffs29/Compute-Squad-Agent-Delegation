@@ -1,0 +1,54 @@
+diff --git a/src/server/auth/__tests__/reset.routes.test.js b/src/server/auth/__tests__/reset.routes.test.js
+index b2817aa..c25f741 100644
+--- a/src/server/auth/__tests__/reset.routes.test.js
++++ b/src/server/auth/__tests__/reset.routes.test.js
+@@ -65,3 +65,24 @@ test('the global IP limiter allows 300 requests per IP per 5 minutes', () => {
+   clock.advance(5 * 60 * 1000);
+   assert.equal(reset('nobody@example.com', '10.0.0.1').status, 200);
+ });
++
++test('a second request within 60 seconds sends no email and creates no token', () => {
++  const { app, clock, reset } = setup();
++  const first = reset('ada@example.com');
++  clock.advance(59 * 1000);
++  const second = reset('ada@example.com');
++  assert.deepEqual(second, first);
++  assert.equal(app.outbox.length, 1);
++  assert.equal(app.store.listResetTokens(1).length, 1);
++  reset('grace@example.com');
++  assert.equal(app.outbox.length, 2);
++});
++
++test('a request 60 seconds after the last token creates a token and sends the email', () => {
++  const { app, clock, reset } = setup();
++  reset('ada@example.com');
++  clock.advance(60 * 1000);
++  reset('ada@example.com');
++  assert.equal(app.outbox.length, 2);
++  assert.equal(app.store.listResetTokens(1).length, 2);
++});
+diff --git a/src/server/auth/reset.service.js b/src/server/auth/reset.service.js
+index 661e700..37e4afe 100644
+--- a/src/server/auth/reset.service.js
++++ b/src/server/auth/reset.service.js
+@@ -4,6 +4,7 @@ const GENERIC_RESULT = Object.freeze({
+   ok: true,
+   message: 'If an account exists for that address, a reset link is on its way.',
+ });
++const RESEND_COOLDOWN_MS = 60 * 1000;
+ 
+ function hashToken(token) {
+   return crypto.createHash('sha256').update(token).digest('hex');
+@@ -17,6 +18,12 @@ function requestPasswordReset({ store, log, outbox, clock }, email) {
+     return GENERIC_RESULT;
+   }
+ 
++  const tokens = store.listResetTokens(account.id);
++  const newest = tokens[tokens.length - 1];
++  if (newest && clock.now() - newest.createdAt < RESEND_COOLDOWN_MS) {
++    return GENERIC_RESULT;
++  }
++
+   const token = crypto.randomBytes(32).toString('hex');
+   store.insertResetToken({
+     accountId: account.id,

@@ -1,0 +1,26 @@
+{
+  "note": "After a FAIL names Plan and revision r2 is logged, the Executor works through r1's tasks and says so on its Plan: line.",
+  "cites": [
+    {
+      "file": "agents/squad-executor.md",
+      "text": "Earlier revisions are history, not instructions."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "The latest attempt of each stage governs; earlier attempts are history no stage acts on."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "governing-plan"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    }
+  ]
+}

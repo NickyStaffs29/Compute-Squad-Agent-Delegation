@@ -1,0 +1,52 @@
+{
+  "note": "Live seed for section 6, S2 and the second run, in tests/live/run.sh: plan r1 splits the work into WO-1 and WO-2, and the user's execute request granted r1 WO-1. Resuming runs the one granted work order, an executor at the plan's STANDARD rung and one PM verdict, with no second prompt and no WO-2 entry. The second run (s2o) asks /squad for another goal over this open run: the one-active-run rule refuses the archive until the user parks or abandons it. S3a and S3b start from the same run state in s3.log.md.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Resume is not a mode and grants nothing: it performs the `Next:` action of the latest `## Status` entry."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Spawn an executor only when the latest `## Status` grants the plan revision and work order about to run."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Never ask for a grant the log already records. A grant covers only the work orders it names: after their verdict, append a `## Status` and stop."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "spawn `squad-executor` (mid rung)."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "When a new run would start over a non-empty log whose latest `Next:` line is not `Next: none`, do not spawn the archive."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: spawn squad-executor (STANDARD) for WO-1",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "dirty": [
+          "src/server/db/store.js"
+        ]
+      },
+      "next": "stop: unlogged edits in src/server/db/store.js",
+      "via": "tree check"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "refuse the archive: ask the user to resume, park, or abandon the open run",
+      "via": "new run: refuse"
+    }
+  ]
+}

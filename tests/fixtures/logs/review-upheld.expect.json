@@ -1,0 +1,28 @@
+{
+  "note": "Finding 3: a high-stakes PASS on the plan's only work order, then an upheld ## High-stakes review; the session ended before the Status after it. Resuming spawns squad-mech for the closing archive, and check 8d runs squad-mech's close guard and archive command over this log.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Run this in the main session on every high-stakes PASS; never delegate it."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Otherwise spawn `squad-mech` to close the run."
+    },
+    {
+      "file": "agents/squad-mech.md",
+      "text": "When told to close a run, first run `grep '^Result:' COMPUTE_SQUAD_LOG.md | tail -n 1`."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-mech to close the run",
+      "via": "row: `## High-stakes review` reading `Result: upheld`"
+    }
+  ]
+}

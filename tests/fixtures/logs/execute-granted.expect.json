@@ -1,0 +1,31 @@
+{
+  "note": "Section 6, S2: an execute request is recorded as a grant Decision for one work order of the governing revision, and the Status after it lets the executor spawn.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`execute <work order>`: continue the run in this worktree."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Spawn an executor only when the latest `## Status` grants the plan revision and work order about to run."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    },
+    {
+      "state": {
+        "audit": true
+      },
+      "next": "run the audit procedure and append its ## Audit Findings entry",
+      "via": "row: `## Executor`"
+    }
+  ]
+}

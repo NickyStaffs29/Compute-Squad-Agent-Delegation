@@ -1,0 +1,13 @@
+{
+  "name": "account-service",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Account endpoints: password reset",
+  "main": "src/server/app.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

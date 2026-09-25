@@ -1,0 +1,30 @@
+{
+  "note": "The blocking-delegation log with its DELEGATE: subtask naming no output cap, so nothing bounds what the helper returns or what the main session appends under Delegated.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "each with an exact procedure, a target tier (`intern` for zero-judgment work, `execution` for tightly-specced work), and the most output lines the helper may return."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Each subtask is one item: `- [<intern|execution>] <exact procedure>; return at most <N> lines.`"
+    },
+    {
+      "file": "agents/squad-executor.md",
+      "text": "Each subtask names the most output lines the helper may return (`return at most <N> lines`)."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "delegate-cap"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

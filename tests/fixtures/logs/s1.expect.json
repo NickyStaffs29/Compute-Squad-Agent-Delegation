@@ -1,0 +1,39 @@
+{
+  "note": "Live seed for section 6, S1, in tests/live/run.sh: the run starts from an empty log. Turn 1 is a plan-mode request, so the intern finds nothing to archive, Stage 1 opens the log, and the run stops after the plan with no product edits. Turn 2 approves the plan without granting execution.",
+  "cites": [
+    {
+      "file": "agents/squad-mech.md",
+      "text": "If `grep -q '[^[:space:]]' COMPUTE_SQUAD_LOG.md` fails, leave the file and report \"log was already empty.\""
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Stage 1 appends the Goal entry and the first `## Status` in one command."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`plan`: Stages 0 to 3, then stop. A plan-mode run succeeds with a plan in the log and no product edits."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`plan-approved` never grants execution."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "run Stage 1: the log is empty",
+      "via": "new run: empty log"
+    }
+  ]
+}

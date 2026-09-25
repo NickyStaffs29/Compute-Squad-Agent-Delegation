@@ -1,0 +1,42 @@
+{
+  "note": "Live seed for section 6, S2c, in tests/live/run.sh: WO-1 already has a PASS, the session ended before the Status after it, and the grant names only WO-1. tests/live/run.sh applies tests/live/repo-reset-wo1.patch to the tree, so resuming finds the state the PM left. WO-2 remains in plan r1, so that PASS archived and cleared nothing. Resuming runs the main session's high-stakes review first; it spawns no stage and writes no archive.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If stage entries follow that entry, first recompute `Next:` from `references/resume.md` and append a fresh `## Status`."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A grant covers only the work orders it names: after their verdict, append a `## Status` and stop."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "a PASS on a work order that is not the last of the governing plan revision archives and clears nothing, whatever its stakes: append a `## Status` naming the next work order, which outside `full` mode needs its own grant."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "If any line in the log reads `High-stakes: yes`, or the governing plan revision has a work order after the one you accepted, stop here: archive nothing and clear nothing."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "run the high-stakes review procedure",
+      "via": "row: `## PM — PASS` in a high-stakes run"
+    },
+    {
+      "state": {
+        "dirty": [
+          "src/server/auth/reset.service.js",
+          "src/server/auth/__tests__/reset.routes.test.js"
+        ]
+      },
+      "next": "run the high-stakes review procedure",
+      "via": "row: `## PM — PASS` in a high-stakes run"
+    }
+  ]
+}

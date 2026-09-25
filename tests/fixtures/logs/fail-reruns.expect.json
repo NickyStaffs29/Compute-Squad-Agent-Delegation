@@ -1,0 +1,36 @@
+{
+  "note": "A FAIL naming Executor and then the re-run Executor's rerun: Plan blocker: two FAILs from two sources. The named Executor re-runs one rung up as attempt 2 with a complete entry, the PM writes a complete revision r2 as attempt 2, the Executor's third attempt names r2, and the PM's second verdict is attempt 2.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-run after a FAIL, a `rerun:` blocker, or an overturned high-stakes review is a new attempt under the plain heading, never `(cont.)`, and complete on its own."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "the FAIL total is the number of lines matching `^(Rerun: |- rerun: )`"
+    },
+    {
+      "file": "agents/squad-executor.md",
+      "text": "`Attempt: <n>` counts the `## Executor` entries without `(cont.)` for that work order, this one included."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "`Attempt: <n>` counts the `## PM — PASS` and `## PM — FAIL` entries in the log, this one included"
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "On the template's `Rerun:` line, write exactly one of `Rerun: Recon`, `Rerun: Plan`, or `Rerun: Executor`"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

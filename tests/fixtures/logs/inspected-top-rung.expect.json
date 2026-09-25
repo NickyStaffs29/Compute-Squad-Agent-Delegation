@@ -1,0 +1,26 @@
+{
+  "note": "Execution ran on the top rung, so acceptance shares it: every met row must be reproduced, and this PASS marks one inspected.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "When the Executor entry you judge is `squad-executor-complex`'s, every `met` row is `reproduced`."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "every criterion it marks met is reproduced rather than inspected"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "parity"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

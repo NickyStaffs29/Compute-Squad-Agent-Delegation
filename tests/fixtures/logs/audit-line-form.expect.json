@@ -1,0 +1,26 @@
+{
+  "note": "One finding line of the ## Audit Findings entry has no severity, so it is not in the template's form; the Findings count matches the 29 lines that are.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "- <CONFIRMED | REFUTED | NEEDS-HUMAN | UNREVIEWED> <file>:<line> (<severity>): <claim> Evidence:"
+    },
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "Findings: <n>; skeptics run: <k> (cap 10)"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "audit"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Audit Findings`"
+    }
+  ]
+}

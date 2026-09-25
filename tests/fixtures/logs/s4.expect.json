@@ -1,0 +1,69 @@
+{
+  "note": "Live seed for section 6, S4 and S4b, in tests/live/run.sh: plan r1 has WO-1 and WO-2, and the plan-mode run ended with a handoff Status whose Next: sends WO-1 outside the squad and its acceptance back to Claude Code. run.sh commits the external implementation as C (S4b also edits a WO-2 file) and names C in the prompt. Resuming spawns only squad-pm in ACCEPT mode, against git diff from the Status's Base: to C. S4b's FAIL rests on the PM's scope review: the WO-2 change in src/server/log.js is outside the work order the latest Status names.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "The latest `## Status` is the handoff record."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`accept`: accept an implementation made outside this run against the governing plan revision, then stop."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "In `accept` mode, the change under review is `git diff <Base>` against the tree the latest `Next:` names."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "If `Next:` names another host or session and the user's words do not hand that action to this one, report `Next:` and stop."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "The receiving session takes the allowed scope and required checks from the plan attempt the latest `## Status` names."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Judge only the plan revision and work order that the latest `## Status` entry names. Earlier revisions are history, and other work orders are outside this verdict."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Check every invariant and every \"must NOT change\" item. Diff-review for scope creep, dead code, and slop."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {
+        "head": "c3a9f05",
+        "moved": [
+          "src/server/auth/reset.service.js",
+          "src/server/auth/__tests__/reset.routes.test.js"
+        ]
+      },
+      "next": "perform Next: accept WO-1 in Claude Code against the commit that implements it, working tree clean; review git diff 4f2c9a1 against c3a9f05",
+      "via": "step 5: accept"
+    },
+    {
+      "state": {
+        "head": "c3a9f05",
+        "moved": [
+          "src/server/auth/reset.service.js",
+          "src/server/auth/__tests__/reset.routes.test.js",
+          "src/server/log.js"
+        ]
+      },
+      "next": "perform Next: accept WO-1 in Claude Code against the commit that implements it, working tree clean; review git diff 4f2c9a1 against c3a9f05",
+      "via": "step 5: accept"
+    },
+    {
+      "state": {
+        "host": "Codex"
+      },
+      "next": "stop: Next: hands this action to Claude Code",
+      "via": "step 3"
+    }
+  ]
+}

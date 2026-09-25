@@ -1,0 +1,47 @@
+{
+  "note": "A plan-mode run the user parked: a park Decision and a Status with Next: none. The run is closed, so squad-mech's open-run guard lets Stage 1 archive it for a new goal. It is also the live seed for section 6, S6b, in tests/live/run.sh: a date shim fixes the clock and an archive already exists at the name the archive command gives this log, so /squad with a new goal spawns squad-mech, whose command refuses to overwrite that archive and clears nothing; squad-mech reports ARCHIVE FAILED and the run stops with the log unchanged. Check 8d is the static twin: under the same kind of shim, over this log, the guard allows the archive and the command then changes no file.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Record a park or abandon as a `## Decision`, then a `## Status` with `Next: none`, then run Stage 1."
+    },
+    {
+      "file": "agents/squad-mech.md",
+      "text": "If it prints a line other than `Next: none`, change nothing and report `ARCHIVE REFUSED: open run` followed by that line."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "`Next: none` means the run is closed; a new goal starts at Stage 1."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "It names the copy from `date -u` and the run ID, refuses to overwrite an existing file (`set -C`), verifies the copy byte for byte with `cmp`, and clears the active log only after `cmp` succeeds."
+    },
+    {
+      "file": "agents/squad-mech.md",
+      "text": "Never retry under another name, and never edit, append to, or overwrite a file in `compute-squad-archive/`."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If it reports `ARCHIVE FAILED` or `ARCHIVE REFUSED`, append nothing, give the user its message, and stop."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "closed: a new goal starts at Stage 1",
+      "via": "step 3"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "run Stage 1: archive the log and start the new run",
+      "via": "new run: archive"
+    }
+  ]
+}

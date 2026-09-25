@@ -1,0 +1,22 @@
+{
+  "note": "Section 6, S2b: the grant names plan revision r1 but the log ends at r2, so the executor spawn is denied until a new grant exists.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A new plan revision voids a grant made for an earlier one, except in `full` mode."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "grant"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-pm in ACCEPT mode",
+      "via": "row: `## Executor`"
+    }
+  ]
+}

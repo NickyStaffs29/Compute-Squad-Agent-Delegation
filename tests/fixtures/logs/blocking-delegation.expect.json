@@ -1,0 +1,28 @@
+{
+  "note": "A BLOCKING delegation: the Delegated entry names the requesting stage, the re-spawned Executor continues under (cont.), and an ordinary PASS ends with the line the archive command appends.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If the requesting stage marked the block `BLOCKING`, continue that stage's agent with SendMessage (load it through ToolSearch if it is listed only by name) and point it at the new `## Delegated — <stage>` entry, in the pointer form of Spawn prompts and routing; re-spawn the stage only when the host cannot message a finished agent or the message fails. A continued or re-spawned `BLOCKING` requester appends a `## <Stage> (cont.)` entry covering only the remainder of its work (Hard rules)"
+    },
+    {
+      "file": "agents/squad-helper.md",
+      "text": "The orchestrating session appends your results to the log under `## Delegated — <requesting stage>`."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "It appends `Archive target: <path>` as the last line of your entry"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "hand back to the user: the PM's archive or clear did not finish",
+      "via": "row: `## PM — PASS` in any other run"
+    }
+  ]
+}

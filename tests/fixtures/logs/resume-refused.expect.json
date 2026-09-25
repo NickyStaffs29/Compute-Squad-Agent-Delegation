@@ -1,0 +1,32 @@
+{
+  "note": "The PM's plan ends in a DELEGATE: block that is not BLOCKING, and the helper refused its one step; the session logged the refusal under Delegated and stopped. Resuming re-spawns the PM, which does that step itself or ends its entry with a BLOCKER: block, in a new, complete plan entry rather than a (cont.) entry, instead of taking the plan row and awaiting a grant.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "If it is not, but a result reports a step `REFUSED:` or `not run:`, re-spawn that stage for a new, complete entry (DELEGATE steps 2 and 4)."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If a helper refused a step or reports one that did not run as the procedure says, append that report the same way and re-spawn the requesting stage even if its request was not `BLOCKING`"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A stage whose request was not `BLOCKING` appends a new, complete entry under its plain heading, never `(cont.)`."
+    },
+    {
+      "file": "agents/squad-helper.md",
+      "text": "Begin your final message with `REFUSED: step <n>`."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-spawn squad-pm in PLAN mode for a new, complete entry",
+      "via": "row: Ends in a `DELEGATE:` block, a step refused or not run"
+    }
+  ]
+}

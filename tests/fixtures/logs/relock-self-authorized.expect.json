@@ -1,0 +1,26 @@
+{
+  "note": "The 3.9.2 live run's self-ratified re-lock: the plan rewrites the command a criterion names, and the main session appends a second Goal entry with no Decision quoting the user.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "This step is the only place an unattended run makes assumptions: once the Goal entry is written, only the user changes them."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Changing a command, test, or check that an acceptance criterion names counts as redefining that criterion. A re-lock needs the user"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "re-lock"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-recon",
+      "via": "row: `## Goal — Locked`"
+    }
+  ]
+}

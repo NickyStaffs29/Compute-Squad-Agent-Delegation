@@ -1,0 +1,44 @@
+diff --git a/public/index.html b/public/index.html
+index 75eadd9..2a26857 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -22,6 +22,7 @@
+         <tr><th scope="row">Business</th><td>50</td><td data-cents="19900"></td></tr>
+       </tbody>
+     </table>
++    <p class="billing-note">Prices are per month, billed annually. Cancel any time.</p>
+   </main>
+   <script src="price.js"></script>
+   <script>
+diff --git a/public/styles.css b/public/styles.css
+index 16cb17f..bacc72f 100644
+--- a/public/styles.css
++++ b/public/styles.css
+@@ -33,3 +33,9 @@ main {
+   border-bottom: 1px solid #d0d0d7;
+   text-align: left;
+ }
++
++.billing-note {
++  margin: 12px 0 0;
++  color: #55555f;
++  font-size: 14px;
++}
+diff --git a/test/page.test.js b/test/page.test.js
+new file mode 100644
+index 0000000..48b801e
+--- /dev/null
++++ b/test/page.test.js
+@@ -0,0 +1,12 @@
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++
++const page = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
++
++test('the billing note sits directly under the plans table', () => {
++  const note = '<p class="billing-note">Prices are per month, billed annually. Cancel any time.</p>';
++  assert.match(page, /<\/table>\s*<p class="billing-note">/);
++  assert.ok(page.includes(note));
++});

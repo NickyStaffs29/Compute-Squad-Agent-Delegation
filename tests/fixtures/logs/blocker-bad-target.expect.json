@@ -1,0 +1,22 @@
+{
+  "note": "A rerun: item naming a stage the grammar does not list.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "- rerun: <Recon|Plan|Executor>   (or)   needs-human: <the decision required>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "blocker"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "stop: the entry names no stage to re-run (PM); show it to the user",
+      "via": "row: Ends in a `BLOCKER:` block"
+    }
+  ]
+}

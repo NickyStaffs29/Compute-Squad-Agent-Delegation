@@ -1,0 +1,26 @@
+{
+  "note": "The date call placed inside the quoted heredoc, so the entry holds the command instead of its output.",
+  "cites": [
+    {
+      "file": "agents/squad-recon.md",
+      "text": "Take the `Timestamp:` value from `date -u +%Y-%m-%dT%H:%M:%SZ`, run in a Bash call just before the append and never inside it"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Every entry's `Timestamp:` line is the output of `date -u +%Y-%m-%dT%H:%M:%SZ`"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "timestamp-form"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    }
+  ]
+}

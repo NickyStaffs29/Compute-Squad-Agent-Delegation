@@ -1,6 +1,6 @@
 {
   "name": "compute-squad",
-  "version": "3.9.2",
+  "version": "4.4.0",
   "description": "Compute Squad is a staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest tier plans and adversarially accepts the work, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier, and the cheapest tier handles zero-judgment busywork — all through a shared, auditable log.",
   "author": {
     "name": "Nick Stafford"

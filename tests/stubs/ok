@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in for git in scripts/verify.sh check 8e. It does nothing
+# and exits 0. When STUB_LOG is set, it appends one line per call to that
+# file: the name it was called by, then its arguments.
+if [ -n "${STUB_LOG:-}" ]; then
+  printf '%s %s\n' "${0##*/}" "$*" >> "$STUB_LOG"
+fi
+exit 0

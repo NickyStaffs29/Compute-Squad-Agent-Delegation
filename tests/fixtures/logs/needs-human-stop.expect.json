@@ -1,0 +1,24 @@
+{
+  "note": "An unattended run stops at a needs-human blocker: the main session appends a Status that quotes it and names the stage to re-spawn, and spawns nothing more.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If the session is unattended, do not resolve it yourself, even when the answer looks obvious: append a `## Status` entry whose `Stop:` quotes the blocker and whose `Next:` names the stage to re-spawn, leave the log intact, and end the run by reporting both."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "write `Attended: no` in the Goal entry"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: re-spawn squad-recon once a Decision records the user's answer",
+      "via": "step 4: perform Next"
+    }
+  ]
+}

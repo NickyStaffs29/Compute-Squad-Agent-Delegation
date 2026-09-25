@@ -1,0 +1,46 @@
+{
+  "note": "Live seed for S9 in tests/live/run.sh (work order WO-3f's audit cap). The user's execute request asked for a thorough audit and a stop before acceptance, and the executor's WO-1 change, which tests/live/repo-reset-audit.patch applies uncommitted, carries about 30 planted defects. The latest Status names the audit as the next action and the audit's entry as the stop, so resuming runs the audit: five finders, skeptics on at most 10 findings, one ## Audit Findings entry marking the rest UNREVIEWED, and a Status naming squad-pm (ACCEPT), and no PM spawn. tests/fixtures/live/s9.json holds the live rule's cases over this seed.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Resume is not a mode and grants nothing: it performs the `Next:` action of the latest `## Status` entry."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "The main session runs the fan-out after execution and before it spawns `squad-pm` in ACCEPT mode, following the procedure in `references/audit-prompts.md`, and records the result in one `## Audit Findings` entry."
+    },
+    {
+      "file": "skills/compute-squad/references/audit-prompts.md",
+      "text": "In one message, spawn one skeptic per finding on the top rung, in parallel, for at most 10 findings. The rest are UNREVIEWED."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: run the audit on WO-1 (an audit-grade run, per the Decision above)",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "dirty": [
+          "package.json",
+          "src/server/auth/__tests__/reset.routes.test.js",
+          "src/server/auth/reset.service.js"
+        ]
+      },
+      "next": "perform Next: run the audit on WO-1 (an audit-grade run, per the Decision above)",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "refuse the archive: ask the user to resume, park, or abandon the open run",
+      "via": "new run: refuse"
+    }
+  ]
+}

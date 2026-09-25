@@ -1,0 +1,24 @@
+{
+  "note": "A needs-human: blocker from Recon, answered by a re-lock Decision and a new Goal entry, with no Status after them. Resuming re-spawns Recon, the stage that raised the blocker, not the first stage after a fresh Goal.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "Spawn `squad-recon`. After a re-lock that answers a `needs-human:` blocker, re-spawn the stage that raised it instead."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "record the answer as a re-lock (Stage 0 step 4), and re-spawn the stage that raised it."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "re-spawn squad-recon",
+      "via": "row: `## Goal — Locked`"
+    }
+  ]
+}

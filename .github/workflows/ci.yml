@@ -3,6 +3,8 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
 
 jobs:
   verify:
@@ -11,3 +13,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run verify.sh
         run: bash scripts/verify.sh
+  model-currency:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/verify.sh
+      - run: npm install -g @openai/codex
+      - run: codex debug models --bundled > catalog.json
+      - run: python3 codex/build-agents.py --validate-catalog catalog.json --strict

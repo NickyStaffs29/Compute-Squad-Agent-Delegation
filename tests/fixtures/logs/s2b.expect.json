@@ -1,0 +1,32 @@
+{
+  "note": "Live seed for section 6, S2b, in tests/live/run.sh: the user granted r1 WO-1, the Executor stopped with a rerun: Plan blocker, and the PM wrote revision r2 before the session ended. The latest Status still names the r1 grant, which r2 voids outside full mode, so resuming recomputes Next: and spawns no executor.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If stage entries follow that entry, first recompute `Next:` from `references/resume.md` and append a fresh `## Status`."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A new plan revision voids a grant made for an earlier one, except in `full` mode."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "On Claude Code a PreToolUse hook refuses an executor spawn whose plan revision the latest `## Status` does not grant"
+    },
+    {
+      "file": "agents/squad-executor.md",
+      "text": "If the plan is wrong or impossible, STOP: end your entry with a `BLOCKER:` block (`rerun: Plan`, with why), and do not improvise your own design."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "append a Status that awaits a grant for r2 WO-1, and stop",
+      "via": "row: `## PM — Plan`"
+    }
+  ]
+}

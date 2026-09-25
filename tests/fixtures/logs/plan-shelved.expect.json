@@ -1,0 +1,31 @@
+{
+  "note": "Section 6, S1: a plan-mode run stops after the plan, and the user's approval is a plan-approved Decision with no grant, so the log ends awaiting one.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`plan`: Stages 0 to 3, then stop. A plan-mode run succeeds with a plan in the log and no product edits."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`plan-approved` never grants execution."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "perform Next: await a grant for r1",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "request": "new-goal"
+      },
+      "next": "refuse the archive: ask the user to resume, park, or abandon the open run",
+      "via": "new run: refuse"
+    }
+  ]
+}

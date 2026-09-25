@@ -1,0 +1,26 @@
+{
+  "note": "The FAIL names the stage to re-run in prose and has no Rerun: line, so the FAIL count and the re-run route miss it.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "On the template's `Rerun:` line, write exactly one of `Rerun: Recon`, `Rerun: Plan`, or `Rerun: Executor`"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "the FAIL total is the number of lines matching `^(Rerun: |- rerun: )`"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "fields"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "stop: the entry names no stage to re-run (nothing); show it to the user",
+      "via": "row: `## PM — FAIL`"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "note": "The main session appends a second batch of helper results as (cont.), which only the three stage headings may add.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Only `## Recon`, `## PM — Plan`, and `## Executor` may add ` (cont.)`, and only for a stage continuing after its own `BLOCKING` `DELEGATE:` block"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "heading"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    }
+  ]
+}

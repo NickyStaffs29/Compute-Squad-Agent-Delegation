@@ -1,0 +1,22 @@
+{
+  "note": "A FAIL names Plan and the PM writes a complete new plan, but its Attempt: line still reads 1, so its revision number disagrees with the count the grant hook uses.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n is plan revision r<n>."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "attempt"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-executor for r2, work order all",
+      "via": "row: `## PM — Plan`"
+    }
+  ]
+}

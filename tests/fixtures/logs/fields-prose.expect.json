@@ -1,0 +1,26 @@
+{
+  "note": "The plan states its classification and high-stakes call in prose, as 3.9.2 logs did, so routing has no Classification: line to read.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Routing values sit on fixed lines at the top of an entry, one value each, in this order under the `Agent:` line"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Route and count from these lines and from `- rerun:` blocker lines, never from prose or a final message."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "fields"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "spawn squad-executor-complex for r1, work order all",
+      "via": "row: `## PM — Plan`"
+    }
+  ]
+}

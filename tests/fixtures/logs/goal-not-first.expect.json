@@ -1,0 +1,22 @@
+{
+  "note": "A log that starts at Recon, with no Goal entry for the stages to read the goal from.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Every fresh log opens with a `## Goal — Locked` entry and a `## Status` entry, appended together by Stage 1 before Recon spawns."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "goal-first"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    }
+  ]
+}

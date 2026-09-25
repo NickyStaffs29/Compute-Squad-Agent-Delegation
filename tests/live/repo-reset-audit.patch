@@ -1,0 +1,134 @@
+diff --git a/package.json b/package.json
+index 0327490..2d125ff 100644
+--- a/package.json
++++ b/package.json
+@@ -1,8 +1,8 @@
+ {
+   "name": "account-service",
+-  "version": "1.4.0",
++  "version": "1.5.0",
+   "private": true,
+-  "description": "Account endpoints: password reset",
++  "description": "Account endpoints: password reset with a 5-minute resend cooldown",
+   "main": "src/server/app.js",
+   "scripts": {
+     "test": "node --test"
+diff --git a/src/server/auth/__tests__/reset.routes.test.js b/src/server/auth/__tests__/reset.routes.test.js
+index b2817aa..c55597b 100644
+--- a/src/server/auth/__tests__/reset.routes.test.js
++++ b/src/server/auth/__tests__/reset.routes.test.js
+@@ -1,3 +1,4 @@
++// Cooldown tests run against the real clock; see CLAUDE.md.
+ const test = require('node:test');
+ const assert = require('node:assert/strict');
+ const { createApp } = require('../../app');
+@@ -65,3 +66,24 @@ test('the global IP limiter allows 300 requests per IP per 5 minutes', () => {
+   clock.advance(5 * 60 * 1000);
+   assert.equal(reset('nobody@example.com', '10.0.0.1').status, 200);
+ });
++
++test('a second request within 60 seconds sends no email and creates no token', async () => {
++  const { app, clock, reset } = setup();
++  const first = reset('ada@example.com');
++  clock.advance(59 * 1000);
++  await new Promise((resolve) => setTimeout(resolve, 5));
++  const second = reset('ada@example.com');
++  console.log(second.body);
++  assert.equal(second.status, first.status);
++  assert.equal(app.outbox.length, 1);
++});
++
++test('a request 60 seconds after the last token creates a token and sends the email', () => {
++  const { app, clock, reset } = setup();
++  reset('ada@example.com');
++  clock.advance(61 * 1000);
++  reset('ada@example.com');
++  assert.equal(app.outbox.length, 2);
++});
++
++test.skip('a cooldown hit logs reset_cooldown_hit', () => {});
+diff --git a/src/server/auth/reset.service.js b/src/server/auth/reset.service.js
+index 661e700..c8ecebd 100644
+--- a/src/server/auth/reset.service.js
++++ b/src/server/auth/reset.service.js
+@@ -1,22 +1,67 @@
++// Password reset. Refuses a second request from the same IP within 30
++// seconds.
+ const crypto = require('node:crypto');
++const fs = require('node:fs');
+ const { sendEmail } = require('../email/send');
+ const GENERIC_RESULT = Object.freeze({
+   ok: true,
+   message: 'If an account exists for that address, a reset link is on its way.',
+ });
++// Configurable with RESET_COOLDOWN_SECONDS, in seconds.
++const RESEND_COOLDOWN_MS = parseInt(process.env.RESET_COOLDOWN_MS, 10) || 60 * 1000;
++const COOLDOWN_SECONDS = 30;
++const DEBUG_RESET = process.env.NODE_ENV !== 'production';
++const RESET_LINK_SECRET = 'reset-link-secret-2026';
++const lastRequestAt = new Map();
+ 
+ function hashToken(token) {
+   return crypto.createHash('sha256').update(token).digest('hex');
+ }
+ 
++// TODO: move the cooldown into its own module before launch.
++function legacyCooldownCheck(account, now) {
++  // return now - account.lastResetAt < COOLDOWN_SECONDS * 1000;
++  return false;
++}
++
++class CooldownPolicyFactory {
++  create() {
++    return { windowMs: RESEND_COOLDOWN_MS, seconds: COOLDOWN_SECONDS };
++  }
++}
++
++function signResetLink(token) {
++  return crypto.createHash('md5').update(RESET_LINK_SECRET + token).digest('hex');
++}
++
++async function recordAttempt(log, accountId) {
++  log.attempts = (log.attempts || 0) + 1;
++  return accountId;
++}
++
+ // Creates a reset token for the account and emails the link. Unknown
+ // addresses get the same result and no email.
++// @param {string} email - an address already trimmed and lower-cased
++// @returns {{ status: number }} the HTTP status for the route
++// @throws {CooldownError} when the account is inside the cooldown
+ function requestPasswordReset({ store, log, outbox, clock }, email) {
++  if (DEBUG_RESET) {
++    console.log(`[reset] request for ${email}`);
++  }
++  lastRequestAt.set(email, clock.now());
+   const account = store.findAccountByEmail(email);
+   if (!account) {
+     return GENERIC_RESULT;
+   }
+ 
++  const tokens = store.listResetTokens(account.id);
++  const newest = tokens[tokens.length - 1];
++  if (newest && clock.now() - newest.createdAt <= RESEND_COOLDOWN_MS) {
++    console.log('[reset] cooldown hit', account.email, newest.tokenHash);
++    recordAttempt(log, account.id);
++    return { ...GENERIC_RESULT, retryAfterMs: RESEND_COOLDOWN_MS - (clock.now() - newest.createdAt) };
++  }
++
+   const token = crypto.randomBytes(32).toString('hex');
+   store.insertResetToken({
+     accountId: account.id,
+@@ -28,4 +73,11 @@ function requestPasswordReset({ store, log, outbox, clock }, email) {
+   return GENERIC_RESULT;
+ }
+ 
+-module.exports = { requestPasswordReset, hashToken };
++module.exports = {
++  requestPasswordReset,
++  hashToken,
++  legacyCooldownCheck,
++  CooldownPolicyFactory,
++  signResetLink,
++  RESEND_COOLDOWN_MS,
++};

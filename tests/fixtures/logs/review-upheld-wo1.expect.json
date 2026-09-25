@@ -1,0 +1,24 @@
+{
+  "note": "Finding 3 with finding 9's work orders: the review upholds WO-1's high-stakes PASS while WO-2 remains, so it closes nothing; the next Status names WO-2, which awaits its own grant.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If the governing plan revision has a work order after the one this PASS accepted, spawn nothing: that Status names the next work order instead."
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "If the governing plan has work orders after the one its PASS accepted, append a `## Status` naming the next one and apply the grant rule."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "append a Status naming WO-2, then await a grant for r1 WO-2, and stop",
+      "via": "row: `## High-stakes review` reading `Result: upheld`"
+    }
+  ]
+}

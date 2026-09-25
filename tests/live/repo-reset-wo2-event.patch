@@ -1,0 +1,12 @@
+diff --git a/src/server/log.js b/src/server/log.js
+index cee4819..5834611 100644
+--- a/src/server/log.js
++++ b/src/server/log.js
+@@ -1,6 +1,6 @@
+ // Structured log events. An event is a known code plus ids, never an email
+ // address or a token; an unknown code throws so a typo cannot ship.
+-const EVENT_CODES = Object.freeze(['reset_email_sent']);
++const EVENT_CODES = Object.freeze(['reset_email_sent', 'reset_cooldown_hit']);
+ 
+ function createLogger() {
+   const events = [];

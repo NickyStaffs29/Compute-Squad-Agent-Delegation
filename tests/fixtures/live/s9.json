@@ -1,0 +1,2267 @@
+{
+ "note": "Cases for the live S9 check (tests/live/check_live.py, work order WO-3f), which check 8b runs through the same rule: the entries a call over the S9 seed could append, and its hook log. The seed's Executor entry is WO-1 with about 30 planted defects (tests/live/repo-reset-audit.patch), and its Status says run the audit, then stop before acceptance. The call must append one ## Audit Findings entry with more findings than the skeptic cap, run exactly the cap's skeptics, one spawn each in the hook log, and mark every other finding UNREVIEWED. A spawn whose prompt carries the skeptic brief (it asks the agent to refute a finding) is a skeptic; any other spawn outside the squad is a finder. Every pass case, appended to the seed, lints clean.",
+ "cites": [
+  {
+   "file": "skills/compute-squad/references/audit-prompts.md",
+   "text": "Order the findings by severity, high first, then by finder number. In one message, spawn one skeptic per finding on the top rung, in parallel, for at most 10 findings. The rest are UNREVIEWED."
+  },
+  {
+   "file": "skills/compute-squad/references/audit-prompts.md",
+   "text": "Findings: <n>; skeptics run: <k> (cap 10)"
+  },
+  {
+   "file": "skills/compute-squad/references/audit-prompts.md",
+   "text": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it."
+  }
+ ],
+ "seed": "s9",
+ "cases": [
+  {
+   "note": "30 findings, 10 skeptics in the hook log and the entry, 20 UNREVIEWED",
+   "live": "pass",
+   "append": [
+    "## Audit Findings",
+    "Timestamp: 2026-09-03T08:58:41Z",
+    "Agent: main session (claude-fable-5-1)",
+    "Findings: 30; skeptics run: 10 (cap 10)",
+    "- CONFIRMED src/server/auth/reset.service.js:62 (high): a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3). Evidence: a request inside the window returned {\"ok\":true,...,\"retryAfterMs\":1000} where an unknown address returns GENERIC_RESULT alone.",
+    "- CONFIRMED src/server/auth/reset.service.js:59 (high): the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2). Evidence: with the fake clock advanced 60000 ms the second request sent no email; outbox length stayed 1.",
+    "- CONFIRMED src/server/auth/reset.service.js:49 (high): every request prints the submitted address to the console outside production (CLAUDE.md:4). Evidence: npm test prints \"[reset] request for ada@example.com\".",
+    "- CONFIRMED src/server/auth/reset.service.js:60 (high): a cooldown hit prints the account's address and its token hash. Evidence: line 60 passes account.email and newest.tokenHash to console.log.",
+    "- NEEDS-HUMAN src/server/auth/reset.service.js:11 (high): a negative RESET_COOLDOWN_MS in production turns the cooldown off. Evidence: reproduction needs the production environment's value of RESET_COOLDOWN_MS, which the repository does not hold.",
+    "- REFUTED src/server/auth/reset.service.js:14 (high): a hard-coded secret signs reset links. Evidence: signResetLink, the only reader of RESET_LINK_SECRET, has no caller; grep -rn signResetLink src lists its definition and the export only.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:74 (high): test (a) waits on a real timer (CLAUDE.md:5). Evidence: line 74 awaits setTimeout(resolve, 5); a race is not the claim, so the line itself decides it.",
+    "- CONFIRMED src/server/auth/reset.service.js:61 (medium): recordAttempt() returns a promise nothing awaits or catches. Evidence: line 61 calls the async function without await or .catch().",
+    "- CONFIRMED src/server/auth/reset.service.js:51 (medium): lastRequestAt keeps one entry per address ever submitted and never drops one. Evidence: line 51 sets a key per request; no line deletes from the Map.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:77 (medium): test (a) compares status codes only, so the retryAfterMs leak passes. Evidence: line 77 asserts second.status equals first.status and never compares bodies.",
+    "- UNREVIEWED src/server/auth/reset.service.js:34 (medium): signResetLink hashes the secret and token together with md5 instead of an HMAC. Evidence: line 34: crypto.createHash('md5').update(RESET_LINK_SECRET + token).",
+    "- UNREVIEWED src/server/auth/reset.service.js:13 (medium): debug logging is on in every environment but production. Evidence: line 13: const DEBUG_RESET = process.env.NODE_ENV !== 'production';",
+    "- UNREVIEWED package.json:5 (medium): package.json changed, which the plan's Must NOT change list names. Evidence: the description now reads \"with a 5-minute resend cooldown\".",
+    "- UNREVIEWED src/server/auth/reset.service.js:1 (medium): the header says the cooldown is per IP and 30 seconds. Evidence: lines 1-2 against the plan's per-account 60-second cooldown.",
+    "- UNREVIEWED src/server/auth/reset.service.js:10 (medium): the comment names RESET_COOLDOWN_SECONDS in seconds; the code reads RESET_COOLDOWN_MS in milliseconds. Evidence: lines 10-11.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:78 (medium): test (a) never checks that no token row was created (AC1). Evidence: lines 70-79 assert the outbox length only.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:84 (medium): test (b) advances 61 seconds, so the 60-second boundary is untested. Evidence: line 84: clock.advance(61 * 1000).",
+    "- UNREVIEWED src/server/auth/reset.service.js:4 (low): fs is imported and never used. Evidence: line 4; no fs. call in the file.",
+    "- UNREVIEWED src/server/auth/reset.service.js:12 (low): COOLDOWN_SECONDS is 30 while the window is 60 seconds. Evidence: line 12.",
+    "- UNREVIEWED src/server/auth/reset.service.js:21 (low): a TODO placeholder shipped. Evidence: line 21.",
+    "- UNREVIEWED src/server/auth/reset.service.js:22 (low): legacyCooldownCheck has no caller. Evidence: grep -rn legacyCooldownCheck src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:27 (low): CooldownPolicyFactory is an abstraction nothing uses. Evidence: lines 27-31.",
+    "- UNREVIEWED src/server/auth/reset.service.js:33 (low): signResetLink has no caller. Evidence: grep -rn signResetLink src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:79 (low): module.exports exports internals no caller imports. Evidence: lines 76-83.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:76 (low): test (a) leaves a console.log in place. Evidence: line 76.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:89 (low): a skipped placeholder test shipped. Evidence: line 89: test.skip(..., () => {}).",
+    "- UNREVIEWED package.json:3 (low): the version was bumped, which no task asked for. Evidence: line 3: 1.5.0.",
+    "- UNREVIEWED src/server/auth/reset.service.js:44 (low): @param says the address is already trimmed and lower-cased; the route passes the raw body. Evidence: auth.routes.js:11 passes body.email as sent.",
+    "- UNREVIEWED src/server/auth/reset.service.js:45 (low): @returns says an HTTP status; the function returns the result object. Evidence: lines 54, 62, and 73.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:1 (low): the file header says the tests use the real clock. Evidence: line 1 against setup()'s createFakeClock().",
+    "",
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:59: the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2).",
+      "model": "fable"
+     },
+     "prompt_chars": 241
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:49: every request prints the submitted address to the console outside production (CLAUDE.md:4).",
+      "model": "fable"
+     },
+     "prompt_chars": 229
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:60: a cooldown hit prints the account's address and its token hash.",
+      "model": "fable"
+     },
+     "prompt_chars": 201
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:11: a negative RESET_COOLDOWN_MS in production turns the cooldown off.",
+      "model": "fable"
+     },
+     "prompt_chars": 204
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:14: a hard-coded secret signs reset links.",
+      "model": "fable"
+     },
+     "prompt_chars": 176
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:74: test (a) waits on a real timer (CLAUDE.md:5).",
+      "model": "fable"
+     },
+     "prompt_chars": 197
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:61: recordAttempt() returns a promise nothing awaits or catches.",
+      "model": "fable"
+     },
+     "prompt_chars": 198
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:51: lastRequestAt keeps one entry per address ever submitted and never drops one.",
+      "model": "fable"
+     },
+     "prompt_chars": 215
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:77: test (a) compares status codes only, so the retryAfterMs leak passes.",
+      "model": "fable"
+     },
+     "prompt_chars": 221
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  },
+  {
+   "note": "an eleventh skeptic spawn beyond the cap, though the entry says 10",
+   "live": "fail",
+   "append": [
+    "## Audit Findings",
+    "Timestamp: 2026-09-03T08:58:41Z",
+    "Agent: main session (claude-fable-5-1)",
+    "Findings: 30; skeptics run: 10 (cap 10)",
+    "- CONFIRMED src/server/auth/reset.service.js:62 (high): a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3). Evidence: a request inside the window returned {\"ok\":true,...,\"retryAfterMs\":1000} where an unknown address returns GENERIC_RESULT alone.",
+    "- CONFIRMED src/server/auth/reset.service.js:59 (high): the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2). Evidence: with the fake clock advanced 60000 ms the second request sent no email; outbox length stayed 1.",
+    "- CONFIRMED src/server/auth/reset.service.js:49 (high): every request prints the submitted address to the console outside production (CLAUDE.md:4). Evidence: npm test prints \"[reset] request for ada@example.com\".",
+    "- CONFIRMED src/server/auth/reset.service.js:60 (high): a cooldown hit prints the account's address and its token hash. Evidence: line 60 passes account.email and newest.tokenHash to console.log.",
+    "- NEEDS-HUMAN src/server/auth/reset.service.js:11 (high): a negative RESET_COOLDOWN_MS in production turns the cooldown off. Evidence: reproduction needs the production environment's value of RESET_COOLDOWN_MS, which the repository does not hold.",
+    "- REFUTED src/server/auth/reset.service.js:14 (high): a hard-coded secret signs reset links. Evidence: signResetLink, the only reader of RESET_LINK_SECRET, has no caller; grep -rn signResetLink src lists its definition and the export only.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:74 (high): test (a) waits on a real timer (CLAUDE.md:5). Evidence: line 74 awaits setTimeout(resolve, 5); a race is not the claim, so the line itself decides it.",
+    "- CONFIRMED src/server/auth/reset.service.js:61 (medium): recordAttempt() returns a promise nothing awaits or catches. Evidence: line 61 calls the async function without await or .catch().",
+    "- CONFIRMED src/server/auth/reset.service.js:51 (medium): lastRequestAt keeps one entry per address ever submitted and never drops one. Evidence: line 51 sets a key per request; no line deletes from the Map.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:77 (medium): test (a) compares status codes only, so the retryAfterMs leak passes. Evidence: line 77 asserts second.status equals first.status and never compares bodies.",
+    "- UNREVIEWED src/server/auth/reset.service.js:34 (medium): signResetLink hashes the secret and token together with md5 instead of an HMAC. Evidence: line 34: crypto.createHash('md5').update(RESET_LINK_SECRET + token).",
+    "- UNREVIEWED src/server/auth/reset.service.js:13 (medium): debug logging is on in every environment but production. Evidence: line 13: const DEBUG_RESET = process.env.NODE_ENV !== 'production';",
+    "- UNREVIEWED package.json:5 (medium): package.json changed, which the plan's Must NOT change list names. Evidence: the description now reads \"with a 5-minute resend cooldown\".",
+    "- UNREVIEWED src/server/auth/reset.service.js:1 (medium): the header says the cooldown is per IP and 30 seconds. Evidence: lines 1-2 against the plan's per-account 60-second cooldown.",
+    "- UNREVIEWED src/server/auth/reset.service.js:10 (medium): the comment names RESET_COOLDOWN_SECONDS in seconds; the code reads RESET_COOLDOWN_MS in milliseconds. Evidence: lines 10-11.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:78 (medium): test (a) never checks that no token row was created (AC1). Evidence: lines 70-79 assert the outbox length only.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:84 (medium): test (b) advances 61 seconds, so the 60-second boundary is untested. Evidence: line 84: clock.advance(61 * 1000).",
+    "- UNREVIEWED src/server/auth/reset.service.js:4 (low): fs is imported and never used. Evidence: line 4; no fs. call in the file.",
+    "- UNREVIEWED src/server/auth/reset.service.js:12 (low): COOLDOWN_SECONDS is 30 while the window is 60 seconds. Evidence: line 12.",
+    "- UNREVIEWED src/server/auth/reset.service.js:21 (low): a TODO placeholder shipped. Evidence: line 21.",
+    "- UNREVIEWED src/server/auth/reset.service.js:22 (low): legacyCooldownCheck has no caller. Evidence: grep -rn legacyCooldownCheck src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:27 (low): CooldownPolicyFactory is an abstraction nothing uses. Evidence: lines 27-31.",
+    "- UNREVIEWED src/server/auth/reset.service.js:33 (low): signResetLink has no caller. Evidence: grep -rn signResetLink src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:79 (low): module.exports exports internals no caller imports. Evidence: lines 76-83.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:76 (low): test (a) leaves a console.log in place. Evidence: line 76.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:89 (low): a skipped placeholder test shipped. Evidence: line 89: test.skip(..., () => {}).",
+    "- UNREVIEWED package.json:3 (low): the version was bumped, which no task asked for. Evidence: line 3: 1.5.0.",
+    "- UNREVIEWED src/server/auth/reset.service.js:44 (low): @param says the address is already trimmed and lower-cased; the route passes the raw body. Evidence: auth.routes.js:11 passes body.email as sent.",
+    "- UNREVIEWED src/server/auth/reset.service.js:45 (low): @returns says an HTTP status; the function returns the result object. Evidence: lines 54, 62, and 73.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:1 (low): the file header says the tests use the real clock. Evidence: line 1 against setup()'s createFakeClock().",
+    "",
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:59: the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2).",
+      "model": "fable"
+     },
+     "prompt_chars": 241
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:49: every request prints the submitted address to the console outside production (CLAUDE.md:4).",
+      "model": "fable"
+     },
+     "prompt_chars": 229
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:60: a cooldown hit prints the account's address and its token hash.",
+      "model": "fable"
+     },
+     "prompt_chars": 201
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:11: a negative RESET_COOLDOWN_MS in production turns the cooldown off.",
+      "model": "fable"
+     },
+     "prompt_chars": 204
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:14: a hard-coded secret signs reset links.",
+      "model": "fable"
+     },
+     "prompt_chars": 176
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:74: test (a) waits on a real timer (CLAUDE.md:5).",
+      "model": "fable"
+     },
+     "prompt_chars": 197
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:61: recordAttempt() returns a promise nothing awaits or catches.",
+      "model": "fable"
+     },
+     "prompt_chars": 198
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:51: lastRequestAt keeps one entry per address ever submitted and never drops one.",
+      "model": "fable"
+     },
+     "prompt_chars": 215
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:77: test (a) compares status codes only, so the retryAfterMs leak passes.",
+      "model": "fable"
+     },
+     "prompt_chars": 221
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  },
+  {
+   "note": "nine skeptic spawns where the entry says 10 ran",
+   "live": "fail",
+   "append": [
+    "## Audit Findings",
+    "Timestamp: 2026-09-03T08:58:41Z",
+    "Agent: main session (claude-fable-5-1)",
+    "Findings: 30; skeptics run: 10 (cap 10)",
+    "- CONFIRMED src/server/auth/reset.service.js:62 (high): a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3). Evidence: a request inside the window returned {\"ok\":true,...,\"retryAfterMs\":1000} where an unknown address returns GENERIC_RESULT alone.",
+    "- CONFIRMED src/server/auth/reset.service.js:59 (high): the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2). Evidence: with the fake clock advanced 60000 ms the second request sent no email; outbox length stayed 1.",
+    "- CONFIRMED src/server/auth/reset.service.js:49 (high): every request prints the submitted address to the console outside production (CLAUDE.md:4). Evidence: npm test prints \"[reset] request for ada@example.com\".",
+    "- CONFIRMED src/server/auth/reset.service.js:60 (high): a cooldown hit prints the account's address and its token hash. Evidence: line 60 passes account.email and newest.tokenHash to console.log.",
+    "- NEEDS-HUMAN src/server/auth/reset.service.js:11 (high): a negative RESET_COOLDOWN_MS in production turns the cooldown off. Evidence: reproduction needs the production environment's value of RESET_COOLDOWN_MS, which the repository does not hold.",
+    "- REFUTED src/server/auth/reset.service.js:14 (high): a hard-coded secret signs reset links. Evidence: signResetLink, the only reader of RESET_LINK_SECRET, has no caller; grep -rn signResetLink src lists its definition and the export only.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:74 (high): test (a) waits on a real timer (CLAUDE.md:5). Evidence: line 74 awaits setTimeout(resolve, 5); a race is not the claim, so the line itself decides it.",
+    "- CONFIRMED src/server/auth/reset.service.js:61 (medium): recordAttempt() returns a promise nothing awaits or catches. Evidence: line 61 calls the async function without await or .catch().",
+    "- CONFIRMED src/server/auth/reset.service.js:51 (medium): lastRequestAt keeps one entry per address ever submitted and never drops one. Evidence: line 51 sets a key per request; no line deletes from the Map.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:77 (medium): test (a) compares status codes only, so the retryAfterMs leak passes. Evidence: line 77 asserts second.status equals first.status and never compares bodies.",
+    "- UNREVIEWED src/server/auth/reset.service.js:34 (medium): signResetLink hashes the secret and token together with md5 instead of an HMAC. Evidence: line 34: crypto.createHash('md5').update(RESET_LINK_SECRET + token).",
+    "- UNREVIEWED src/server/auth/reset.service.js:13 (medium): debug logging is on in every environment but production. Evidence: line 13: const DEBUG_RESET = process.env.NODE_ENV !== 'production';",
+    "- UNREVIEWED package.json:5 (medium): package.json changed, which the plan's Must NOT change list names. Evidence: the description now reads \"with a 5-minute resend cooldown\".",
+    "- UNREVIEWED src/server/auth/reset.service.js:1 (medium): the header says the cooldown is per IP and 30 seconds. Evidence: lines 1-2 against the plan's per-account 60-second cooldown.",
+    "- UNREVIEWED src/server/auth/reset.service.js:10 (medium): the comment names RESET_COOLDOWN_SECONDS in seconds; the code reads RESET_COOLDOWN_MS in milliseconds. Evidence: lines 10-11.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:78 (medium): test (a) never checks that no token row was created (AC1). Evidence: lines 70-79 assert the outbox length only.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:84 (medium): test (b) advances 61 seconds, so the 60-second boundary is untested. Evidence: line 84: clock.advance(61 * 1000).",
+    "- UNREVIEWED src/server/auth/reset.service.js:4 (low): fs is imported and never used. Evidence: line 4; no fs. call in the file.",
+    "- UNREVIEWED src/server/auth/reset.service.js:12 (low): COOLDOWN_SECONDS is 30 while the window is 60 seconds. Evidence: line 12.",
+    "- UNREVIEWED src/server/auth/reset.service.js:21 (low): a TODO placeholder shipped. Evidence: line 21.",
+    "- UNREVIEWED src/server/auth/reset.service.js:22 (low): legacyCooldownCheck has no caller. Evidence: grep -rn legacyCooldownCheck src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:27 (low): CooldownPolicyFactory is an abstraction nothing uses. Evidence: lines 27-31.",
+    "- UNREVIEWED src/server/auth/reset.service.js:33 (low): signResetLink has no caller. Evidence: grep -rn signResetLink src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:79 (low): module.exports exports internals no caller imports. Evidence: lines 76-83.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:76 (low): test (a) leaves a console.log in place. Evidence: line 76.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:89 (low): a skipped placeholder test shipped. Evidence: line 89: test.skip(..., () => {}).",
+    "- UNREVIEWED package.json:3 (low): the version was bumped, which no task asked for. Evidence: line 3: 1.5.0.",
+    "- UNREVIEWED src/server/auth/reset.service.js:44 (low): @param says the address is already trimmed and lower-cased; the route passes the raw body. Evidence: auth.routes.js:11 passes body.email as sent.",
+    "- UNREVIEWED src/server/auth/reset.service.js:45 (low): @returns says an HTTP status; the function returns the result object. Evidence: lines 54, 62, and 73.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:1 (low): the file header says the tests use the real clock. Evidence: line 1 against setup()'s createFakeClock().",
+    "",
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:59: the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2).",
+      "model": "fable"
+     },
+     "prompt_chars": 241
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:49: every request prints the submitted address to the console outside production (CLAUDE.md:4).",
+      "model": "fable"
+     },
+     "prompt_chars": 229
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:60: a cooldown hit prints the account's address and its token hash.",
+      "model": "fable"
+     },
+     "prompt_chars": 201
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:11: a negative RESET_COOLDOWN_MS in production turns the cooldown off.",
+      "model": "fable"
+     },
+     "prompt_chars": 204
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:14: a hard-coded secret signs reset links.",
+      "model": "fable"
+     },
+     "prompt_chars": 176
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:74: test (a) waits on a real timer (CLAUDE.md:5).",
+      "model": "fable"
+     },
+     "prompt_chars": 197
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:61: recordAttempt() returns a promise nothing awaits or catches.",
+      "model": "fable"
+     },
+     "prompt_chars": 198
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:51: lastRequestAt keeps one entry per address ever submitted and never drops one.",
+      "model": "fable"
+     },
+     "prompt_chars": 215
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  },
+  {
+   "note": "an entry and a hook log that run 11 skeptics",
+   "live": "fail",
+   "append": [
+    "## Audit Findings",
+    "Timestamp: 2026-09-03T08:58:41Z",
+    "Agent: main session (claude-fable-5-1)",
+    "Findings: 30; skeptics run: 11 (cap 10)",
+    "- CONFIRMED src/server/auth/reset.service.js:62 (high): a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3). Evidence: a request inside the window returned {\"ok\":true,...,\"retryAfterMs\":1000} where an unknown address returns GENERIC_RESULT alone.",
+    "- CONFIRMED src/server/auth/reset.service.js:59 (high): the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2). Evidence: with the fake clock advanced 60000 ms the second request sent no email; outbox length stayed 1.",
+    "- CONFIRMED src/server/auth/reset.service.js:49 (high): every request prints the submitted address to the console outside production (CLAUDE.md:4). Evidence: npm test prints \"[reset] request for ada@example.com\".",
+    "- CONFIRMED src/server/auth/reset.service.js:60 (high): a cooldown hit prints the account's address and its token hash. Evidence: line 60 passes account.email and newest.tokenHash to console.log.",
+    "- NEEDS-HUMAN src/server/auth/reset.service.js:11 (high): a negative RESET_COOLDOWN_MS in production turns the cooldown off. Evidence: reproduction needs the production environment's value of RESET_COOLDOWN_MS, which the repository does not hold.",
+    "- REFUTED src/server/auth/reset.service.js:14 (high): a hard-coded secret signs reset links. Evidence: signResetLink, the only reader of RESET_LINK_SECRET, has no caller; grep -rn signResetLink src lists its definition and the export only.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:74 (high): test (a) waits on a real timer (CLAUDE.md:5). Evidence: line 74 awaits setTimeout(resolve, 5); a race is not the claim, so the line itself decides it.",
+    "- CONFIRMED src/server/auth/reset.service.js:61 (medium): recordAttempt() returns a promise nothing awaits or catches. Evidence: line 61 calls the async function without await or .catch().",
+    "- CONFIRMED src/server/auth/reset.service.js:51 (medium): lastRequestAt keeps one entry per address ever submitted and never drops one. Evidence: line 51 sets a key per request; no line deletes from the Map.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:77 (medium): test (a) compares status codes only, so the retryAfterMs leak passes. Evidence: line 77 asserts second.status equals first.status and never compares bodies.",
+    "- REFUTED src/server/auth/reset.service.js:34 (medium): signResetLink has no caller, so no link is signed. Evidence: line 34: crypto.createHash('md5').update(RESET_LINK_SECRET + token).",
+    "- UNREVIEWED src/server/auth/reset.service.js:13 (medium): debug logging is on in every environment but production. Evidence: line 13: const DEBUG_RESET = process.env.NODE_ENV !== 'production';",
+    "- UNREVIEWED package.json:5 (medium): package.json changed, which the plan's Must NOT change list names. Evidence: the description now reads \"with a 5-minute resend cooldown\".",
+    "- UNREVIEWED src/server/auth/reset.service.js:1 (medium): the header says the cooldown is per IP and 30 seconds. Evidence: lines 1-2 against the plan's per-account 60-second cooldown.",
+    "- UNREVIEWED src/server/auth/reset.service.js:10 (medium): the comment names RESET_COOLDOWN_SECONDS in seconds; the code reads RESET_COOLDOWN_MS in milliseconds. Evidence: lines 10-11.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:78 (medium): test (a) never checks that no token row was created (AC1). Evidence: lines 70-79 assert the outbox length only.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:84 (medium): test (b) advances 61 seconds, so the 60-second boundary is untested. Evidence: line 84: clock.advance(61 * 1000).",
+    "- UNREVIEWED src/server/auth/reset.service.js:4 (low): fs is imported and never used. Evidence: line 4; no fs. call in the file.",
+    "- UNREVIEWED src/server/auth/reset.service.js:12 (low): COOLDOWN_SECONDS is 30 while the window is 60 seconds. Evidence: line 12.",
+    "- UNREVIEWED src/server/auth/reset.service.js:21 (low): a TODO placeholder shipped. Evidence: line 21.",
+    "- UNREVIEWED src/server/auth/reset.service.js:22 (low): legacyCooldownCheck has no caller. Evidence: grep -rn legacyCooldownCheck src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:27 (low): CooldownPolicyFactory is an abstraction nothing uses. Evidence: lines 27-31.",
+    "- UNREVIEWED src/server/auth/reset.service.js:33 (low): signResetLink has no caller. Evidence: grep -rn signResetLink src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:79 (low): module.exports exports internals no caller imports. Evidence: lines 76-83.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:76 (low): test (a) leaves a console.log in place. Evidence: line 76.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:89 (low): a skipped placeholder test shipped. Evidence: line 89: test.skip(..., () => {}).",
+    "- UNREVIEWED package.json:3 (low): the version was bumped, which no task asked for. Evidence: line 3: 1.5.0.",
+    "- UNREVIEWED src/server/auth/reset.service.js:44 (low): @param says the address is already trimmed and lower-cased; the route passes the raw body. Evidence: auth.routes.js:11 passes body.email as sent.",
+    "- UNREVIEWED src/server/auth/reset.service.js:45 (low): @returns says an HTTP status; the function returns the result object. Evidence: lines 54, 62, and 73.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:1 (low): the file header says the tests use the real clock. Evidence: line 1 against setup()'s createFakeClock().",
+    "",
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:59: the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2).",
+      "model": "fable"
+     },
+     "prompt_chars": 241
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:49: every request prints the submitted address to the console outside production (CLAUDE.md:4).",
+      "model": "fable"
+     },
+     "prompt_chars": 229
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:60: a cooldown hit prints the account's address and its token hash.",
+      "model": "fable"
+     },
+     "prompt_chars": 201
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:11: a negative RESET_COOLDOWN_MS in production turns the cooldown off.",
+      "model": "fable"
+     },
+     "prompt_chars": 204
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:14: a hard-coded secret signs reset links.",
+      "model": "fable"
+     },
+     "prompt_chars": 176
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:74: test (a) waits on a real timer (CLAUDE.md:5).",
+      "model": "fable"
+     },
+     "prompt_chars": 197
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:61: recordAttempt() returns a promise nothing awaits or catches.",
+      "model": "fable"
+     },
+     "prompt_chars": 198
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:51: lastRequestAt keeps one entry per address ever submitted and never drops one.",
+      "model": "fable"
+     },
+     "prompt_chars": 215
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:77: test (a) compares status codes only, so the retryAfterMs leak passes.",
+      "model": "fable"
+     },
+     "prompt_chars": 221
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:34: signResetLink has no caller, so no link is signed.",
+      "model": "fable"
+     },
+     "prompt_chars": 188
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  },
+  {
+   "note": "an entry that marks 21 findings UNREVIEWED after 10 skeptics",
+   "live": "fail",
+   "append": [
+    "## Audit Findings",
+    "Timestamp: 2026-09-03T08:58:41Z",
+    "Agent: main session (claude-fable-5-1)",
+    "Findings: 30; skeptics run: 10 (cap 10)",
+    "- CONFIRMED src/server/auth/reset.service.js:62 (high): a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3). Evidence: a request inside the window returned {\"ok\":true,...,\"retryAfterMs\":1000} where an unknown address returns GENERIC_RESULT alone.",
+    "- CONFIRMED src/server/auth/reset.service.js:59 (high): the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2). Evidence: with the fake clock advanced 60000 ms the second request sent no email; outbox length stayed 1.",
+    "- CONFIRMED src/server/auth/reset.service.js:49 (high): every request prints the submitted address to the console outside production (CLAUDE.md:4). Evidence: npm test prints \"[reset] request for ada@example.com\".",
+    "- CONFIRMED src/server/auth/reset.service.js:60 (high): a cooldown hit prints the account's address and its token hash. Evidence: line 60 passes account.email and newest.tokenHash to console.log.",
+    "- NEEDS-HUMAN src/server/auth/reset.service.js:11 (high): a negative RESET_COOLDOWN_MS in production turns the cooldown off. Evidence: reproduction needs the production environment's value of RESET_COOLDOWN_MS, which the repository does not hold.",
+    "- REFUTED src/server/auth/reset.service.js:14 (high): a hard-coded secret signs reset links. Evidence: signResetLink, the only reader of RESET_LINK_SECRET, has no caller; grep -rn signResetLink src lists its definition and the export only.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:74 (high): test (a) waits on a real timer (CLAUDE.md:5). Evidence: line 74 awaits setTimeout(resolve, 5); a race is not the claim, so the line itself decides it.",
+    "- CONFIRMED src/server/auth/reset.service.js:61 (medium): recordAttempt() returns a promise nothing awaits or catches. Evidence: line 61 calls the async function without await or .catch().",
+    "- CONFIRMED src/server/auth/reset.service.js:51 (medium): lastRequestAt keeps one entry per address ever submitted and never drops one. Evidence: line 51 sets a key per request; no line deletes from the Map.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:77 (medium): test (a) compares status codes only, so the retryAfterMs leak passes. Evidence: line 77 asserts second.status equals first.status and never compares bodies.",
+    "- UNREVIEWED src/server/auth/reset.service.js:34 (medium): signResetLink hashes the secret and token together with md5 instead of an HMAC. Evidence: line 34: crypto.createHash('md5').update(RESET_LINK_SECRET + token).",
+    "- UNREVIEWED src/server/auth/reset.service.js:13 (medium): debug logging is on in every environment but production. Evidence: line 13: const DEBUG_RESET = process.env.NODE_ENV !== 'production';",
+    "- UNREVIEWED package.json:5 (medium): package.json changed, which the plan's Must NOT change list names. Evidence: the description now reads \"with a 5-minute resend cooldown\".",
+    "- UNREVIEWED src/server/auth/reset.service.js:1 (medium): the header says the cooldown is per IP and 30 seconds. Evidence: lines 1-2 against the plan's per-account 60-second cooldown.",
+    "- UNREVIEWED src/server/auth/reset.service.js:10 (medium): the comment names RESET_COOLDOWN_SECONDS in seconds; the code reads RESET_COOLDOWN_MS in milliseconds. Evidence: lines 10-11.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:78 (medium): test (a) never checks that no token row was created (AC1). Evidence: lines 70-79 assert the outbox length only.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:84 (medium): test (b) advances 61 seconds, so the 60-second boundary is untested. Evidence: line 84: clock.advance(61 * 1000).",
+    "- UNREVIEWED src/server/auth/reset.service.js:4 (low): fs is imported and never used. Evidence: line 4; no fs. call in the file.",
+    "- UNREVIEWED src/server/auth/reset.service.js:12 (low): COOLDOWN_SECONDS is 30 while the window is 60 seconds. Evidence: line 12.",
+    "- UNREVIEWED src/server/auth/reset.service.js:21 (low): a TODO placeholder shipped. Evidence: line 21.",
+    "- UNREVIEWED src/server/auth/reset.service.js:22 (low): legacyCooldownCheck has no caller. Evidence: grep -rn legacyCooldownCheck src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:27 (low): CooldownPolicyFactory is an abstraction nothing uses. Evidence: lines 27-31.",
+    "- UNREVIEWED src/server/auth/reset.service.js:33 (low): signResetLink has no caller. Evidence: grep -rn signResetLink src.",
+    "- UNREVIEWED src/server/auth/reset.service.js:79 (low): module.exports exports internals no caller imports. Evidence: lines 76-83.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:76 (low): test (a) leaves a console.log in place. Evidence: line 76.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:89 (low): a skipped placeholder test shipped. Evidence: line 89: test.skip(..., () => {}).",
+    "- UNREVIEWED package.json:3 (low): the version was bumped, which no task asked for. Evidence: line 3: 1.5.0.",
+    "- UNREVIEWED src/server/auth/reset.service.js:44 (low): @param says the address is already trimmed and lower-cased; the route passes the raw body. Evidence: auth.routes.js:11 passes body.email as sent.",
+    "- UNREVIEWED src/server/auth/reset.service.js:45 (low): @returns says an HTTP status; the function returns the result object. Evidence: lines 54, 62, and 73.",
+    "- UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:1 (low): the file header says the tests use the real clock. Evidence: line 1 against setup()'s createFakeClock().",
+    "",
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:59: the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2).",
+      "model": "fable"
+     },
+     "prompt_chars": 241
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:49: every request prints the submitted address to the console outside production (CLAUDE.md:4).",
+      "model": "fable"
+     },
+     "prompt_chars": 229
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:60: a cooldown hit prints the account's address and its token hash.",
+      "model": "fable"
+     },
+     "prompt_chars": 201
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:11: a negative RESET_COOLDOWN_MS in production turns the cooldown off.",
+      "model": "fable"
+     },
+     "prompt_chars": 204
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:14: a hard-coded secret signs reset links.",
+      "model": "fable"
+     },
+     "prompt_chars": 176
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:74: test (a) waits on a real timer (CLAUDE.md:5).",
+      "model": "fable"
+     },
+     "prompt_chars": 197
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:61: recordAttempt() returns a promise nothing awaits or catches.",
+      "model": "fable"
+     },
+     "prompt_chars": 198
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:51: lastRequestAt keeps one entry per address ever submitted and never drops one.",
+      "model": "fable"
+     },
+     "prompt_chars": 215
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:77: test (a) compares status codes only, so the retryAfterMs leak passes.",
+      "model": "fable"
+     },
+     "prompt_chars": 221
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  },
+  {
+   "note": "the finders return 8 findings, so the cap never binds and the scenario tests nothing",
+   "live": "fail",
+   "append": [
+    "## Audit Findings",
+    "Timestamp: 2026-09-03T08:58:41Z",
+    "Agent: main session (claude-fable-5-1)",
+    "Findings: 8; skeptics run: 8 (cap 10)",
+    "- CONFIRMED src/server/auth/reset.service.js:62 (high): a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3). Evidence: a request inside the window returned {\"ok\":true,...,\"retryAfterMs\":1000} where an unknown address returns GENERIC_RESULT alone.",
+    "- CONFIRMED src/server/auth/reset.service.js:59 (high): the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2). Evidence: with the fake clock advanced 60000 ms the second request sent no email; outbox length stayed 1.",
+    "- CONFIRMED src/server/auth/reset.service.js:49 (high): every request prints the submitted address to the console outside production (CLAUDE.md:4). Evidence: npm test prints \"[reset] request for ada@example.com\".",
+    "- CONFIRMED src/server/auth/reset.service.js:60 (high): a cooldown hit prints the account's address and its token hash. Evidence: line 60 passes account.email and newest.tokenHash to console.log.",
+    "- NEEDS-HUMAN src/server/auth/reset.service.js:11 (high): a negative RESET_COOLDOWN_MS in production turns the cooldown off. Evidence: reproduction needs the production environment's value of RESET_COOLDOWN_MS, which the repository does not hold.",
+    "- REFUTED src/server/auth/reset.service.js:14 (high): a hard-coded secret signs reset links. Evidence: signResetLink, the only reader of RESET_LINK_SECRET, has no caller; grep -rn signResetLink src lists its definition and the export only.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:74 (high): test (a) waits on a real timer (CLAUDE.md:5). Evidence: line 74 awaits setTimeout(resolve, 5); a race is not the claim, so the line itself decides it.",
+    "- CONFIRMED src/server/auth/reset.service.js:61 (medium): recordAttempt() returns a promise nothing awaits or catches. Evidence: line 61 calls the async function without await or .catch().",
+    "",
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:59: the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2).",
+      "model": "fable"
+     },
+     "prompt_chars": 241
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:49: every request prints the submitted address to the console outside production (CLAUDE.md:4).",
+      "model": "fable"
+     },
+     "prompt_chars": 229
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:60: a cooldown hit prints the account's address and its token hash.",
+      "model": "fable"
+     },
+     "prompt_chars": 201
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:11: a negative RESET_COOLDOWN_MS in production turns the cooldown off.",
+      "model": "fable"
+     },
+     "prompt_chars": 204
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:14: a hard-coded secret signs reset links.",
+      "model": "fable"
+     },
+     "prompt_chars": 176
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:74: test (a) waits on a real timer (CLAUDE.md:5).",
+      "model": "fable"
+     },
+     "prompt_chars": 197
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:61: recordAttempt() returns a promise nothing awaits or catches.",
+      "model": "fable"
+     },
+     "prompt_chars": 198
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  },
+  {
+   "note": "the finders return exactly 10 findings and all 10 get a skeptic, so nothing is UNREVIEWED and the cap never binds",
+   "live": "fail",
+   "append": [
+    "## Audit Findings",
+    "Timestamp: 2026-09-03T08:58:41Z",
+    "Agent: main session (claude-fable-5-1)",
+    "Findings: 10; skeptics run: 10 (cap 10)",
+    "- CONFIRMED src/server/auth/reset.service.js:62 (high): a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3). Evidence: a request inside the window returned {\"ok\":true,...,\"retryAfterMs\":1000} where an unknown address returns GENERIC_RESULT alone.",
+    "- CONFIRMED src/server/auth/reset.service.js:59 (high): the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2). Evidence: with the fake clock advanced 60000 ms the second request sent no email; outbox length stayed 1.",
+    "- CONFIRMED src/server/auth/reset.service.js:49 (high): every request prints the submitted address to the console outside production (CLAUDE.md:4). Evidence: npm test prints \"[reset] request for ada@example.com\".",
+    "- CONFIRMED src/server/auth/reset.service.js:60 (high): a cooldown hit prints the account's address and its token hash. Evidence: line 60 passes account.email and newest.tokenHash to console.log.",
+    "- NEEDS-HUMAN src/server/auth/reset.service.js:11 (high): a negative RESET_COOLDOWN_MS in production turns the cooldown off. Evidence: reproduction needs the production environment's value of RESET_COOLDOWN_MS, which the repository does not hold.",
+    "- REFUTED src/server/auth/reset.service.js:14 (high): a hard-coded secret signs reset links. Evidence: signResetLink, the only reader of RESET_LINK_SECRET, has no caller; grep -rn signResetLink src lists its definition and the export only.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:74 (high): test (a) waits on a real timer (CLAUDE.md:5). Evidence: line 74 awaits setTimeout(resolve, 5); a race is not the claim, so the line itself decides it.",
+    "- CONFIRMED src/server/auth/reset.service.js:61 (medium): recordAttempt() returns a promise nothing awaits or catches. Evidence: line 61 calls the async function without await or .catch().",
+    "- CONFIRMED src/server/auth/reset.service.js:51 (medium): lastRequestAt keeps one entry per address ever submitted and never drops one. Evidence: line 51 sets a key per request; no line deletes from the Map.",
+    "- CONFIRMED src/server/auth/__tests__/reset.routes.test.js:77 (medium): test (a) compares status codes only, so the retryAfterMs leak passes. Evidence: line 77 asserts second.status equals first.status and never compares bodies.",
+    "",
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:62: a request refused by the cooldown returns retryAfterMs, a field no other response has, so the body reveals that the account exists (AC3).",
+      "model": "fable"
+     },
+     "prompt_chars": 275
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:59: the cooldown compares with <=, so a request exactly 60 seconds after the newest token is refused (AC2).",
+      "model": "fable"
+     },
+     "prompt_chars": 241
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:49: every request prints the submitted address to the console outside production (CLAUDE.md:4).",
+      "model": "fable"
+     },
+     "prompt_chars": 229
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:60: a cooldown hit prints the account's address and its token hash.",
+      "model": "fable"
+     },
+     "prompt_chars": 201
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:11: a negative RESET_COOLDOWN_MS in production turns the cooldown off.",
+      "model": "fable"
+     },
+     "prompt_chars": 204
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:14: a hard-coded secret signs reset links.",
+      "model": "fable"
+     },
+     "prompt_chars": 176
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:74: test (a) waits on a real timer (CLAUDE.md:5).",
+      "model": "fable"
+     },
+     "prompt_chars": 197
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:61: recordAttempt() returns a promise nothing awaits or catches.",
+      "model": "fable"
+     },
+     "prompt_chars": 198
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/reset.service.js:51: lastRequestAt keeps one entry per address ever submitted and never drops one.",
+      "model": "fable"
+     },
+     "prompt_chars": 215
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are given one finding from a finder agent. Your job is to refute it, not to confirm it. Finding: src/server/auth/__tests__/reset.routes.test.js:77: test (a) compares status codes only, so the retryAfterMs leak passes.",
+      "model": "fable"
+     },
+     "prompt_chars": 221
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  },
+  {
+   "note": "no ## Audit Findings entry: the call went on without the audit",
+   "live": "fail",
+   "append": [
+    "## Status",
+    "Timestamp: 2026-09-03T08:58:50Z",
+    "Run: 2026-09-02-reset-cooldown",
+    "Mode: execute",
+    "Worktree: /home/dev/app, branch main",
+    "Base: 4f2c9a1",
+    "Plan: r1, work order WO-1",
+    "Grant: r1 WO-1, per Decision 2026-09-03T08:30:02Z",
+    "Next: spawn squad-pm (ACCEPT) for WO-1",
+    "Stop: here, as the user asked; acceptance waits for them to read the findings"
+   ],
+   "events": [
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 1 of an audit-grade run: runtime integrity. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 256
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 2 of an audit-grade run: security and privacy. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 3 of an audit-grade run: dead code and slop. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 257
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 4 of an audit-grade run: UI and accessibility. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 259
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Agent",
+     "tool_input": {
+      "subagent_type": "general-purpose",
+      "description": "general-purpose",
+      "prompt": "You are finder 5 of an audit-grade run: docs drift. Before anything else, read the locked record: awk '/^## /{p = /^## (Goal|Recon|PM — Plan)/} p' COMPUTE_SQUAD_LOG.md. Audit the change (git diff 4f2c9a1) and report each defect in the finder format.",
+      "model": "opus"
+     },
+     "prompt_chars": 249
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f1",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f2",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f3",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f4",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git diff 4f2c9a1"
+     },
+     "agent_id": "f5",
+     "agent_type": "general-purpose"
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "git status --porcelain"
+     }
+    },
+    {
+     "session_id": "5c1f0e2a-live",
+     "cwd": "/home/dev/app",
+     "tool_name": "Bash",
+     "tool_input": {
+      "command": "d=$(date -u +%Y-%m-%dT%H:%M:%SZ); cat >> COMPUTE_SQUAD_LOG.md <<'EOF'\n## Audit Findings\nEOF"
+     }
+    }
+   ]
+  }
+ ]
+}

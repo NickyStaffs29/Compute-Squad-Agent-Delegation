@@ -1,0 +1,26 @@
+{
+  "note": "Helper results for Recon's DELEGATE: block are appended under another stage's name.",
+  "cites": [
+    {
+      "file": "agents/squad-helper.md",
+      "text": "The orchestrating session appends your results to the log under `## Delegated — <requesting stage>`."
+    },
+    {
+      "file": "agents/squad-mech.md",
+      "text": "the orchestrating session appends them to `COMPUTE_SQUAD_LOG.md` under `## Delegated — <requesting stage>`."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "heading"
+    ]
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: the log has no Goal or no Status entry",
+      "via": "step 1"
+    }
+  ]
+}

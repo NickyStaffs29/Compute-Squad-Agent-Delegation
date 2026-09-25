@@ -1,0 +1,38 @@
+{
+  "note": "Finding 14 with finding 10's tree check: Recon's baseline run left coverage/ behind, which it names on its baseline line and never cleans up. Resuming for the granted WO-1 treats that path as logged and spawns the executor; a path no entry names still stops the run.",
+  "cites": [
+    {
+      "file": "agents/squad-recon.md",
+      "text": "run the project's canonical test or verify command once on the untouched tree, in one Bash call of this form, and never clean up after it"
+    },
+    {
+      "file": "skills/compute-squad/references/resume.md",
+      "text": "A listed path other than `COMPUTE_SQUAD_LOG.md` and `compute-squad-archive/` that no `Files changed:` line of this run names, and that no `## Recon` baseline line of this run names after `tree changed:`, means a stage edited files without logging."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {
+        "dirty": [
+          "coverage/"
+        ]
+      },
+      "next": "perform Next: spawn squad-executor (STANDARD) for WO-1",
+      "via": "step 4: perform Next"
+    },
+    {
+      "state": {
+        "dirty": [
+          "coverage/",
+          "src/server/db/store.js"
+        ]
+      },
+      "next": "stop: unlogged edits in src/server/db/store.js",
+      "via": "tree check"
+    }
+  ]
+}

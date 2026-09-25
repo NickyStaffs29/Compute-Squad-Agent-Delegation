@@ -1,0 +1,24 @@
+{
+  "note": "A criterion the change did not break fails on the base commit too: the PM appends a pending entry with the criteria block and asks the user to waive or re-scope it.",
+  "cites": [
+    {
+      "file": "agents/squad-pm.md",
+      "text": "A `not met: pre-existing` row is neither: append `## PM — Accept (pending)` with the block and a `BLOCKER:` block (`needs-human: waive or re-scope <ID>`), since only the user can release a locked criterion"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "put its `needs-human:` question to the user and record the answer as a `## Decision` followed by a `## Status`"
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  },
+  "resume": [
+    {
+      "state": {},
+      "next": "ask the user: needs-human: waive or re-scope AC2",
+      "via": "row: Ends in a `BLOCKER:` block"
+    }
+  ]
+}
