@@ -1,5 +1,38 @@
 # Changelog
 
+## 4.6.0 — 2026-09-25
+
+### Added
+
+- Codex now asks for a model and supported reasoning effort for the top, mid,
+  and bottom tiers, plus the main session's effort. It lists the logged-in
+  account catalog, rejects unavailable choices, and saves only after an
+  explicit `yes`. Choices live outside the checkout in
+  `$CODEX_HOME/compute-squad/choices.conf` and survive routine updates.
+- The Codex updater renders the plugin, seven agents, and four profiles from
+  one effective build using those choices. It replaces the earlier GitHub
+  marketplace copy after the local build installs and refuses another enabled
+  Compute Squad copy rather than loading two skills.
+
+### Upgrade
+
+- From a 4.6.0 checkout, run `codex/update.sh` in a terminal and confirm your
+  tier choices. A scheduled run with no saved choices exits 3 and installs
+  nothing.
+- When upgrading a 4.5.0 checkout, the first invocation still runs its old
+  updater script after `git pull`; run the updater again in a terminal to use
+  this chooser. Remove any separate personal-marketplace installation yourself
+  before that run; the new updater names the copy and stops without removing it.
+- Start a new Codex session after installing so it loads the new plugin and
+  named-agent definitions. Running sessions keep the files they already loaded.
+
+### Verification
+
+- The updater takes a single lock before reading the checkout, catalog, or
+  saved choices and holds it through installation. The offline verifier covers
+  both orders of an overlapping scheduled update and interactive review.
+  Paid live model-routing runs are not included in this release check.
+
 ## 4.5.0 — 2026-09-25
 
 ### Fixed

@@ -1,6 +1,6 @@
 # Compute Squad: Codex reading copy
 
-Version: 4.5.0
+Version: 4.6.0
 No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
