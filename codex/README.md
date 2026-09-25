@@ -56,7 +56,7 @@ and `squad-executor-haiku` are routed to it by default (see Model routing in
 `codex/SKILL.md`). Some Multi-Agent V2 setups have been reported to reject
 Luna as a delegation target; this repo has not verified that against official
 Codex docs, so the shipped TOMLs and profiles keep `gpt-5.6-luna` as the
-default and `scripts/verify.sh` asserts it.
+default, and `scripts/verify.sh` holds them to `models.conf`.
 
 If a `squad-mech` or `squad-executor-haiku` spawn fails specifically because
 the target model is rejected as a subagent, apply one of these manually for
@@ -82,13 +82,15 @@ otherwise "none"). You own these; no session may redefine them.
 
 Then run the sessions in order:
 
-| Order | Prompt file | Stage | Suggested model |
+<!-- routing:begin -->
+| Order | Prompt file | Stage | Model (rung) |
 |---|---|---|---|
-| 1 | `01-archive.md` | Archive the prior log | `gpt-5.6-luna` max |
-| 2 | `02-recon.md` | Read-only codebase mapping | `gpt-5.6-terra` max |
-| 3 | `03-pm-plan.md` | Spec + task breakdown, no code | `gpt-5.6-sol` max |
-| 4 | `04-execute.md` | Implementation, exactly per plan | Terra max; Luna max for MECHANICAL, Sol max for COMPLEX |
-| 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | `gpt-5.6-sol` max |
+| 1 | `01-archive.md` | Archive the prior log | `gpt-5.6-luna` max (bottom) |
+| 2 | `02-recon.md` | Read-only codebase mapping | `gpt-5.6-terra` max (mid) |
+| 3 | `03-pm-plan.md` | Spec + task breakdown, no code | `gpt-5.6-sol` max (top) |
+| 4 | `04-execute.md` | Implementation, exactly per plan | STANDARD `gpt-5.6-terra` max (mid); MECHANICAL `gpt-5.6-luna` max (bottom); COMPLEX `gpt-5.6-sol` max (top) |
+| 5 | `05-pm-accept.md` | Adversarial acceptance, PASS/FAIL | `gpt-5.6-sol` max (top) |
+<!-- routing:end -->
 
 The fallback has one execute prompt file, not three; you pick the model per run. The native plugin's
 generated TOMLs preserve the three routing variants (`squad-executor-haiku`, `squad-executor`, and

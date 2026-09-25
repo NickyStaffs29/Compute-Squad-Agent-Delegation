@@ -1,5 +1,91 @@
 # Changelog
 
+## 3.12.0 — 2026-09-24
+
+Lands work order WO-3a of the 3.9.2 analysis: the model manifest. It moves where models are named,
+not which models run. Every agent, rung, and Codex effort keeps its 3.11.0 assignment, and every
+generated file other than the four routing blocks is byte for byte what 3.11.0's generator wrote,
+apart from the version string. The one addition is a Codex effort for the audit finders and
+skeptic, which 3.11.0 did not give: the report's manifest sets both to `max`. The locked ladder,
+the executor renames, and finding 8's pointer rewrites are WO-3b.
+
+- **One manifest names the models (finding 6).** New root file `models.conf` holds a `reviewed`
+  date, a `[rung]` table (bottom `haiku` and `gpt-5.6-luna`, mid `sonnet` and `gpt-5.6-terra`, top
+  `opus` and `gpt-5.6-sol`), and a `[role]` table that gives each of the seven agents, plus
+  `strategy`, `finder`, and `skeptic`, a Claude rung, a Codex rung, and a Codex effort. The values
+  are today's assignments. Its header calls it the only file that names models; that is not yet
+  fully true, because `README.md`'s Codex prerequisites, agent headings, tree comments, and FAQ,
+  `codex/README.md`'s install and Luna sections, and `codex/SKILL.md`'s Sol/Terra/Luna shorthand
+  still name models by hand until finding 8's pointers land in WO-3b.
+- **The generator writes every routed file from it (finding 6).** `codex/build-agents.py` reads
+  `models.conf` with a Python 3.9 stdlib parser that never defaults: it fails, naming the line
+  where there is one, on an unknown rung, a duplicate row or section, a missing section or rung
+  row, a wrong field count, a line outside a section, or a missing or invalid `reviewed` date. It
+  now writes the `model:` line of each `agents/*.md`, the model and effort in each
+  `codex/agents/*.toml`, `codex/profiles.toml`, and the four routing blocks, besides the five
+  manual prompts, and `--check` covers all 24 files. Codex model and effort are keyed on the agent
+  name; `MODEL_BY_TIER`, `TIER_TERMS`, and `translate_tiers` are gone. A model family name or
+  `gpt-` ID in an agent description or body now fails the build. Not in the report: a
+  `--parse-manifest PATH` mode prints the parsed manifest as JSON so `scripts/verify.sh` uses the
+  same parser, and an unknown argument exits 2.
+- **Four generated routing blocks (finding 6).** The blocks between `<!-- routing:begin -->` and
+  `<!-- routing:end -->` in `skills/compute-squad/SKILL.md`, `codex/SKILL.md`, `README.md`, and
+  `codex/README.md` are now written from the manifest; only SKILL.md had markers before. SKILL.md's
+  block gains a generated-from line and a sentence on spawning on a rung (the rung's alias as the
+  Agent tool's `model` in Claude Code; in Codex, the rung's ID and effort only for finders and the
+  skeptic), and the paragraph after it on Codex loading and per-host sources of truth is deleted,
+  per the report's replacement range. `codex/SKILL.md`'s table lists each role with its rung and
+  adds the audit finder and skeptic rows; its "source of truth" sentence is deleted, and its
+  suffix and Sol/Terra/Luna shorthand sentences stay, because the report assumed the file retired
+  while WO-2 kept it as a reading copy whose stage headings use the shorthand. `README.md`'s role
+  table gives Recon, Execution, and Delegated execution their own rows under a snapshot line, and
+  `codex/README.md`'s manual-session table names each model's rung.
+- **Check 2 ties each agent to the manifest (finding 6).** `scripts/verify.sh` check 2 requires
+  each agent's `model:` to equal the Claude alias `models.conf` assigns its rung, and its failure
+  names the agent and says to edit `models.conf` and regenerate. It also requires every Claude
+  rung alias in `ALLOWED_MODELS`, which stays `sonnet`, `opus`, `haiku`; the report's swap of
+  `haiku` for `fable` belongs to finding 7's ladder in WO-3b.
+- **Check 6 tests routing policy, not model IDs (finding 6).** The literal model table and profile
+  tuples are gone. Check 6 now requires that the manifest parses; that its roles are the tracked
+  agents plus `strategy`, `finder`, and `skeptic`; one TOML per agent; three different models per
+  host; the PM on the top rung on both hosts; MECHANICAL below STANDARD below COMPLEX, with the PM
+  above STANDARD and at or above every executor, and the skeptic above the finders; only the
+  MECHANICAL executor, `squad-helper`, and `squad-mech` on the Claude bottom rung; and every effort
+  in `low`, `medium`, `high`, `xhigh`, `max`. It also feeds the parser four malformed copies (a
+  missing column, which the report names, plus an unknown rung, a duplicate row, and a missing
+  section) and fails if any parses. Each policy holds for today's assignments and for WO-3b's
+  ladder, so none waits on WO-3b; the executor names in check 6 and in the generator's label
+  tables change when WO-3b renames the executors. The TOML shape tests, prompt markers, and
+  `--check` call stay, and `--check`'s diff is now printed on failure, which the report's accuracy
+  note assumes.
+- **Check 7d checks markers in all four files (finding 6).** Each file must hold one begin line
+  and then one end line, each alone on its line; check 6's `--check` holds the content. The test
+  that the block names every pinned model, the `codex/SKILL.md` section scan, and the unused
+  `extract_section` helper are removed. Section 4 names only checks 2 and 6; this change follows
+  from the markers now appearing in four files.
+- **Contributor docs (finding 6).** `CONTRIBUTING.md` moves `codex/profiles.toml` to the generated
+  line of the sync list, adds the "Routing is one edit." paragraph, says the frontmatter `model` is
+  written from `models.conf`, and says nothing `--check` covers is hand-edited. `README.md`'s tree
+  lists `models.conf` and says what `build-agents.py` writes. `codex/README.md`'s Luna section now
+  says `scripts/verify.sh` holds the TOMLs and profiles to `models.conf`, since check 6 no longer
+  names `gpt-5.6-luna`.
+- **Not landed in this release.**
+  - `build-agents.py --validate-catalog` (finding 6 item 9) and check 9, the warning on a
+    `reviewed` date older than 90 days: both are specified with finding 8 and land with it in
+    WO-3b, where `codex/update.sh` starts calling the flag.
+  - Finding 8's pointer rewrites of the model names outside the blocks, listed above, and the
+    `codex/profiles.toml` tree comment.
+  - The locked ladder, the executor renames, and `ALLOWED_MODELS` with `fable` (finding 7, WO-3b).
+  - Every Codex model ID stays `gpt-5.6-*` until WO-0.
+- **Acceptance.** Byte identity with WO-2's output was checked with `cmp` against a snapshot. In
+  copies of the repo, each seeded violation (a duplicated rung model on each host, the PM below
+  top on each host, Recon on the bottom rung, effort `maximum`, an inverted executor ladder, a
+  skeptic not above the finders) failed check 6, 20 malformed manifests failed to parse, and a
+  hand-edit to each class of generated file failed `--check`. Fed the report's WO-3b manifest, the
+  generator reproduced the report's four blocks byte for byte. No live run was made; this work
+  order's acceptance needs none, and the new spawn-on-a-rung sentence was not run on a model.
+  Codex behavior is source-read only.
+
 ## 3.11.0 — 2026-09-24
 
 Lands work order WO-2 of the 3.9.2 analysis: structural sync and CI pins. No stage gains a mode,

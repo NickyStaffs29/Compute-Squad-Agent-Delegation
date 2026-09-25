@@ -1,6 +1,6 @@
 # Compute Squad: Codex reading copy
 
-Version: 3.11.0
+Version: 3.12.0
 No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
@@ -8,21 +8,27 @@ human decisions; named Codex agents own the stages after the goal is locked.
 
 ## Model routing
 
-The profiles in `codex/profiles.toml` pin reasoning effort. The agent TOMLs in
-`codex/agents/` pin the model tier:
+<!-- routing:begin -->
+Generated from `models.conf` (reviewed 2026-09-24); edit that file, never this table.
 
-| Role | Agent | Codex model | Effort |
-|---|---|---|---|
-| Strategy and final judgment | main session | `gpt-5.6-sol` | `high` |
-| Plan and acceptance | `squad-pm` | `gpt-5.6-sol` | `max` |
-| Recon, standard execution, delegated execution | `squad-recon`, `squad-executor`, `squad-helper` | `gpt-5.6-terra` | `max` |
-| COMPLEX execution and escalation | `squad-executor-opus` | `gpt-5.6-sol` | `max` |
-| MECHANICAL execution and intern work | `squad-executor-haiku`, `squad-mech` | `gpt-5.6-luna` | `max` |
+| Role | Agent | Rung | Codex model | Effort |
+|---|---|---|---|---|
+| Strategy and final judgment | main session | top | `gpt-5.6-sol` | `high` |
+| Plan and acceptance | `squad-pm` | top | `gpt-5.6-sol` | `max` |
+| COMPLEX execution | `squad-executor-opus` | top | `gpt-5.6-sol` | `max` |
+| Audit skeptic | none | top | `gpt-5.6-sol` | `max` |
+| Recon | `squad-recon` | mid | `gpt-5.6-terra` | `max` |
+| STANDARD execution | `squad-executor` | mid | `gpt-5.6-terra` | `max` |
+| Delegated execution | `squad-helper` | mid | `gpt-5.6-terra` | `max` |
+| Audit finders | none | mid | `gpt-5.6-terra` | `max` |
+| MECHANICAL execution | `squad-executor-haiku` | bottom | `gpt-5.6-luna` | `max` |
+| Intern work | `squad-mech` | bottom | `gpt-5.6-luna` | `max` |
+<!-- routing:end -->
 
 The `opus`, `sonnet`, and `haiku` suffixes are retained in agent names for
-compatibility with the Claude package. The Codex model fields are the source of
-truth for Codex routing. Stage headings below use Sol, Terra, and Luna as
-shorthand for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` respectively.
+compatibility with the Claude package. Stage headings below use Sol, Terra, and
+Luna as shorthand for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`
+respectively.
 
 Before starting, ensure the seven files in `~/.codex/agents/` are installed as
 described in `codex/README.md`. If the named roles or their models are

@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-accept").
 metadata:
-  version: "3.11.0"
+  version: "3.12.0"
   author: "Nick Stafford"
 ---
 
@@ -26,17 +26,13 @@ Coordinate exclusively through `COMPUTE_SQUAD_LOG.md` in the repo root.
 ## Model routing
 
 <!-- routing:begin -->
+Generated from `models.conf` (reviewed 2026-09-24); edit that file, never this block.
 Rungs (Claude alias, Codex ID): top `opus`, `gpt-5.6-sol`; mid `sonnet`, `gpt-5.6-terra`; bottom `haiku`, `gpt-5.6-luna`.
 - Top: main session, `squad-pm`, `squad-executor-opus`, audit skeptic.
 - Mid: `squad-recon`, `squad-executor`, `squad-helper`, audit finders.
 - Bottom: `squad-executor-haiku`, `squad-mech`.
-Codex effort: `high` for the main session, `max` for every squad agent. Agent files already pin their models.
+Codex effort: `high` for the main session, `max` for every other role. Agent files already pin their models. To spawn on a rung (escalation, finders, skeptic), pass the rung's alias as the Agent tool's `model` in Claude Code; in Codex a named agent keeps its pinned model, so pass the rung's ID and effort only for finders and the skeptic.
 <!-- routing:end -->
-
-When this shared skill is loaded by Codex, use the generated definitions in
-`codex/agents/` after copying them to `~/.codex/agents/`. The Claude agents'
-`model:` aliases remain the source of truth for the Claude package; the Codex
-TOML `model` fields are the source of truth for Codex.
 
 ## Stage 0 — Strategy (main session, before anything spawns)
 

@@ -130,14 +130,20 @@ What Compute Squad actually sells is verification and auditability that don't de
 
 One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
-| Role | Claude model | Codex model | Agent | Owns |
+<!-- routing:begin -->
+Snapshot of `models.conf`, reviewed 2026-09-24. Routing reads `models.conf`; this table is generated from it.
+
+| Role | Agent | Claude Code | Codex | Owns |
 |---|---|---|---|---|
-| Strategy | Main session | `gpt-5.6-sol` high | none. This is you and your session model | Goal, gaps, acceptance criteria, final judgment |
-| PM | Opus | `gpt-5.6-sol` max | `squad-pm` | The plan and the acceptance decision |
-| Execution on MECHANICAL | Haiku | `gpt-5.6-luna` max | `squad-executor-haiku` | The same executor protocol, cheapest model |
-| Execution | Sonnet | `gpt-5.6-terra` max | `squad-recon`, `squad-executor`, `squad-helper` | Mapping the codebase, implementing the plan, delegated subtasks |
-| Execution on COMPLEX | Opus | `gpt-5.6-sol` max | `squad-executor-opus` | The same executor protocol, stronger model |
-| Intern | Haiku | `gpt-5.6-luna` max | `squad-mech` | Busywork. Nothing that requires judgment |
+| Strategy | main session | your session model; top recommended | `gpt-5.6-sol` high | Goal, gaps, acceptance criteria, final judgment |
+| PM | `squad-pm` | `opus` (top) | `gpt-5.6-sol` max | The plan and the acceptance decision |
+| Recon | `squad-recon` | `sonnet` (mid) | `gpt-5.6-terra` max | Mapping the codebase |
+| Execution | `squad-executor` | `sonnet` (mid) | `gpt-5.6-terra` max | Implementing the plan |
+| Execution on MECHANICAL | `squad-executor-haiku` | `haiku` (bottom) | `gpt-5.6-luna` max | The same executor protocol, bottom rung |
+| Execution on COMPLEX | `squad-executor-opus` | `opus` (top) | `gpt-5.6-sol` max | The same executor protocol, top rung |
+| Delegated execution | `squad-helper` | `sonnet` (mid) | `gpt-5.6-terra` max | Tightly-specced subtasks |
+| Intern | `squad-mech` | `haiku` (bottom) | `gpt-5.6-luna` max | Busywork. Nothing that requires judgment |
+<!-- routing:end -->
 
 ## How a run works
 
@@ -261,7 +267,7 @@ Compute-Squad-Agent-Delegation/
 │   ├── README.md             # Codex install, routing, and manual fallback
 │   ├── SKILL.md              # reading copy with Codex model names; no host loads it
 │   ├── agents/*.toml         # generated Codex agent definitions
-│   ├── build-agents.py       # generates the agent TOMLs and 01-05*.md from agents/*.md
+│   ├── build-agents.py       # writes model lines, TOMLs, profiles, routing blocks, and 01-05*.md
 │   ├── profiles.toml         # Sol/Terra/Luna profile reference
 │   ├── update.sh             # installs/refreshes the native Codex plugin
 │   └── 01-05*.md             # manual-session fallback prompts (generated)
@@ -271,6 +277,7 @@ Compute-Squad-Agent-Delegation/
 │   └── verify.sh             # the CI gate; run it before every commit
 ├── tests/                    # check 8 log linter and fixtures (not packaged)
 ├── dist/compute-squad.plugin # drag-and-drop install for Claude Cowork
+├── models.conf               # model assignments by rung and role; build-agents.py reads it
 ├── .gitignore                # excludes COMPUTE_SQUAD_LOG.md and its archive
 ├── CONTRIBUTING.md           # the sync rule: skill, agents, codex, dist change together
 ├── CHANGELOG.md              # version history

@@ -6,8 +6,9 @@
 #   1. Claude and Codex plugin/marketplace manifests parse as JSON.
 #   2. Every agents/*.md has YAML frontmatter that parses, only the keys name,
 #      description, model, color, tools, and omitClaudeMd (placed after model),
-#      model in {sonnet, opus, haiku}, and at least one <example> block in the
-#      description.
+#      model in {sonnet, opus, haiku} and equal to the Claude alias models.conf
+#      assigns that agent's rung, and at least one <example> block in the
+#      description. Every Claude rung alias in models.conf is in that set.
 #   3. skills/compute-squad/SKILL.md frontmatter parses and its metadata.version
 #      equals plugin.json's version. codex/SKILL.md, a reading copy no host
 #      loads, opens with its reading-copy title and has a Version: line equal
@@ -16,15 +17,23 @@
 #   5. dist/compute-squad.plugin matches skills/, agents/, commands/, README.md,
 #      and .claude-plugin/plugin.json by content (unzip + diff -r, not a rebuild+
 #      byte-diff, since zip embeds mtimes and a fresh rebuild would always differ).
-#   6. Codex generated files are valid: the agent TOMLs and their model routing,
-#      the profiles, the five manual prompts codex/01-archive.md to
-#      codex/05-pm-accept.md (each marked as generated on line 2), and
-#      codex/build-agents.py --check over all of them.
+#   6. models.conf holds routing policy: it parses (and a malformed copy does
+#      not), its roles are the agents plus strategy, finder, and skeptic, each
+#      host's three rungs name three different models, the PM is on the top
+#      rung, the executors climb one rung per classification under the PM,
+#      the skeptic sits above the finders, only the MECHANICAL executor, the
+#      helper, and the intern may sit on the Claude bottom rung, and every
+#      Codex effort is a known level. The agent TOMLs are well formed, the
+#      five manual prompts codex/01-archive.md to codex/05-pm-accept.md are
+#      each marked as generated on line 2, and codex/build-agents.py --check
+#      holds everything it writes (model lines, TOMLs, profiles, routing
+#      blocks, prompts) to models.conf and the agent bodies.
 #   7. Shared protocol blocks and facts read identically across files:
 #      7a the Goal — Locked template; 7b the BLOCKER block in both SKILL.md
-#      files; 7c the helper cap; 7d the routing block names every pinned
-#      model; 7e the product description; 7i log headings stay on SKILL.md's
-#      closed list; 7j the archive command; 7l protocol text names rungs, not
+#      files; 7c the helper cap; 7d each of the four files with a generated
+#      routing block has one begin and one end marker; 7e the product
+#      description; 7i log headings stay on SKILL.md's closed list; 7j the
+#      archive command; 7l protocol text names rungs, not
 #      models, outside the routing block; 7o no file names the deleted routing
 #      reference; 7p the shared-span table, whose rows include the blocker
 #      grammar span (7k) and the command output forms (7n); 7q the agent
@@ -193,8 +202,8 @@ def parse_frontmatter(path):
 
 
 # ---- Check 2: every git-tracked agents/*.md has frontmatter that parses,
-# only allowed keys, an allowed model, and at least one <example> block in
-# the description.
+# only allowed keys, the model models.conf assigns its rung (within
+# ALLOWED_MODELS), and at least one <example> block in the description.
 # Uses git ls-files, not a bare glob, so an untracked file sitting in
 # agents/ (e.g. a stray editor or Finder copy) cannot silently pass as an
 # 8th agent. ----
@@ -209,10 +218,26 @@ if not agent_paths:
 
 ALLOWED_MODELS = {"sonnet", "opus", "haiku"}
 EXAMPLE_RE = re.compile(r"<example>.*?</example>", re.DOTALL)
+
 # Every other frontmatter field is a reviewed decision, not a default. The
 # camelCase omitClaudeMd must come after model:, because codex/build-agents.py
 # ends the description at the next lowercase key and would swallow it there.
 ALLOWED_KEYS = ("name", "description", "model", "color", "tools", "omitClaudeMd")
+
+# models.conf assigns each agent a rung, and each rung one Claude alias.
+# codex/build-agents.py writes the model: line from it; this names the agent
+# whose line disagrees. Check 6 holds the rest of the manifest to policy.
+manifest_run = subprocess.run(
+    [sys.executable, "codex/build-agents.py", "--parse-manifest", "models.conf"],
+    capture_output=True, text=True,
+)
+if manifest_run.returncode != 0:
+    fail(2, f"models.conf does not parse: {manifest_run.stderr.strip()}")
+manifest = json.loads(manifest_run.stdout)
+rung_aliases = {rung: row["claude"] for rung, row in manifest["rungs"].items()}
+unallowed = {rung: alias for rung, alias in rung_aliases.items() if alias not in ALLOWED_MODELS}
+if unallowed:
+    fail(2, f"models.conf: Claude rung aliases {unallowed!r} are not in {sorted(ALLOWED_MODELS)}")
 
 for path in agent_paths:
     try:
@@ -230,12 +255,23 @@ for path in agent_paths:
     model = data.get("model")
     if model not in ALLOWED_MODELS:
         fail(2, f"{path}: model {model!r} not in {sorted(ALLOWED_MODELS)}")
+    agent = os.path.basename(path)[:-len(".md")]
+    role = manifest["roles"].get(agent)
+    if role is None:
+        fail(2, f"{path}: models.conf has no [role] row for {agent}")
+    assigned = rung_aliases[role["claude_rung"]]
+    if model != assigned:
+        fail(
+            2,
+            f"{path}: model {model!r} differs from models.conf, which puts {agent} on the "
+            f"{role['claude_rung']} rung ({assigned!r}); edit models.conf and run python3 codex/build-agents.py",
+        )
 
     description = data.get("description", "")
     if not EXAMPLE_RE.search(description):
         fail(2, f"{path}: description has no <example>...</example> block")
 
-ok(2, f"{len(agent_paths)} agent files have valid frontmatter with only allowed keys, an allowed model, and an <example> block")
+ok(2, f"{len(agent_paths)} agent files have valid frontmatter with only allowed keys, the model models.conf assigns, and an <example> block")
 
 
 # ---- Check 3: SKILL.md frontmatter parses and metadata.version matches
@@ -366,17 +402,22 @@ fi
 echo "PASS: check 5: $plugin_zip matches its Claude source set and excludes codex/"
 
 # ---------------------------------------------------------------------------
-# Check 6: Codex-native files are present, generated, and routed to the
-# intended model IDs, and the five manual prompts are generated from the agent
-# bodies. This uses only stdlib-compatible text checks so the gate also runs
-# on Python 3.9, which predates tomllib.
+# Check 6: models.conf, the one file that names models, parses and holds the
+# routing policy; the Codex agent TOMLs are well formed; the five manual
+# prompts are generated from the agent bodies; and codex/build-agents.py
+# --check holds every file it writes to models.conf and the agent bodies.
+# The policy is tested here, not the model names, so a re-point that keeps
+# the rungs distinct and ordered passes, and one that collapses or inverts
+# them fails. This uses only stdlib-compatible text checks so the gate also
+# runs on Python 3.9, which predates tomllib.
 # ---------------------------------------------------------------------------
 python3 <<'PYEOF'
 import json
+import os
 import pathlib
-import re
 import subprocess
 import sys
+import tempfile
 
 
 def fail(msg):
@@ -384,42 +425,125 @@ def fail(msg):
     sys.exit(1)
 
 
-agent_models = {
-    "squad-pm.toml": "gpt-5.6-sol",
-    "squad-recon.toml": "gpt-5.6-terra",
-    "squad-executor.toml": "gpt-5.6-terra",
-    "squad-executor-haiku.toml": "gpt-5.6-luna",
-    "squad-executor-opus.toml": "gpt-5.6-sol",
-    "squad-helper.toml": "gpt-5.6-terra",
-    "squad-mech.toml": "gpt-5.6-luna",
-}
+def parse_manifest(path):
+    return subprocess.run(
+        [sys.executable, "codex/build-agents.py", "--parse-manifest", path],
+        capture_output=True, text=True,
+    )
+
+
+RUNG_ORDER = ("bottom", "mid", "top")
+HOSTS = ("claude", "codex")
+EXTRA_ROLES = ("strategy", "finder", "skeptic")
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+MECHANICAL, STANDARD, COMPLEX = "squad-executor-haiku", "squad-executor", "squad-executor-opus"
+# The roles that need no judgment beyond a tight spec; every other role runs
+# on the mid rung or above in Claude Code.
+BOTTOM_ALLOWED = (MECHANICAL, "squad-helper", "squad-mech")
+
+# (i) models.conf parses. Check 2 holds its Claude aliases to ALLOWED_MODELS.
+run = parse_manifest("models.conf")
+if run.returncode != 0:
+    fail(f"models.conf does not parse: {run.stderr.strip()}")
+manifest = json.loads(run.stdout)
+if set(manifest["rungs"]) != set(RUNG_ORDER):
+    fail(f"models.conf: the rungs are {sorted(manifest['rungs'])!r}, expected {list(RUNG_ORDER)!r}")
+rungs, roles = manifest["rungs"], manifest["roles"]
+
+# (ii) the roles are the git-tracked agents plus exactly strategy, finder,
+# and skeptic.
+agents = sorted(
+    path[len("agents/"):-len(".md")]
+    for path in subprocess.run(
+        ["git", "ls-files", "--", "agents/*.md"], check=True, capture_output=True, text=True,
+    ).stdout.split()
+)
+if sorted(roles) != sorted(agents + list(EXTRA_ROLES)):
+    fail(f"models.conf: the [role] rows are {sorted(roles)!r}; expected the agents {agents!r} plus {list(EXTRA_ROLES)!r}")
+
+# (iii) the agent TOMLs are exactly the agent roles, each well formed.
 agent_dir = pathlib.Path("codex/agents")
 actual = {path.name for path in agent_dir.glob("*.toml")}
-if actual != set(agent_models):
-    fail(f"codex/agents files are {sorted(actual)!r}, expected {sorted(agent_models)!r}")
-
-for filename, expected_model in agent_models.items():
+if actual != {f"{agent}.toml" for agent in agents}:
+    fail(f"codex/agents files are {sorted(actual)!r}, expected one per agent: {[a + '.toml' for a in agents]!r}")
+for filename in sorted(actual):
     text = (agent_dir / filename).read_text(encoding="utf-8")
-    if f'model = "{expected_model}"' not in text:
-        fail(f"{filename}: expected model {expected_model}")
     if 'developer_instructions = """' not in text:
         fail(f"{filename}: missing developer_instructions")
     if not text.rstrip().endswith('"""'):
         fail(f"{filename}: developer_instructions is not closed")
 
-profiles = pathlib.Path("codex/profiles.toml").read_text(encoding="utf-8")
-for profile, model, effort in (
-    ("compute-squad", "gpt-5.6-sol", "high"),
-    ("compute-squad-pm", "gpt-5.6-sol", "max"),
-    ("compute-squad-execution", "gpt-5.6-terra", "max"),
-    ("compute-squad-mechanical", "gpt-5.6-luna", "max"),
-):
-    section = re.search(r"^\[profiles\." + re.escape(profile) + r"\](.*?)(?=^\[|\Z)", profiles, re.MULTILINE | re.DOTALL)
-    if not section:
-        fail(f"profiles.toml: missing {profile}")
-    body = section.group(1)
-    if f'model = "{model}"' not in body or f'model_reasoning_effort = "{effort}"' not in body:
-        fail(f"profiles.toml: {profile} has wrong model or effort")
+
+def level(role, host):
+    return RUNG_ORDER.index(roles[role][f"{host}_rung"])
+
+
+problems = []
+for host in HOSTS:
+    # (iv) each host's three rungs name three different models, so no two
+    # rungs collapse onto one model.
+    models = [rungs[rung][host] for rung in RUNG_ORDER]
+    if len(set(models)) != len(models):
+        problems.append(
+            f"{host}: the rungs must name three different models; bottom, mid, top are {', '.join(models)}"
+        )
+    # (v) the PM plans and accepts on the top rung.
+    if roles["squad-pm"][f"{host}_rung"] != "top":
+        problems.append(f"{host}: squad-pm is on the {roles['squad-pm'][host + '_rung']} rung, not top")
+    # (vi) execution climbs one rung per classification, the PM sits above
+    # STANDARD execution and at or above every executor, and the skeptic
+    # sits above the finders it checks.
+    ladder = [level(role, host) for role in (MECHANICAL, STANDARD, COMPLEX)]
+    if not ladder[0] < ladder[1] < ladder[2]:
+        problems.append(
+            f"{host}: executor rungs must climb {MECHANICAL} < {STANDARD} < {COMPLEX}; "
+            f"they are {', '.join(RUNG_ORDER[i] for i in ladder)}"
+        )
+    if not (level("squad-pm", host) > ladder[1] and level("squad-pm", host) >= max(ladder)):
+        problems.append(f"{host}: squad-pm must sit above {STANDARD} and at or above every executor")
+    if not level("skeptic", host) > level("finder", host):
+        problems.append(f"{host}: the skeptic must sit above the finders")
+# (vii) in Claude Code, only work that needs no judgment runs on the bottom
+# rung.
+for role, row in roles.items():
+    if row["claude_rung"] == "bottom" and role not in BOTTOM_ALLOWED:
+        problems.append(f"claude: {role} is on the bottom rung; only {', '.join(BOTTOM_ALLOWED)} may be")
+# (viii) every Codex effort is a level Codex names.
+for role, row in roles.items():
+    if row["codex_effort"] not in EFFORTS:
+        problems.append(f"codex: {role} has effort {row['codex_effort']!r}, not one of {', '.join(EFFORTS)}")
+if problems:
+    fail("models.conf breaks the routing policy: " + "; ".join(problems))
+
+# (ix) the parser fails on a malformed manifest rather than defaulting: a
+# role row missing a column, a role on an unknown rung, a duplicated row,
+# and a missing section each exit nonzero with no parsed output.
+source_lines = pathlib.Path("models.conf").read_text(encoding="utf-8").split("\n")
+role_header = next(i for i, line in enumerate(source_lines) if line.startswith("[role]"))
+rung_header = next(i for i, line in enumerate(source_lines) if line.startswith("[rung]"))
+row_at = next(
+    i for i in range(role_header + 1, len(source_lines))
+    if source_lines[i].strip() and not source_lines[i].lstrip().startswith("#")
+)
+row_fields = source_lines[row_at].split()
+rung_end = next(
+    (i for i in range(rung_header + 1, len(source_lines)) if not source_lines[i].strip()), len(source_lines)
+)
+malformed = {
+    "a role row missing a column": source_lines[:row_at] + [" ".join(row_fields[:-1])] + source_lines[row_at + 1:],
+    "a role on an unknown rung": source_lines[:row_at] + [" ".join([row_fields[0], "upper"] + row_fields[2:])]
+    + source_lines[row_at + 1:],
+    "a duplicated role row": source_lines[:row_at + 1] + [source_lines[row_at]] + source_lines[row_at + 1:],
+    "no [rung] section": source_lines[:rung_header] + source_lines[rung_end:],
+}
+with tempfile.TemporaryDirectory() as tmp:
+    for what, lines in malformed.items():
+        path = os.path.join(tmp, "models.conf")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines))
+        bad = parse_manifest(path)
+        if bad.returncode == 0 or bad.stdout.strip() or "FAIL:" not in bad.stderr:
+            fail(f"the models.conf parser accepted a copy with {what}; it must exit nonzero and print no manifest")
 
 # The manual prompts: exactly these five, each generated from its agent body
 # and marked as generated on line 2. build-agents.py --check below compares
@@ -447,15 +571,23 @@ for path, agent in prompt_sources.items():
     if lines[1:2] != [marker]:
         fail(f"{path}: line 2 must be the generated-file marker {marker!r}")
 
-if subprocess.run([sys.executable, "codex/build-agents.py", "--check"], stdout=subprocess.DEVNULL).returncode != 0:
-    fail("codex/build-agents.py --check failed")
+sync = subprocess.run([sys.executable, "codex/build-agents.py", "--check"], capture_output=True, text=True)
+if sync.returncode != 0:
+    fail(
+        "codex/build-agents.py --check failed; a generated file was hand-edited or models.conf or an agent "
+        f"body changed without a regeneration (run python3 codex/build-agents.py):\n{sync.stdout}{sync.stderr}"
+    )
 
 with open(".codex-plugin/plugin.json", encoding="utf-8") as handle:
     manifest = json.load(handle)
 if manifest.get("skills") != "./skills/":
     fail(".codex-plugin/plugin.json does not point at ./skills/")
 
-print("PASS: check 6: Codex agents, manual prompts, profiles, routing, and generator sync are valid")
+print(
+    f"PASS: check 6: models.conf parses and holds the routing policy on both hosts, {len(malformed)} malformed "
+    f"copies fail to parse, the {len(actual)} Codex agent TOMLs and 5 manual prompts are valid, and "
+    f"codex/build-agents.py --check finds every generated file in sync"
+)
 PYEOF
 
 # ---------------------------------------------------------------------------
@@ -508,25 +640,6 @@ def extract_fenced_block(text, path, opening_line, next_line, closing_line="```"
     if end is None:
         fail(f"{path}: no closing {closing_line!r} found after line {start + 1}")
     return lines[start + 1:end]
-
-
-def extract_section(text, path, heading):
-    """Return the lines from a '## heading' line up to (not including) the
-    next line starting with '## ', or end of file."""
-    lines = text.splitlines()
-    start = None
-    for i, line in enumerate(lines):
-        if line.strip() == heading:
-            start = i
-            break
-    if start is None:
-        fail(f"{path}: no heading {heading!r}")
-    end = len(lines)
-    for i in range(start + 1, len(lines)):
-        if lines[i].startswith("## "):
-            end = i
-            break
-    return lines[start:end]
 
 
 def tracked_files(*pathspecs):
@@ -591,16 +704,15 @@ for path in cap_paths:
 
 print(f"PASS: check 7: the 5-helper-per-stage-per-run cap reads '5' in {', '.join(cap_paths)}")
 
-# ---- 7d: the routing block. skills/compute-squad/SKILL.md names models only
-# between one "<!-- routing:begin -->" line and one "<!-- routing:end -->"
-# line (7l bans model names everywhere else in protocol text). The block must
-# name, in backticks, every model an agent file pins: each agents/*.md
-# `model:` alias and each codex/agents/*.toml `model` ID. codex/SKILL.md, a
-# reading copy with no markers yet, still names every pinned Codex ID in its
-# Model routing section.
+# ---- 7d: the routing blocks. codex/build-agents.py writes each block from
+# models.conf between one "<!-- routing:begin -->" line and one
+# "<!-- routing:end -->" line in four files, and check 6's --check holds
+# their content to models.conf. Here each file must have exactly one begin
+# marker, then one end marker, each alone on its line. In the shared skill,
+# 7l bans model names everywhere outside the block.
 ROUTING_BEGIN = "<!-- routing:begin -->"
 ROUTING_END = "<!-- routing:end -->"
-routing_block_paths = ["skills/compute-squad/SKILL.md"]
+routing_block_paths = ["skills/compute-squad/SKILL.md", "codex/SKILL.md", "README.md", "codex/README.md"]
 
 
 def routing_block_span(path, lines):
@@ -618,40 +730,12 @@ def routing_block_span(path, lines):
     return begin, end
 
 
-pinned_models = set()
-for path in tracked_files("agents/*.md"):
-    frontmatter = read(path).split("\n---\n", 1)[0]
-    match = re.search(r"^model:[ \t]*(\S+)[ \t]*$", frontmatter, re.MULTILINE)
-    if not match:
-        fail(f"{path}: no model: line in the frontmatter")
-    pinned_models.add(match.group(1))
-pinned_codex_models = set()
-for path in tracked_files("codex/agents/*.toml"):
-    match = re.search(r'^model = "([^"]+)"$', read(path), re.MULTILINE)
-    if not match:
-        fail(f"{path}: no model line")
-    pinned_codex_models.add(match.group(1))
-if not pinned_models or not pinned_codex_models:
-    fail("found no agent files to read pinned models from")
-pinned_models |= pinned_codex_models
-
 for path in routing_block_paths:
-    lines = read(path).splitlines()
-    begin, end = routing_block_span(path, lines)
-    block = "\n".join(lines[begin + 1:end])
-    for model in sorted(pinned_models):
-        if f"`{model}`" not in block:
-            fail(f"{path}: the routing block does not name `{model}`, which an agent file pins")
-
-codex_routing_path = "codex/SKILL.md"
-codex_routing = "\n".join(extract_section(read(codex_routing_path), codex_routing_path, "## Model routing"))
-for model in sorted(pinned_codex_models):
-    if f"`{model}`" not in codex_routing:
-        fail(f"{codex_routing_path}: the Model routing section does not name `{model}`, which a Codex agent pins")
+    routing_block_span(path, read(path).splitlines())
 
 print(
-    f"PASS: check 7: {', '.join(routing_block_paths)} has one routing block naming every pinned model "
-    f"({', '.join(sorted(pinned_models))}), and {codex_routing_path} names every pinned Codex model"
+    f"PASS: check 7: {', '.join(routing_block_paths)} each have one routing block between a begin and an end "
+    f"marker (check 6's --check holds the content to models.conf)"
 )
 
 # ---- 7e: the product description is one canonical string across every
