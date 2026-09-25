@@ -32,22 +32,36 @@
 #      7a the Goal — Locked template; 7b the BLOCKER block in both SKILL.md
 #      files; 7c the helper cap; 7d each of the four files with a generated
 #      routing block has one begin and one end marker; 7e the product
-#      description; 7i log headings stay on SKILL.md's closed list; 7j the
+#      description; 7f the ## Status and ## Decision templates in SKILL.md
+#      and codex/README.md; 7i log headings stay on SKILL.md's closed list; 7j the
 #      archive command; 7l protocol text names rungs, not
 #      models, outside the routing block; 7m the three executor bodies are one
 #      protocol apart from each agent's own name and the MECHANICAL stop line;
 #      7o no file names the deleted routing
 #      reference; 7p the shared-span table, whose rows include the blocker
-#      grammar span (7k) and the command output forms (7n); 7q the agent
+#      grammar span (7k), the command output forms (7n), the latest-Goal
+#      read, and the rule that changing a criterion's command redefines the
+#      criterion; 7q the agent
 #      description budget; 7r no agent has a tool to spawn agents; 7s
 #      codex/SKILL.md stays a reading copy and both SKILL.md files carry the
 #      no-absorption rule; 7t no file names a renamed executor or the old
 #      escalation wording, and both SKILL.md files carry the FAIL charge rule
-#      and the setup-gap stop.
-#   8. Behavior without a model, on fixtures under tests/: log grammar (8a)
-#      and codex/update.sh with stubs (8e), which must refuse a model the
+#      and the setup-gap stop; 7u no file under agents/, codex/, or skills/
+#      reads the goal from the entry at the top of the log.
+#   8. Behavior without a model, on fixtures under tests/: log grammar,
+#      including the grant hook's verdict on every Executor entry, the
+#      re-lock record, and the stop at a needs-human blocker (8a), the
+#      grant hook's decisions on synthetic PreToolUse JSON and over the live
+#      seed logs, including its hold on every stage agent except squad-mech
+#      while a needs-human blocker is open (8c),
+#      codex/update.sh with stubs (8e), which must refuse a model the
 #      stub catalog lacks and leave CODEX_HOME unchanged, and whose catalog
-#      validator must apply its effort, retirement, upgrade, and format rules.
+#      validator must apply its effort, retirement, upgrade, and format rules,
+#      and the usage ledger hook on synthetic transcripts (8f), whose records
+#      must hold exact token sums, including a final message written after
+#      the hook starts, and which must print nothing. The live
+#      tier, tests/live/run.sh, spends model tokens, so neither this script
+#      nor CI runs it.
 #   9. Staleness: models.conf's reviewed date, or a Snapshot date in README.md
 #      or codex/README.md, older than 90 days prints a warning, never a
 #      failure.
@@ -784,6 +798,20 @@ print(
     f"({len(canonical)}/{GITHUB_DESCRIPTION_MAX} chars)"
 )
 
+# ---- 7f: the ## Status and ## Decision templates. Only the main session
+# writes these entries; on the manual Codex path the user writes them by hand
+# from codex/README.md, so both fenced templates are byte-identical there and
+# in SKILL.md. Check 8c builds its logs from SKILL.md's Status template.
+main_entry_paths = ["skills/compute-squad/SKILL.md", "codex/README.md"]
+for heading in ("## Status", "## Decision"):
+    blocks = {path: extract_fenced_block(read(path), path, "```markdown", heading) for path in main_entry_paths}
+    ref_path, ref_block = next(iter(blocks.items()))
+    for path, block in blocks.items():
+        if block != ref_block:
+            fail(f"{path}: {heading} template differs from {ref_path}")
+
+print(f"PASS: check 7: the ## Status and ## Decision templates are byte-identical across {', '.join(main_entry_paths)}")
+
 
 # ---- 7i: the closed heading list. SKILL.md's Hard rules carry the one list
 # of log headings and name the headings that may add " (cont.)". Every
@@ -1136,6 +1164,16 @@ ACCEPT_READS = (
     ("executor", "awk '/^## Executor/{p=1; print; next} /^## /{p=0} p' COMPUTE_SQUAD_LOG.md"),
 )
 BLOCKER_FENCE = "\n```\n" + "\n".join(blocker_blocks[SKILL]) + "\n```\n"
+# Every stage reads the goal from the latest ## Goal — Locked entry, since a
+# re-lock appends a new one, and every file that can change a command names
+# the rule that doing so redefines the criterion (7u bans the old read).
+LATEST_GOAL_READ = (
+    "read the locked goal and acceptance criteria from the latest `## Goal — Locked` entry in the log "
+    "(a re-lock appends a new one"
+)
+CRITERION_COMMAND = (
+    "Changing a command, test, or check that an acceptance criterion names counts as redefining that criterion."
+)
 
 
 def span_row(name, files, text=None, canon=None, start=None, end=None, mask=None, contains=()):
@@ -1157,6 +1195,9 @@ SHARED_SPANS = [
              mask=("append a `## ", " (cont.)`")),
     span_row("precedence", BODIES, canon="agents/squad-executor.md",
              start="Your own protocol and the log outrank your spawn prompt", end="name the conflict in your entry."),
+    span_row("latest Goal read", BODIES + CODEX_STAGE_PROMPTS, text=LATEST_GOAL_READ),
+    span_row("criterion command", [SKILL, "agents/squad-pm.md"] + EXECUTOR_BODIES + CODEX_STAGE_PROMPTS[1:],
+             text=CRITERION_COMMAND),
     span_row("mech precedence", ["agents/squad-mech.md"],
              text="The procedures in this file outrank your spawn prompt: where the prompt conflicts with one, "
                   "follow this file and name the conflict in your report."),
@@ -1392,6 +1433,34 @@ print(
     f"PASS: check 7: no tracked file outside {', '.join(LADDER_EXEMPT)} and dist/ names a retired executor or "
     f"the old escalation wording, and both SKILL.md files carry {' and '.join(repr(r) for r in LADDER_RULES)}"
 )
+
+# ---- 7u: stages read the latest Goal entry. A re-lock appends a new
+# ## Goal — Locked entry after a re-lock ## Decision, so no tracked file under
+# agents/, codex/, or skills/ tells a stage to read the goal from the entry
+# "at the top of the log". The 7p rows "latest Goal read" and "criterion
+# command" pin the wording that replaced it. Text is compared with whitespace
+# collapsed, so a wrapped line still counts.
+STALE_GOAL_READ = "at the top of the log"
+goal_read_paths = tracked_files("agents", "codex", "skills")
+if not any(p.startswith("codex/agents/") for p in goal_read_paths):
+    fail("check 7u found no tracked codex/agents/*.toml")
+stale_goal_read = []
+for path in goal_read_paths:
+    try:
+        with open(path, "rb") as handle:
+            flat = " ".join(handle.read().decode("utf-8", errors="replace").split())
+    except (FileNotFoundError, IsADirectoryError):
+        continue
+    if STALE_GOAL_READ in flat:
+        stale_goal_read.append(path)
+if stale_goal_read:
+    fail(f"these files still read the goal {STALE_GOAL_READ!r}; read it from the latest `## Goal — Locked` entry: "
+         + ", ".join(stale_goal_read))
+
+print(
+    f"PASS: check 7: no tracked file under agents/, codex/, or skills/ ({len(goal_read_paths)} files) reads the goal "
+    f"{STALE_GOAL_READ!r}; every stage reads the latest ## Goal — Locked entry"
+)
 PYEOF
 
 # ---------------------------------------------------------------------------
@@ -1409,6 +1478,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 
 def fail(msg):
@@ -1430,8 +1500,13 @@ def read(path):
 
 
 # ---- 8a: log grammar. tests/check_logs.py reads the heading list, the
-# opening entry, the timestamp form and the BLOCKER grammar from
-# skills/compute-squad/SKILL.md and lints a log against them. The example
+# opening entry, the timestamp form, the BLOCKER grammar, the Goal
+# template's Attended: field and the re-lock rule from
+# skills/compute-squad/SKILL.md and lints a log against them; its grant rule
+# runs the grant hook (8c) over the log above every Executor entry, its
+# re-lock rule holds every later Goal entry to a re-lock Decision directly
+# above it, and its needs-human rule lets no stage entry follow a needs-human
+# blocker until a Decision. The example
 # log must lint clean. Each fixture tests/fixtures/logs/<name>.log.md has a
 # <name>.expect.json that cites the protocol text it tests (each cited text
 # must still be in the cited file) and says whether the linter passes it or
@@ -1520,6 +1595,278 @@ if uncovered:
 print(
     f"PASS: check 8: docs/example-log.md lints clean, {len(passing)} fixture logs pass, and {len(failing)} fail "
     f"with exactly their expected rules; every linter rule has a failing fixture ({', '.join(linter_rules)})"
+)
+
+# ---- 8c: the grant hook. skills/compute-squad/hooks/grant-gate.sh runs on
+# Claude Code's PreToolUse event for the spawn tool, wired inline under the
+# hooks key of .claude-plugin/plugin.json with a matcher for both of its
+# names, Agent and Task (Claude Code 2.1.282 reports Task); a root
+# hooks/hooks.json would load in Codex too, where it would allow every
+# spawn. Synthetic PreToolUse JSON
+# is piped into the script under sh, and under dash and bash where they are
+# installed, in a temp git repo whose log is built from SKILL.md's ## Status
+# template. Every tracked executor, with and without the plugin prefix, is
+# denied with no log, with Grant: none, with no Grant line in the latest
+# Status, with a grant for another plan revision, and with a grant written
+# anywhere but the latest Status; it is allowed with a grant for the current
+# revision (the count of ## PM — Plan entries without (cont.)) or for all
+# revisions. While a needs-human: BLOCKER has no ## Decision after it, the
+# script holds every executor and every other stage agent except squad-mech
+# (it archives a fresh run at Stage 1): squad-helper, squad-pm, and
+# squad-recon. A Decision releases the hold; a later needs-human: blocker
+# holds again, and so does a later rerun: blocker, which cannot resolve it.
+# Every other agent, and input the script cannot read, is allowed silently.
+# Over the live seeds in tests/fixtures/logs/ that tests/live/run.sh uses,
+# every executor is denied for s1 and s2b and allowed for s2 and s2c.
+# An allow prints nothing; a deny prints one PreToolUse decision, whose
+# reason names ## Status for a missing grant and the open blocker for a hold.
+GATE = "skills/compute-squad/hooks/grant-gate.sh"
+CLAUDE_PLUGIN = ".claude-plugin/plugin.json"
+SKILL = "skills/compute-squad/SKILL.md"
+GATE_COMMAND = 'sh "${CLAUDE_PLUGIN_ROOT}/' + GATE + '"'
+if GATE not in tracked_set:
+    fail(f"{GATE} is not tracked, so the plugin would ship without it")
+if "hooks/hooks.json" in tracked_set:
+    fail(f"hooks/hooks.json is tracked; Codex loads a plugin's root hooks/hooks.json, so Claude hooks stay inline in {CLAUDE_PLUGIN}")
+if re.search(r"\b(?:python3?|jq)\b", read(GATE)):
+    fail(f"{GATE} calls python or jq; the hook stays POSIX sh with git, sed, awk, and grep")
+wired = 0
+for entry in json.loads(read(CLAUDE_PLUGIN)).get("hooks", {}).get("PreToolUse", []):
+    try:
+        matches = all(re.fullmatch(entry.get("matcher", ""), tool) for tool in ("Agent", "Task"))
+    except re.error:
+        matches = False
+    commands = [h.get("command") for h in entry.get("hooks", []) if h.get("type") == "command"]
+    if matches and GATE_COMMAND in commands:
+        wired += 1
+if wired != 1:
+    fail(f"{CLAUDE_PLUGIN}: hooks.PreToolUse must run {GATE_COMMAND!r} once, under a matcher that matches Agent and Task")
+
+skill_lines = read(SKILL).splitlines()
+status_at = [i for i in range(len(skill_lines) - 1) if skill_lines[i] == "```markdown" and skill_lines[i + 1] == "## Status"]
+if len(status_at) != 1:
+    fail(f"{SKILL}: needs one ```markdown block that opens with ## Status; found {len(status_at)}")
+status_template = []
+for line in skill_lines[status_at[0] + 1:]:
+    if line == "```":
+        break
+    status_template.append(line)
+if sum(line.startswith("Grant: ") for line in status_template) != 1:
+    fail(f"{SKILL}: the ## Status template needs exactly one 'Grant: ' line, which {GATE} reads")
+
+
+def status(grant):
+    """A ## Status entry from SKILL.md's template with its Grant: line set to
+    grant, or dropped when grant is None."""
+    lines = []
+    for line in status_template:
+        if line.startswith("Grant: "):
+            if grant is None:
+                continue
+            line = "Grant: " + grant
+        lines.append(line)
+    return "\n".join(lines) + "\n\n"
+
+
+GOAL = "## Goal — Locked\nTimestamp: 2026-09-01T09:00:00Z\n\nGoal: g\n\n"
+PLAN = "## PM — Plan\nTimestamp: 2026-09-01T09:05:00Z\n\nTasks.\n\n"
+PLAN_CONT = "## PM — Plan (cont.)\nTimestamp: 2026-09-01T09:06:00Z\n\nMore tasks.\n\n"
+DECISION = '## Decision\nTimestamp: 2026-09-01T09:07:00Z\nType: grant\nCovers: r1, work order all\nUser\'s words: "go"\n\n'
+R1 = "r1 all, per Decision 2026-09-01T09:07:00Z"
+R2 = "r2 WO-1, per Decision 2026-09-01T09:07:00Z"
+ALL = "all revisions, full-mode request"
+GATE_CASES = [
+    ("no log", None, "deny"),
+    ("Grant: none", GOAL + status("none"), "deny"),
+    ("no Grant line in the latest Status", GOAL + status(None), "deny"),
+    ("no Grant line in the latest Status after a granting one", GOAL + status(ALL) + PLAN + status(None), "deny"),
+    ("Grant: all revisions", GOAL + status(ALL), "allow"),
+    ("r1 before any plan", GOAL + status(R1), "deny"),
+    ("r0 before any plan", GOAL + status("r0 all, per Decision 2026-09-01T09:07:00Z"), "deny"),
+    ("r1 over one plan", GOAL + status("none") + PLAN + status(R1), "allow"),
+    ("r2 over two plans and a (cont.)", GOAL + status("none") + PLAN + PLAN_CONT + PLAN + status(R2), "allow"),
+    ("r2 after a third plan", GOAL + status("none") + PLAN + PLAN_CONT + PLAN + status(R2) + PLAN, "deny"),
+    ("r1 over eleven plans", GOAL + PLAN * 11 + status(R1), "deny"),
+    ("r11 over eleven plans", GOAL + PLAN * 11 + status("r11 all, per Decision 2026-09-01T09:07:00Z"), "allow"),
+    ("r11 over one plan", GOAL + PLAN + status("r11 all, per Decision 2026-09-01T09:07:00Z"), "deny"),
+    ("a Grant line outside a Status entry", GOAL + status("none") + PLAN.replace("Tasks.", "Tasks.\nGrant: " + ALL), "deny"),
+    ("a grant Decision with no Status after it", GOAL + status("none") + PLAN + DECISION, "deny"),
+    ("a later Status that revokes", GOAL + status(ALL) + PLAN + status("none"), "deny"),
+    ("a later Status that grants", GOAL + status("none") + PLAN + status(ALL), "allow"),
+]
+SEED_VERDICTS = [("s1", "deny"), ("s2", "allow"), ("s2b", "deny"), ("s2c", "allow")]
+for seed, _ in SEED_VERDICTS:
+    if FIXTURES + seed + ".log.md" not in tracked_set:
+        fail(f"check 8c needs the tracked live seed {FIXTURES}{seed}.log.md")
+executors = sorted(os.path.basename(p)[:-len(".md")] for p in tracked_files("agents/squad-executor*.md"))
+others = sorted(os.path.basename(p)[:-len(".md")] for p in tracked_files("agents/*.md"))
+others = [a for a in others if a not in executors]
+if not executors or not others:
+    fail("check 8c found no tracked executor or no other agent under agents/")
+# A needs-human: blocker holds every stage agent; only the intern, which
+# archives a fresh run's log at Stage 1, and agents outside the squad pass.
+HOLD_EXEMPT = "squad-mech"
+HOLD_REASON = "needs-human blocker unresolved"
+if HOLD_EXEMPT not in others:
+    fail(f"check 8c found no tracked agents/{HOLD_EXEMPT}.md")
+held = [a for a in others if a != HOLD_EXEMPT]
+PLAN_NH = (
+    "## PM — Plan\nTimestamp: 2026-09-01T09:05:00Z\n\nTasks.\n\nBLOCKER:\n"
+    "- needs-human: whether the command a criterion names may change\n- why: it fails on the base commit.\n\n"
+)
+RECON_NH = PLAN_NH.replace("## PM — Plan", "## Recon (cont.)").replace("09:05:00Z", "09:09:00Z")
+RERUN = "## Executor\nTimestamp: 2026-09-01T09:10:00Z\n\nStopped.\n\nBLOCKER:\n- rerun: Plan\n- why: w.\n\n"
+RELOCK = (
+    "## Decision\nTimestamp: 2026-09-01T09:08:00Z\nType: re-lock\nCovers: criterion 2\n"
+    "User's words: \"change it\"\n\n"
+)
+# (name, log, executor verdict, verdict for the other held agents)
+HOLD_CASES = [
+    ("a log that ends in a needs-human: blocker", GOAL + status(ALL) + PLAN_NH, "hold", "hold"),
+    ("a Status after a needs-human: blocker", GOAL + status(ALL) + PLAN_NH + status(ALL), "hold", "hold"),
+    ("a needs-human: blocker and no grant", GOAL + status("none") + PLAN_NH, "deny", "hold"),
+    ("a blank line inside the BLOCKER: block", GOAL + status(ALL) + PLAN_NH.replace("BLOCKER:\n", "BLOCKER:\n\n"),
+     "hold", "hold"),
+    ("a Decision after a needs-human: blocker", GOAL + status(ALL) + PLAN_NH + RELOCK, "allow", "allow"),
+    ("a Decision and a Status after a needs-human: blocker", GOAL + status(ALL) + PLAN_NH + RELOCK + status(ALL),
+     "allow", "allow"),
+    ("a second needs-human: blocker after a Decision", GOAL + status(ALL) + PLAN_NH + RELOCK + status(ALL) + RECON_NH,
+     "hold", "hold"),
+    ("a rerun: blocker after an open needs-human: blocker", GOAL + status(ALL) + PLAN_NH + RERUN, "hold", "hold"),
+    ("a suffixed Decision heading", GOAL + status(ALL) + PLAN_NH + RELOCK.replace("## Decision", "## Decision (addendum)"),
+     "hold", "hold"),
+    ("only a rerun: blocker", GOAL + status(ALL) + PLAN + RERUN, "allow", "allow"),
+    ("needs-human: text outside a BLOCKER: block",
+     GOAL + status(ALL) + PLAN.replace("Tasks.", "Tasks. The PM weighed a `BLOCKER:` block.\n- needs-human: none"),
+     "allow", "allow"),
+]
+shells = [sh for sh in ("sh", "dash", "bash") if shutil.which(sh)]
+if "sh" not in shells:
+    fail("check 8c needs sh, which runs the hook on every host")
+gate_path = os.path.abspath(GATE)
+gate_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
+def gate(shell, payload, cwd):
+    run = subprocess.run([shell, gate_path], input=payload, capture_output=True, text=True, env=gate_env, cwd=cwd, timeout=60)
+    if run.returncode != 0 or run.stderr:
+        fail(f"{GATE} under {shell} exited {run.returncode} with stderr {run.stderr.strip()!r} for {payload!r}")
+    if not run.stdout:
+        return "allow"
+    try:
+        decision = json.loads(run.stdout)["hookSpecificOutput"]
+        reason = decision["permissionDecisionReason"]
+        ok = (decision["hookEventName"] == "PreToolUse" and decision["permissionDecision"] == "deny"
+              and run.stdout.count("\n") == 1)
+    except (ValueError, KeyError, TypeError):
+        ok, reason = False, ""
+    if ok and HOLD_REASON in reason:
+        return "hold"
+    if not ok or "## Status" not in reason:
+        fail(
+            f"{GATE} under {shell} printed something other than one PreToolUse deny naming ## Status or "
+            f"{HOLD_REASON!r}: {run.stdout!r}"
+        )
+    return "deny"
+
+
+def payload(agent, cwd, style="compact"):
+    data = {"session_id": "s", "hook_event_name": "PreToolUse", "tool_name": "Agent",
+            "tool_input": {"description": "d", "prompt": "p", "subagent_type": agent}, "cwd": cwd}
+    if style == "spaced":
+        return json.dumps(data, separators=(" , ", " : "))
+    if style == "indented":
+        return json.dumps(data, indent=2)
+    return json.dumps(data, separators=(",", ":"))
+
+
+checked = 0
+with tempfile.TemporaryDirectory() as tmp:
+    repo = os.path.join(tmp, "repo")
+    sub = os.path.join(repo, "src", "deep")
+    os.makedirs(sub)
+    subprocess.run(["git", "init", "-q", repo], check=True, env=gate_env)
+    log = os.path.join(repo, "COMPUTE_SQUAD_LOG.md")
+    for name, text, expected in GATE_CASES:
+        if text is None:
+            if os.path.exists(log):
+                os.remove(log)
+        else:
+            with open(log, "w", encoding="utf-8") as handle:
+                handle.write(text)
+        for shell in shells:
+            for agent in executors:
+                for form in (agent, "compute-squad:" + agent):
+                    got = gate(shell, payload(form, repo), tmp)
+                    checked += 1
+                    if got != expected:
+                        fail(f"{GATE} under {shell}: {form} with {name}: expected {expected}, got {got}")
+            if expected == "allow":
+                continue
+            for agent in others + ["general-purpose", "Explore"]:
+                for form in (agent, "compute-squad:" + agent):
+                    checked += 1
+                    if gate(shell, payload(form, repo), tmp) != "allow":
+                        fail(f"{GATE} under {shell}: {form} with {name}: a spawn that is not an executor must pass")
+    # The live seeds of section 6 (tests/live/run.sh) as they stand: S1's
+    # empty log and S2b's grant for r1 under plan r2 deny, S2's r1 WO-1 grant
+    # allows. S2c allows too: its zero spawns rest on the work-order scope of
+    # a grant, which this hook does not check, so 8b covers S2c.
+    for seed, expected in SEED_VERDICTS:
+        with open(log, "w", encoding="utf-8") as handle:
+            handle.write(read(FIXTURES + seed + ".log.md"))
+        for shell in shells:
+            for agent in executors:
+                got = gate(shell, payload("compute-squad:" + agent, repo), tmp)
+                checked += 1
+                if got != expected:
+                    fail(f"{GATE} under {shell}: compute-squad:{agent} over the live seed {FIXTURES}{seed}.log.md: "
+                         f"expected {expected}, got {got}")
+    # A needs-human: blocker with no ## Decision after it holds every stage.
+    for name, text, for_executor, for_held in HOLD_CASES:
+        with open(log, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        for shell in shells:
+            for agent in executors + held + [HOLD_EXEMPT, "general-purpose", "Explore"]:
+                expected = for_executor if agent in executors else for_held if agent in held else "allow"
+                for form in (agent, "compute-squad:" + agent):
+                    got = gate(shell, payload(form, repo), tmp)
+                    checked += 1
+                    if got != expected:
+                        fail(f"{GATE} under {shell}: {form} with {name}: expected {expected}, got {got}")
+    # JSON layout, the working directory, and unreadable input.
+    for text, expected in ((GOAL + status("none"), "deny"), (GOAL + status(ALL), "allow")):
+        with open(log, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        for shell in shells:
+            for style in ("spaced", "indented"):
+                for cwd in (repo, sub):
+                    checked += 1
+                    if gate(shell, payload("compute-squad:" + executors[0], cwd, style), tmp) != expected:
+                        fail(f"{GATE} under {shell}: {style} JSON with cwd {cwd} must {expected}")
+            for bad in ("", "not json", '{"tool_input":{}}'):
+                checked += 1
+                if gate(shell, bad, tmp) != "allow":
+                    fail(f"{GATE} under {shell}: input with no subagent_type ({bad!r}) must pass silently")
+    # Outside a git repository the log is read from cwd itself.
+    plain = os.path.join(tmp, "plain")
+    os.makedirs(plain)
+    ceiling = dict(gate_env, GIT_CEILING_DIRECTORIES=tmp)
+    for text, expected in ((GOAL + status("none"), "deny"), (GOAL + status(ALL), "allow")):
+        with open(os.path.join(plain, "COMPUTE_SQUAD_LOG.md"), "w", encoding="utf-8") as handle:
+            handle.write(text)
+        run = subprocess.run(["sh", gate_path], input=payload(executors[0], plain), capture_output=True, text=True,
+                             env=ceiling, timeout=60)
+        checked += 1
+        if run.returncode != 0 or ("deny" if run.stdout else "allow") != expected:
+            fail(f"{GATE}: outside a git repository, a log in cwd with {text.splitlines()[-2]!r} must {expected}")
+
+print(
+    f"PASS: check 8: {GATE} is wired once in {CLAUDE_PLUGIN} for Agent and Task and made {checked} decisions as "
+    f"specified under {', '.join(shells)}: {', '.join(executors)} denied without a grant for the current plan "
+    f"revision, with and without the compute-squad: prefix, and over the live seeds "
+    f"{', '.join(f'{seed} {verdict}' for seed, verdict in SEED_VERDICTS)}; {', '.join(executors + held)} held while a "
+    f"needs-human: blocker has no ## Decision after it; and {HOLD_EXEMPT} always allowed"
 )
 
 # ---- 8e: codex/update.sh with stubs. The updater runs with stub git
@@ -1732,6 +2079,300 @@ print(
     f"installs the {len(agent_tomls)} codex/agents TOMLs byte for byte, writes {len(profiles)} profiles, "
     f"and leaves the user's files in CODEX_HOME untouched; --validate-catalog handles {len(validator_cases)} "
     f"more stub catalogs ({', '.join(case[0] for case in validator_cases)}) as specified, with and without --strict"
+)
+
+# ---- 8f: the usage ledger. skills/compute-squad/hooks/usage-ledger.sh runs
+# on Claude Code's SubagentStop and Stop events, wired inline in
+# .claude-plugin/plugin.json with no matcher: a SubagentStop matcher filters
+# by agent type, and the ledger must also record agents that have no agent
+# file, such as audit finders, while a run's log is non-empty. Measured on
+# Claude Code 2.1.282 with a Haiku main session: the host queues transcript
+# writes and flushes them every 100 ms, so an agent's final message can reach
+# its transcript after SubagentStop fires. One probe's ledger missed a
+# background executor's last call that way, and another's snapshot taken as
+# the hook started lacked the final message, so the script waits, at most
+# five seconds, while the last assistant record still ends in a tool call or
+# has no stop reason. A message with parallel tool calls can keep the output
+# count of its first streamed record (3 where the host counted 193), so the
+# ledger's output can read low while billed input stays exact; the live
+# tier's 1% check reports that. On a small run without such a message the
+# ledger's totals equal the host's modelUsage exactly, a compute-squad:.*
+# matcher runs the hook for squad agents only, and the Stop hook's output did
+# not reach the model on the next turn. SubagentStop's payload lists running
+# agents, each with its own agent_type, in background_tasks after the
+# top-level fields, so the script reads each field's first value.
+# Payloads shaped like the host's are piped into the script under sh, and
+# under dash and bash where installed, in a temp git repo, against the
+# synthetic transcripts in tests/fixtures/ledger/ (real ones carry the
+# user's identity). Each line it appends must equal the record computed here
+# with a JSON parser: exact token sums, a message split across lines counted
+# once, escaped JSON in tool output ignored, the first heading of each log
+# append, and elapsed seconds across a month boundary. When the final message
+# lands 0.5 s after the hook starts, at SubagentStop or at Stop, the hook is
+# still waiting then and its line counts that message. It records squad
+# agents always, other agents only while the log is non-empty, the main
+# session's total with each, and Stop only for a session already in the
+# ledger. The run ID is the log's, or the newest archive's once the log is
+# empty. It prints nothing and exits 0 on every input, malformed included.
+# Last, the end-of-run command in SKILL.md's Hard rules, run on that ledger,
+# prints the run's subagent lines and then its last main line.
+LEDGER = "skills/compute-squad/hooks/usage-ledger.sh"
+LEDGER_COMMAND = 'sh "${CLAUDE_PLUGIN_ROOT}/' + LEDGER + '"'
+LEDGER_FIXTURES = "tests/fixtures/ledger/"
+LEDGER_KEYS = [
+    "v", "run", "session", "agent", "agent_id", "models", "started", "stopped", "elapsed_s", "calls",
+    "input", "cache_write", "cache_write_1h", "cache_read", "output", "entries",
+]
+for path in (LEDGER, LEDGER_FIXTURES + "agent.jsonl", LEDGER_FIXTURES + "main.jsonl"):
+    if path not in tracked_set:
+        fail(f"{path} is not tracked")
+ledger_source = read(LEDGER)
+if re.search(r"\b(?:python3?|jq)\b", ledger_source):
+    fail(f"{LEDGER} calls python or jq; the hook stays POSIX sh with git, sed, awk, and grep")
+target_match = re.search(r'^ledger="\$root/([^"]+)"$', ledger_source, re.MULTILINE)
+if not target_match:
+    fail(f"{LEDGER}: no ledger=\"$root/<path>\" line")
+LEDGER_TARGET = target_match.group(1)
+for path in (SKILL, "README.md"):
+    if LEDGER_TARGET not in read(path):
+        fail(f"{path} does not name {LEDGER_TARGET}, where {LEDGER} writes")
+plugin_hooks = json.loads(read(CLAUDE_PLUGIN)).get("hooks", {})
+for event in ("SubagentStop", "Stop"):
+    wired = [
+        entry for entry in plugin_hooks.get(event, [])
+        if LEDGER_COMMAND in [h.get("command") for h in entry.get("hooks", []) if h.get("type") == "command"]
+    ]
+    if len(wired) != 1 or "matcher" in wired[0]:
+        fail(f"{CLAUDE_PLUGIN}: hooks.{event} must run {LEDGER_COMMAND!r} once, with no matcher")
+end_match = re.search(r"print this run's records with `([^`]+)`", read(SKILL))
+if not end_match or "<run ID>" not in end_match.group(1) or LEDGER_TARGET not in end_match.group(1):
+    fail(f"{SKILL}: the usage rule must print this run's records with a command that names <run ID> and {LEDGER_TARGET}")
+END_COMMAND = end_match.group(1)
+
+
+def transcript_record(path, run, session, agent, agent_id):
+    """The ledger line for one transcript, computed with a JSON parser."""
+    calls, models, stamps, heads, lines = {}, [], [], [], 0
+    for raw in read(path).splitlines():
+        line = json.loads(raw)
+        if isinstance(line.get("timestamp"), str):
+            stamps.append(line["timestamp"])
+        message = line.get("message")
+        if line.get("type") != "assistant" or not isinstance(message, dict) or "usage" not in message:
+            continue
+        lines += 1
+        usage = message["usage"]
+        calls[message["id"]] = (
+            usage.get("input_tokens", 0), usage.get("cache_creation_input_tokens", 0),
+            usage.get("cache_creation", {}).get("ephemeral_1h_input_tokens", 0),
+            usage.get("cache_read_input_tokens", 0), usage.get("output_tokens", 0),
+        )
+        if message["model"] not in models:
+            models.append(message["model"])
+        for block in message["content"]:
+            if block.get("type") == "tool_use" and block.get("name") == "Bash":
+                command = block["input"].get("command", "")
+                if ">> COMPUTE_SQUAD_LOG.md" in command:
+                    heads.append(next(l for l in command.split("\n") if l.startswith("## ")))
+    if lines <= len(calls) or stamps[0][5:7] == stamps[-1][5:7]:
+        fail(f"{path} must split a message across lines and cross a month boundary, so 8f tests both")
+    sums = [sum(call[i] for call in calls.values()) for i in range(5)]
+    start, stop = (datetime.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S") for s in (stamps[0], stamps[-1]))
+    return dict(zip(LEDGER_KEYS, [
+        1, run, session, agent, agent_id, ",".join(models), stamps[0], stamps[-1],
+        int((stop - start).total_seconds()), len(calls), *sums, "; ".join(heads),
+    ]))
+
+
+if "msg_trap" not in read(LEDGER_FIXTURES + "agent.jsonl"):
+    fail(f"{LEDGER_FIXTURES}agent.jsonl must quote transcript JSON in tool output (msg_trap), which the ledger ignores")
+agent_fixture = os.path.abspath(LEDGER_FIXTURES + "agent.jsonl")
+main_fixture = os.path.abspath(LEDGER_FIXTURES + "main.jsonl")
+ledger_path = os.path.abspath(LEDGER)
+ledger_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+ledger_shells = [sh for sh in ("sh", "dash", "bash") if shutil.which(sh)]
+if "sh" not in ledger_shells:
+    fail("check 8f needs sh, which runs the hook on every host")
+SESSION, OTHER_SESSION = "00000000-0000-4000-8000-00000000000a", "00000000-0000-4000-8000-00000000000b"
+RUN, OLD_RUN = "2026-02-28-reset-cooldown", "2026-02-27-older-run"
+
+
+def ledger_payload(event, cwd, session=SESSION, agent_type=None, agent_path=agent_fixture, main_path=main_fixture,
+                   style="compact"):
+    """A hook payload with the host's key order; SubagentStop's names another agent last in background_tasks
+    and quotes an agent_type in its last message."""
+    data = {"session_id": session, "transcript_path": main_path, "cwd": cwd, "prompt_id": "p",
+            "permission_mode": "acceptEdits"}
+    if event == "SubagentStop":
+        other = "compute-squad:squad-helper" if agent_type == "general-purpose" else "general-purpose"
+        data.update({
+            "agent_id": "a0f1e2d3c4b5a6978", "agent_type": agent_type, "hook_event_name": event,
+            "stop_hook_active": False, "agent_transcript_path": agent_path,
+            "last_assistant_message": 'Done. The log says "agent_type":"compute-squad:squad-pm".',
+            "background_tasks": [
+                {"id": "a0f1e2d3c4b5a6978", "type": "subagent", "status": "running", "description": "d",
+                 "agent_type": agent_type},
+                {"id": "b1c2d3e4f5a6b7c80", "type": "subagent", "status": "running", "description": "o",
+                 "agent_type": other},
+            ],
+            "session_crons": [],
+        })
+    else:
+        data.update({"hook_event_name": event, "stop_hook_active": False, "last_assistant_message": "done",
+                     "background_tasks": [], "session_crons": []})
+    return json.dumps(data, separators=(" , ", " : ") if style == "spaced" else (",", ":"))
+
+
+def run_ledger(shell, payload, cwd):
+    run = subprocess.run([shell, ledger_path], input=payload, capture_output=True, text=True, env=ledger_env,
+                         cwd=cwd, timeout=60)
+    if run.returncode != 0 or run.stdout or run.stderr:
+        fail(f"{LEDGER} under {shell} must print nothing and exit 0; exit {run.returncode}, stdout "
+             f"{run.stdout!r}, stderr {run.stderr!r}, for {payload[:160]!r}")
+
+
+def run_ledger_late(shell, payload, cwd, path, source):
+    """Run the hook while path holds source up to its final message, and append that message 0.5 s later: the
+    host flushes transcript writes every 100 ms, so the last message can land after the event fires."""
+    lines = read(source).splitlines(keepends=True)
+    final = [json.loads(line)["message"]["id"] for line in lines if json.loads(line).get("type") == "assistant"][-1]
+    cut = next(i for i, line in enumerate(lines) if f'"id":"{final}"' in line)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.writelines(lines[:cut])
+    proc = subprocess.Popen([shell, ledger_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True, env=ledger_env, cwd=cwd)
+    proc.stdin.write(payload)
+    proc.stdin.close()
+    time.sleep(0.5)
+    waited = proc.poll() is None
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.writelines(lines[cut:])
+    out, err = proc.stdout.read(), proc.stderr.read()
+    code = proc.wait(timeout=60)
+    if not waited or code != 0 or out or err:
+        fail(f"{LEDGER} under {shell} must wait while the transcript's last assistant record ends in a tool call, "
+             f"then print nothing and exit 0; still running at 0.5 s: {waited}, exit {code}, stdout {out!r}, "
+             f"stderr {err!r}")
+
+
+def ledger_records(repo):
+    path = os.path.join(repo, LEDGER_TARGET)
+    if not os.path.exists(path):
+        return []
+    records = []
+    for line in read(path).splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            fail(f"{LEDGER} wrote a line that is not JSON: {line!r}")
+        if list(record) != LEDGER_KEYS:
+            fail(f"{LEDGER} wrote keys {list(record)!r}; expected {LEDGER_KEYS!r}")
+        records.append(record)
+    return records
+
+
+ledger_runs = 0
+with tempfile.TemporaryDirectory() as tmp:
+    empty = os.path.join(tmp, "empty.jsonl")
+    open(empty, "w").close()
+    malformed = [
+        "", "not json", '{"hook_event_name":"PreToolUse","cwd":"."}',
+        '{"hook_event_name":"SubagentStop","agent_type":"compute-squad:squad-pm"',
+    ]
+    for shell in ledger_shells:
+        repo = os.path.join(tmp, shell, "repo")
+        sub = os.path.join(repo, "src", "deep")
+        os.makedirs(sub)
+        subprocess.run(["git", "init", "-q", repo], check=True, env=ledger_env)
+        log = os.path.join(repo, "COMPUTE_SQUAD_LOG.md")
+        archive = os.path.join(repo, os.path.dirname(LEDGER_TARGET))
+        expected = []
+
+        def step(label, payload, cwd, *new):
+            global ledger_runs
+            run_ledger(shell, payload, cwd)
+            ledger_runs += 1
+            expected.extend(new)
+            got = ledger_records(repo)
+            if got != expected:
+                fail(f"{LEDGER} under {shell}, {label}: the ledger holds\n{got!r}\nexpected\n{expected!r}")
+
+        def rec(path, run, agent, agent_id, session=SESSION):
+            return transcript_record(path, run, session, agent, agent_id)
+
+        main_rec = lambda run: rec(main_fixture, run, "main", "main")
+        # No log: another agent and Stop record nothing and create nothing.
+        step("a general-purpose agent with no log", ledger_payload("SubagentStop", repo, agent_type="general-purpose"), tmp)
+        step("Stop with no ledger", ledger_payload("Stop", repo), tmp)
+        if os.path.exists(archive):
+            fail(f"{LEDGER} under {shell} created {archive} for an agent outside a squad run")
+        # A squad agent is recorded with no log (the intern at Stage 1), then
+        # against the log's Run: line, from a subdirectory, under either spelling.
+        step("squad-mech with no log or archive", ledger_payload("SubagentStop", repo, agent_type="compute-squad:squad-mech"),
+             tmp, rec(agent_fixture, "", "squad-mech", "a0f1e2d3c4b5a6978"), main_rec(""))
+        with open(log, "w", encoding="utf-8") as handle:
+            handle.write(f"## Goal — Locked\nTimestamp: 2026-02-28T23:58:10Z\nRun: {RUN}\n\n## Status\nRun: {RUN}\n\n")
+        step("squad-recon from a subdirectory, with another agent last in background_tasks",
+             ledger_payload("SubagentStop", sub, agent_type="compute-squad:squad-recon", style="spaced"), tmp,
+             rec(agent_fixture, RUN, "squad-recon", "a0f1e2d3c4b5a6978"), main_rec(RUN))
+        # The final message reaches the transcript after the event fires: the
+        # hook waits for it, for an agent at SubagentStop and for the main
+        # session at Stop.
+        late = os.path.join(tmp, shell, "late.jsonl")
+        run_ledger_late(shell, ledger_payload("SubagentStop", repo, agent_type="compute-squad:squad-executor",
+                                              agent_path=late), tmp, late, agent_fixture)
+        ledger_runs += 1
+        expected.extend([rec(agent_fixture, RUN, "squad-executor", "a0f1e2d3c4b5a6978"), main_rec(RUN)])
+        run_ledger_late(shell, ledger_payload("Stop", repo, main_path=late), tmp, late, main_fixture)
+        ledger_runs += 1
+        expected.append(main_rec(RUN))
+        if ledger_records(repo) != expected:
+            fail(f"{LEDGER} under {shell}, final messages flushed after the event: the ledger holds\n"
+                 f"{ledger_records(repo)!r}\nexpected\n{expected!r}")
+        # Another agent (an audit finder) is recorded while the log is non-empty.
+        step("a general-purpose agent during a run", ledger_payload("SubagentStop", repo, agent_type="general-purpose"),
+             tmp, rec(agent_fixture, RUN, "general-purpose", "a0f1e2d3c4b5a6978"), main_rec(RUN))
+        step("Stop for a session in the ledger", ledger_payload("Stop", repo), tmp, main_rec(RUN))
+        step("Stop for another session", ledger_payload("Stop", repo, session=OTHER_SESSION), tmp)
+        # Once a PASS clears the log, the run ID comes from the newest archive.
+        for name, run_id, stamp in (("older", OLD_RUN, 1000000000), ("newer", RUN, 2000000000)):
+            path = os.path.join(archive, f"COMPUTE_SQUAD_LOG_2026-02-28_000000_{name}.md")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(f"## Goal — Locked\nRun: {run_id}\n")
+            os.utime(path, (stamp, stamp))
+        open(log, "w").close()
+        step("a general-purpose agent after the log is cleared",
+             ledger_payload("SubagentStop", repo, agent_type="general-purpose"), tmp)
+        step("squad-pm after the log is cleared", ledger_payload("SubagentStop", repo, agent_type="compute-squad:squad-pm"),
+             tmp, rec(agent_fixture, RUN, "squad-pm", "a0f1e2d3c4b5a6978"), main_rec(RUN))
+        # Unreadable input and missing or empty transcripts write nothing.
+        for bad in malformed:
+            step(f"malformed input {bad!r}", bad, tmp)
+        step("missing transcripts", ledger_payload("SubagentStop", repo, agent_type="compute-squad:squad-pm",
+                                                   agent_path=os.path.join(tmp, "gone.jsonl"),
+                                                   main_path=os.path.join(tmp, "gone.jsonl")), tmp)
+        step("empty transcripts", ledger_payload("SubagentStop", repo, agent_type="compute-squad:squad-pm",
+                                                 agent_path=empty, main_path=empty), tmp)
+        # The end-of-run command prints this run's subagent lines, then its last main line.
+        with open(os.path.join(repo, LEDGER_TARGET), "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(dict(main_rec(OLD_RUN), output=1), separators=(",", ":")) + "\n")
+        lines = read(os.path.join(repo, LEDGER_TARGET)).splitlines()
+        mine = [line for line in lines if f'"run":"{RUN}"' in line]
+        want = [line for line in mine if '"agent":"main"' not in line] + [
+            [line for line in mine if '"agent":"main"' in line][-1]]
+        printed = subprocess.run([shell, "-c", END_COMMAND.replace("<run ID>", RUN)], capture_output=True, text=True,
+                                 cwd=repo, env=ledger_env, timeout=60)
+        if printed.returncode != 0 or printed.stdout.splitlines() != want:
+            fail(f"{SKILL}'s end-of-run command under {shell} printed\n{printed.stdout}{printed.stderr}\nexpected\n"
+                 + "\n".join(want))
+
+print(
+    f"PASS: check 8: {LEDGER} is wired once, with no matcher, for SubagentStop and Stop in {CLAUDE_PLUGIN} and "
+    f"ran {ledger_runs} times as specified under {', '.join(ledger_shells)} on {LEDGER_FIXTURES}: exact token "
+    f"sums with split messages counted once, a final message flushed after the event waited for, squad agents "
+    f"always, other agents only during a run, Stop only for "
+    f"a session in the ledger, the run ID from the log or the newest archive, silent on every input; "
+    f"{SKILL}'s end-of-run command prints the run's lines"
 )
 PYEOF
 

@@ -1,0 +1,25 @@
+{
+  "note": "Live seed for section 6, S2c, in tests/live/run.sh: WO-1 already has a PASS, the session ended before the Status after it, and the grant names only WO-1. tests/live/run.sh applies tests/live/repo-reset-wo1.patch to the tree and writes the archive copy the PASS entry names, so resuming finds the state the PM left. It spawns no stage and leaves the archive copy untouched.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If stage entries follow that entry, first recompute `Next:` from them by the stage order and the FAIL and blocker rules, and append a fresh `## Status`."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A grant covers only the work orders it names: after their verdict, append a `## Status` and stop."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "If it flagged the change high-stakes (auth, payments, migrations, privacy, production config), the PM leaves the active log intact"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "An archive file is never overwritten, appended to, or edited once written."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  }
+}

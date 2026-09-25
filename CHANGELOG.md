@@ -1,5 +1,155 @@
 # Changelog
 
+## 4.1.0 — 2026-09-24
+
+Lands work order WO-3c of the 3.9.2 analysis: modes, execution grants, unattended runs, and the
+usage ledger (findings 1, 4, and the ledger part of 21), plus finding 21's Goal-template timestamp
+line, which WO-1 could not land, and the live test tier from finding 26 that these scenarios need.
+Claude Code gains its first plugin hooks, all declared inline under the `hooks` key of
+`.claude-plugin/plugin.json`; there is no root `hooks/hooks.json`, and `.codex-plugin/plugin.json`
+still has no `hooks` key. The stage order within a full run is unchanged. This release closes
+leftover finding N7 (the example log credited squad-mech with appending the Goal entry).
+
+- **`/squad` takes a mode (finding 1).** `commands/squad.md` reads a first word of `plan`,
+  `execute`, or `accept` as the mode, with `full` as the default, and its `argument-hint` is
+  `[plan|execute|accept] <goal or work order>`. It tells the session to read the latest
+  `## Status` first, run only the stages the mode permits, and never spawn an executor without a
+  grant the log records. The `description` line is unchanged.
+- **Modes, grants, and the Status entry (finding 1).** `skills/compute-squad/SKILL.md` gains a
+  section defining the four modes, the governing plan revision, resume (which grants nothing),
+  and the new `## Status` and `## Decision` templates, which only the main session writes. A
+  `## Decision` quotes the user's own words, and `plan-approved` never grants execution. An
+  executor spawns only when the latest `## Status` grants the plan revision and work order about
+  to run. Stage 1 now archives only when the invocation starts a new run, and appends the Goal
+  entry and the first `## Status` in one Bash command; it keeps WO-2's `ARCHIVE FAILED` stop.
+  Stage 4 checks the grant before routing. The Hard rules say every fresh log opens with a Goal
+  and a Status, stages read the latest Goal entry, and no stage skips within a mode. Both new
+  headings join the closed heading list (7i now counts 10). Adaptations the tree forced: the
+  templates use the `Timestamp:` line, not `<timestamp line>`; the resume sentence does not cite
+  `references/resume.md` and the `execute` bullet drops "revalidate", both of which arrive with
+  finding 10 in WO-3d; and one added sentence defines revision r<N> as the count of
+  `## PM — Plan` entries without ` (cont.)` and a plan with no work orders as work order `all`,
+  since finding 9's revision fields are not in the tree yet. WO-3d's governing-plan pointer
+  (finding 9) must replace or agree with that sentence in both SKILL.md copies. One sentence
+  after the Status rule places a re-lock Decision's `## Status` after the new Goal entry that
+  directly follows it, so the Status rule and the re-lock rule agree when read literally.
+- **Goal template: Run, Attended, and Timestamp lines (findings 1, 4, and 21).** The Goal
+  template in `skills/compute-squad/SKILL.md`, `codex/SKILL.md`, and `codex/README.md` changed
+  once, in all three copies, and they stay byte-identical (7a): `<timestamp line>` becomes
+  `Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>` (finding 21's mirror carried over from
+  WO-1), then new `Run:` and `Attended: <yes|no>` lines.
+- **The grant gate (findings 1 and 4).** New POSIX sh hook
+  `skills/compute-squad/hooks/grant-gate.sh` runs on PreToolUse with the matcher `Agent|Task`
+  (Claude Code 2.1.282 reports the spawn tool as `Task`). It denies `squad-executor`,
+  `squad-executor-mechanical`, and `squad-executor-complex`, with or without the
+  `compute-squad:` prefix, unless the latest `## Status` grants the current plan revision or all
+  revisions. It also holds every executor and `squad-recon`, `squad-pm`, and `squad-helper`
+  while a `needs-human:` blocker has no `## Decision` after it; `squad-mech` stays exempt so
+  Stage 1 can archive. Two deviations from finding 4's text: the hold covers any open
+  `needs-human:` blocker, not only the last BLOCKER, which matches the linter's rule and fails
+  closed; and executors get the grant check before the hold. On Codex the grant rule stays
+  prose, checked by reading the log. The hook checks plan revisions, not work orders.
+- **Unattended runs and re-locks (finding 4).** In `skills/compute-squad/SKILL.md`, Stage 0
+  step 3 defines an unattended session, writes `Attended: no`, and makes that step the only
+  place a run makes assumptions; a false goal fact that changes a criterion is a `needs-human:`
+  blocker. The sentence does not name Recon's `goal facts:` line, which finding 14 adds in
+  WO-3e. Step 4 says changing a command, test, or check that a criterion names redefines the
+  criterion, and a re-lock needs the user: in one Bash command, a `## Decision` of Type re-lock
+  quoting them, then a new full Goal entry with a `Supersedes:` line; the latest Goal entry
+  governs. "In one Bash command" is added to the report's text so the Status-after-every-Decision
+  rule does not separate the Decision from its Goal entry. A `needs-human:` blocker now stops
+  the pipeline: with the user present, resolve it and re-spawn the stage that raised it;
+  unattended, append a `## Status` whose `Stop:` quotes the blocker and end the run. The main
+  session never tells a stage the run is unattended. `codex/SKILL.md` mirrors each rule.
+- **Stage bodies read the latest Goal (finding 4).** `agents/squad-recon.md`,
+  `agents/squad-pm.md`, and the three executor bodies read the goal from the latest
+  `## Goal — Locked` entry instead of the entry "at the top of the log". The PM body adds that
+  no adjustment is allowed however narrow, the criterion-command sentence, and that whether the
+  run is attended never changes what it logs. Each executor gains a STOP bullet: a task that
+  would change a criterion's command without the latest Goal stating it ends in a
+  `needs-human:` blocker. Recon, which cannot change a command, gets no such sentence. The
+  generated `codex/02-recon.md` to `codex/05-pm-accept.md` and the five matching
+  `codex/agents/*.toml` were regenerated.
+- **The usage ledger (finding 21).** New POSIX sh hook
+  `skills/compute-squad/hooks/usage-ledger.sh` runs on SubagentStop and Stop, with no matcher,
+  and appends one JSON line per subagent, plus a running total for the main session, to
+  `compute-squad-archive/usage.jsonl`. It prints nothing. A SKILL.md Hard rule gives the
+  end-of-run command that prints a run's lines and says a run with no lines, as on Codex,
+  reports usage as unavailable. One forced change to the report's script: its `field()` helper
+  returns a key's first value, not its last, because the SubagentStop payload lists
+  `background_tasks` entries with their own `agent_type` after the top-level fields. One
+  addition: Claude Code flushes transcript writes every 100 ms, so an agent's final message can
+  reach its transcript after SubagentStop fires (a review probe's ledger missed a background
+  executor's last call that way), and the script now waits, at most five seconds, while the
+  relevant transcript's last assistant record still ends in a tool call or has no stop reason:
+  the agent's at SubagentStop, the main session's at Stop. `.gitignore` already covers the
+  path.
+- **Mirrors (findings 1, 4, and 21).** `codex/README.md` gains a "Modes and grants" paragraph with
+  both templates, byte-identical to SKILL.md's, and the re-lock record in its On FAIL paragraph. Its
+  manual-fallback step now has the operator append the first `## Status` with the Goal entry.
+  `codex/SKILL.md` gains a condensed modes section, though the report expected this file to be
+  retired, with the same grant and resume rules as SKILL.md; it says no Codex hook enforces the
+  grant. `README.md` gains the Modes paragraph, the unattended-run sentence, the `usage.jsonl` line
+  (under the `compute-squad-archive/` bullet) and cost-FAQ sentence, "Resuming never grants
+  execution of a shelved plan", and tree lines for `hooks/`, `tests/`, and the `/squad` modes; "Six
+  stages run in order, every time" now applies to a full run, and the cost FAQ's five-spawn floor to
+  a full run, with three for a plan run. `docs/example-log.md` fixes the Stage 0 line (N7), adds
+  `Run:` and `Attended: yes` lines and three `## Status` entries, and names its archive by run ID.
+  `CONTRIBUTING.md` lists `skills/compute-squad/hooks/` in the sync list and names both hooks in the
+  check 8 sentence.
+- **New and extended checks (findings 1, 4, and 21).** In `scripts/verify.sh`: 7f requires the
+  `## Status` and `## Decision` templates to be byte-identical in SKILL.md and
+  `codex/README.md`; two new 7p rows pin the latest-Goal read across the stage bodies and
+  `codex/02` to `05`, and the criterion-command sentence across SKILL.md, the PM, the executors,
+  and `codex/03` to `05`; new 7u fails if any tracked file under `agents/`, `codex/`, or
+  `skills/` reads the goal from the entry "at the top of the log" (the report's "7x"). 8c pipes
+  synthetic PreToolUse JSON into the grant gate under sh, dash, and bash (1412 decisions),
+  including a `Grant: r0` line before any plan, runs it over the live seeds (`s1` and `s2b`
+  deny, `s2` and `s2c` allow; S2c's zero spawns rest on work-order scope, which 8b covers in
+  WO-3d), requires the hook wired once for `Agent` and `Task`, and bans a tracked root
+  `hooks/hooks.json`. 8f runs the ledger hook on synthetic transcripts in
+  `tests/fixtures/ledger/`: exact token sums, a repeated message ID counted once, a final
+  message written 0.5 s after the hook starts (at SubagentStop and at Stop) that the hook waits
+  for, silent exit on malformed input, and the end-of-run command.
+- **The log linter learns grants, re-locks, and the needs-human stop (findings 1 and 4).**
+  `tests/check_logs.py` gains three rules: `grant` runs the gate over the log above every
+  Executor entry, `re-lock` requires every later Goal entry to follow a re-lock Decision
+  directly with `Attended: yes` and the right `Supersedes:`, and `needs-human` rejects any stage
+  entry between an open `needs-human:` blocker and a Decision. The seven fixtures with Executor
+  entries gain a Run line and a granting Status. New fixtures under `tests/fixtures/logs/`:
+  `plan-shelved`, `execute-granted`, `needs-human-stop`, and `relock-recorded` pass;
+  `executor-no-grant`, `executor-stale-grant`, `status-invented`, `relock-self-authorized`,
+  `relock-status-between`, `relock-wrong-type`, `relock-unattended`,
+  `relock-wrong-supersedes`, and `needs-human-ignored` fail with exactly their rule. Each part
+  of the re-lock rule has a fixture that fails it alone: a Status between the re-lock Decision
+  and the new Goal entry, a Decision of Type waiver directly above it, `Attended: no`, and the
+  wrong `Supersedes:` timestamp. Check 8a now reports 12 passing and 20 failing fixtures.
+- **The live tier (finding 26).** New `tests/live/run.sh` and `tests/live/check_live.py` (Python
+  3.9 stdlib) run the section 6 scenarios S1, its plain-words variant s1n, S2, S2b, and S2c:
+  copy the fixture, commit a base, seed the log, run `claude -p`, then assert spawns by type,
+  permission denials, the diff, the log, archive hashes, and ledger billed input within 1% of
+  `modelUsage` (output at or below it). It has `--list`, `--dry-run`, and `--setup-only` modes that call no model,
+  refuses a live run when `CI` is set, and is never run by `verify.sh`. It adds `Task` to
+  `--allowedTools` and unsets inherited Claude session variables. New
+  `tests/fixtures/repo-reset/` is an 11-file Node password-reset repo mirroring the example log,
+  whose `npm test` passes 6 of 6; `tests/live/repo-reset-wo1.patch` is the WO-1 change S2c
+  starts from. Seed logs `s1`, `s2`, `s2b`, and `s2c` in `tests/fixtures/logs/` lint clean.
+- **Not landed, or not run.** No live scenario ran (the run rules forbid it), so these WO-3c
+  acceptance items are unverified: S1, S2, S2b, and S2c passing live; the grant gate over five
+  repeats with a clean `git status --porcelain`; and a reference run's ledger within 1% of
+  `modelUsage`. Finding 4's live S5c detection was not run either. The static twin 8b arrives with
+  WO-3d. Cheap Haiku probes, about $0.36 in total, did confirm that the gate denies an executor
+  spawn with no log and allows it with a granting Status, that the ledger matched `modelUsage`
+  exactly on a small run including a resume, and that the harness's CLI flags and result fields
+  work. Review probes, about $0.44 more, found the late-flush gap the ledger now waits for, and one
+  it cannot close: a message with parallel tool calls, whose transcript records the host writes
+  before the stream ends, keeps the output count of its first record (3 where the host counted 193),
+  so the ledger's output total can read low while billed input stays exact. The live tier
+  therefore holds billed input to 1% of `modelUsage` and output to at most `modelUsage`, and prints
+  the output shortfall; a reference run has not measured it. Until finding 9's work-order fields land in
+  WO-3d, an ordinary PASS after `/squad execute WO-1` still clears a log that holds WO-2, and S2's
+  PM may fail WO-1 over a criterion that belongs to WO-2.
+
 ## 4.0.0 — 2026-09-24
 
 Lands work order WO-3b of the 3.9.2 analysis: the locked Claude ladder and Codex model currency.

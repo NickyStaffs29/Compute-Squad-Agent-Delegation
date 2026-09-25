@@ -1,0 +1,19 @@
+{
+  "note": "The S1 baseline's improvised heading reworded as a Status variant; the closed list names only ## Status and ## Decision for the main session's entries.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Log entries use only these headings: `## Goal — Locked`, `## Status`, `## Decision`,"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Any other heading or suffix is a protocol violation."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "heading"
+    ]
+  }
+}

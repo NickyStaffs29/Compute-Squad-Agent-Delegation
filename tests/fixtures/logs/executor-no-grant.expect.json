@@ -1,0 +1,19 @@
+{
+  "note": "Section 6, S1 turn 2: after a plan-approved Decision the latest Status still grants nothing, so an executor entry is a spawn the grant hook denies.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "`plan-approved` never grants execution."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "On Claude Code a PreToolUse hook refuses an executor spawn whose plan revision the latest `## Status` does not grant"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "grant"
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "note": "Live seed for section 6, S2, in tests/live/run.sh: plan r1 splits the work into WO-1 and WO-2, and the user's execute request granted r1 WO-1. Resuming runs the one granted work order, an executor at the plan's STANDARD rung and one PM verdict, with no second prompt and no WO-2 entry.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Resume is not a mode and grants nothing: it performs the `Next:` action of the latest `## Status` entry."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Spawn an executor only when the latest `## Status` grants the plan revision and work order about to run."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Never ask for a grant the log already records. A grant covers only the work orders it names: after their verdict, append a `## Status` and stop."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "spawn `squad-executor` (mid rung)."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  }
+}

@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T10:00:12Z
+Run: 2026-09-01-export-dry-run
 
 Goal: Add a --dry-run flag to the export command that prints the files it would write and writes nothing.
 Acceptance criteria:
@@ -7,6 +8,17 @@ Acceptance criteria:
 - export --dry-run prints one line per file a real run would write.
 Out of scope: the import command.
 Assumptions: none.
+
+## Status
+Timestamp: 2026-09-01T10:00:12Z
+Run: 2026-09-01-export-dry-run
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 1a2b3c4
+Plan: none
+Grant: all revisions, full-mode request
+Next: spawn squad-recon
+Stop: after the PM verdict
 
 ## Recon
 Timestamp: 2026-09-01T10:03:40Z

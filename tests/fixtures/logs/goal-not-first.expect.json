@@ -3,7 +3,7 @@
   "cites": [
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "Every fresh log opens with a `## Goal — Locked` entry, appended by Stage 1 before Recon spawns."
+      "text": "Every fresh log opens with a `## Goal — Locked` entry and a `## Status` entry, appended together by Stage 1 before Recon spawns."
     }
   ],
   "lint": {

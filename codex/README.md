@@ -96,12 +96,14 @@ generated TOMLs preserve the three routing variants (`squad-executor-mechanical`
 `squad-executor-complex`) with fixed Codex model IDs.
 
 After session 1 (`01-archive.md`) reports an archive path or an already-empty log (not
-`ARCHIVE FAILED`), append the `## Goal — Locked` entry yourself as its first entry, before pasting
-`02-recon.md`:
+`ARCHIVE FAILED`), append the `## Goal — Locked` entry yourself as its first entry, then the first
+`## Status` (template under **Modes and grants** below), before pasting `02-recon.md`:
 
 ```markdown
 ## Goal — Locked
-<timestamp line>
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Run: <UTC date and a slug: lowercase letters, digits, hyphens>
+Attended: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
 - <concrete, verifiable item>
@@ -112,11 +114,36 @@ Assumptions: <only for unattended runs; otherwise "none">
 Sessions 2 through 5 read the goal and acceptance criteria from that entry — nothing to fill in on
 their end.
 
+**Modes and grants.** A `plan` run is sessions 1 to 3 only. You write the `## Status` and `## Decision` entries yourself: a `## Status` right after the Goal entry, and another after every stage entry and decision (after a re-lock decision, only once its new Goal entry follows it). Paste `04-execute.md` only when the latest `## Status` grants the plan revision and work order you are about to execute.
+
+```markdown
+## Status
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Run: <run ID from the Goal entry>
+Mode: <full | plan | execute | accept>
+Worktree: <repo root path and branch>
+Base: <commit SHA the governing plan was mapped against>
+Plan: <none | r<N>, work order <ID or all>>
+Grant: <none | r<N> <work order or all>, per Decision <timestamp> | all revisions, full-mode request>
+Next: <the one permitted next action, or none when the run is closed>
+Stop: <where this invocation ends>
+```
+
+```markdown
+## Decision
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Type: <grant | plan-approved | waiver | re-lock | park | abandon>
+Covers: <plan revision and work order, or criterion ID>
+User's words: "<verbatim>"
+```
+
 **On FAIL:** re-run the named stage's session (and every stage after it) with the log intact. Each FAIL
 or `rerun:` blocker counts against the stage it names, and that stage's next session runs one model
 rung up (bottom to mid, mid to top); a stage already on the top rung re-runs there. Three total FAILs
 stop the run and hand the full log history back to you, a separate rule from Stage 0's, which is that
-any change to the locked goal itself returns there.
+any change to the locked goal itself returns there. Record that change as a `## Decision` entry of
+Type re-lock followed by a new full `## Goal — Locked` entry with a `Supersedes:` line; sessions 2
+through 5 read the latest one.
 
 **On PASS:** the accept session archives the log, verifies the copy, then clears the active log —
 unless it flagged the change high-stakes, in which case it leaves the log intact for your own review.

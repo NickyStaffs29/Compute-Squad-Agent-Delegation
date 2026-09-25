@@ -9,7 +9,7 @@ should be discussed first, because those changes land in eight places at once.
 The protocol exists in synchronized copies. A protocol change is only complete when all of these
 move together:
 
-- `skills/compute-squad/SKILL.md` and `skills/compute-squad/references/`
+- `skills/compute-squad/SKILL.md`, `skills/compute-squad/references/`, and `skills/compute-squad/hooks/` (Claude Code only, wired in `.claude-plugin/plugin.json`)
 - `agents/*.md`
 - `commands/squad.md`
 - `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json`
@@ -28,8 +28,8 @@ Run `bash scripts/verify.sh` before you push. It's the same gate CI runs
 (`.github/workflows/ci.yml`), and it enforces most of the sync rule above mechanically: JSON/YAML
 validity, the version numbers below, the CHANGELOG heading, the packaged `dist/` artifact, the
 generated Codex agents, a handful of blocks and facts that must read identically across files,
-and check 8, which runs the log linter and codex/update.sh against fixtures in tests/ without a
-model.
+and check 8, which runs the log linter, the grant hook, the usage ledger hook and codex/update.sh
+against fixtures in tests/ without a model.
 
 ## Before you commit
 

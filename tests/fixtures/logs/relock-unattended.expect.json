@@ -1,0 +1,19 @@
+{
+  "note": "A re-lock Decision directly precedes the new Goal entry with the right Supersedes: line, but that entry says Attended: no, though only a user present can re-lock.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-lock needs the user"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Attended: <yes|no>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "re-lock"
+    ]
+  }
+}

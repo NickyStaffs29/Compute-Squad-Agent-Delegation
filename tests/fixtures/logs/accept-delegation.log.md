@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T12:00:12Z
+Run: 2026-09-01-release-notes
 
 Goal: List every changed public function in the release notes for 2.4.0.
 Acceptance criteria:
@@ -7,6 +8,17 @@ Acceptance criteria:
 - npm test passes.
 Out of scope: internal helpers.
 Assumptions: none.
+
+## Status
+Timestamp: 2026-09-01T12:00:12Z
+Run: 2026-09-01-release-notes
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 1a2b3c4
+Plan: none
+Grant: all revisions, full-mode request
+Next: spawn squad-recon
+Stop: after the PM verdict
 
 ## Recon
 Timestamp: 2026-09-01T12:03:18Z
@@ -59,4 +71,4 @@ Agent: squad-pm (claude-opus-5-5)
 - The helper's 6 names match the 6 in docs/release-notes/2.4.0.md.
 Both criteria met. Refutation attempted: an export re-exported from a second
 file (none found). High-stakes: no. Verdict: PASS.
-Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-09-01_122502_norun.md
+Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-09-01_122502_2026-09-01-release-notes.md

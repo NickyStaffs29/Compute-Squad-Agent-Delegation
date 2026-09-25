@@ -1,6 +1,6 @@
 {
   "name": "compute-squad",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Compute Squad is a staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest tier plans and adversarially accepts the work, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier, and the cheapest tier handles zero-judgment busywork — all through a shared, auditable log.",
   "author": {
     "name": "Nick Stafford"
@@ -8,5 +8,29 @@
   "homepage": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation",
   "repository": "https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation",
   "license": "MIT",
-  "keywords": ["agents", "delegation", "orchestration", "pipeline", "code-quality", "codex"]
+  "keywords": ["agents", "delegation", "orchestration", "pipeline", "code-quality", "codex"],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/skills/compute-squad/hooks/grant-gate.sh\"" }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/skills/compute-squad/hooks/usage-ledger.sh\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/skills/compute-squad/hooks/usage-ledger.sh\"" }
+        ]
+      }
+    ]
+  }
 }

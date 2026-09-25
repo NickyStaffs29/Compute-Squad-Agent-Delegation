@@ -1,0 +1,17 @@
+{
+  "note": "The user answers the needs-human blocker in a later session: a re-lock Decision quoting them, then a full Goal entry that supersedes the first, then the stage that raised the blocker runs again.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry with the full template and a `Supersedes: <timestamp of the prior Goal entry>` line."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "record the answer as a re-lock (Stage 0 step 4), and re-spawn the stage that raised it."
+    }
+  ],
+  "lint": {
+    "result": "pass",
+    "rules": []
+  }
+}

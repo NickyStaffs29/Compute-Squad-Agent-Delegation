@@ -12,16 +12,24 @@ as "<path>:<line>: [<rule>] <message>". Exit status: 0 when every log is
 clean, 1 on any violation, 2 when a log cannot be read or the rules cannot
 be read from the skill.
 
-The heading list, the opening entry, the timestamp form and the blocker
-grammar are read from skills/compute-squad/SKILL.md, so the linter follows
-the protocol text. If that text changes shape, the linter stops with status 2
-instead of guessing. Python 3.9 stdlib only.
+The heading list, the opening entry, the timestamp form, the blocker
+grammar, the Goal template's Attended: field and the re-lock rule are read
+from skills/compute-squad/SKILL.md, so the linter follows the protocol text.
+If that text changes shape, the linter stops with status 2 instead of
+guessing. The grant rule runs the Claude Code grant hook,
+skills/compute-squad/hooks/grant-gate.sh, with sh over the log above each
+Executor entry, so a log from either host is held to the rule the hook
+enforces; a denial for an open needs-human: blocker is the needs-human
+rule's to report. Python 3.9 stdlib only.
 """
 import argparse
 import datetime
+import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILL_PATH = os.path.join(REPO_ROOT, "skills", "compute-squad", "SKILL.md")
@@ -36,10 +44,21 @@ RULES = (
     ("timestamp-order", "timestamps never decrease in log order"),
     ("blocker", "a BLOCKER: block ends its entry, with one rerun or needs-human item and one why item"),
     ("blocker-prose", "no line starts with 'Blocker', so blockers are never listed in prose"),
+    ("grant", "the log above every Executor entry, (cont.) included, makes the grant hook allow an executor"
+              " spawn: its latest ## Status grants the current plan revision"),
+    ("re-lock", "every Goal entry after the first directly follows a re-lock Decision, says the run is attended,"
+                " and has a Supersedes: line naming the prior Goal entry's timestamp"),
+    ("needs-human", "no entry other than a Status or a Goal follows a needs-human: blocker until a Decision"
+                    " records the user's answer"),
 )
 
 HEADING_BULLET = "- Log entries use only these headings: "
 CONT = " (cont.)"
+EXECUTOR_HEADING = "## Executor"
+GATE = os.path.join("hooks", "grant-gate.sh")   # relative to the skill's directory
+GATE_AGENT = "compute-squad:squad-executor"
+NEEDS_HUMAN_DENIAL = "needs-human blocker unresolved"   # the hook's reason for an open needs-human: blocker
+STATUS_HEADING = "## Status"
 
 
 class ProtocolError(Exception):
@@ -47,13 +66,15 @@ class ProtocolError(Exception):
 
 
 class Protocol(object):
-    def __init__(self, fixed, cont, delegated, goal, time_format, targets):
+    def __init__(self, fixed, cont, delegated, goal, time_format, targets, gate, relock):
         self.fixed = fixed            # listed headings without a placeholder
         self.cont = cont              # listed headings that may add " (cont.)"
         self.delegated = delegated    # "## Delegated — ", the part before <stage>
         self.goal = goal              # the heading every log opens with
         self.time_format = time_format
         self.targets = targets        # the stages a rerun: blocker may name
+        self.gate = gate              # the grant hook script, run with sh
+        self.relock = relock          # dict: decision heading, type line, attended line, supersedes field
 
 
 def load_protocol(skill_path):
@@ -96,7 +117,44 @@ def load_protocol(skill_path):
     if not first or not second:
         raise ProtocolError(f"{skill_path}: the BLOCKER: block no longer reads '- rerun: <A|B> (or) needs-human: <...>' then '- why: <...>'")
 
-    return Protocol(fixed, cont, delegated, goal.group(1), stamp.group(1), first.group(1).split("|"))
+    relock = re.search(
+        r"A re-lock needs the user: in one Bash command, append a `(## [^`]+)` entry of Type ([a-z-]+) quoting "
+        r"their words, then a new `(## [^`]+)` entry with the full template and a `([A-Za-z]+): <timestamp of the "
+        r"prior Goal entry>` line\.", text,
+    )
+    if not relock or relock.group(1) not in fixed or relock.group(3) != goal.group(1):
+        raise ProtocolError(
+            f"{skill_path}: no 'A re-lock needs the user: in one Bash command, append a `## ...` entry of Type <type> "
+            f"quoting their words, then a new `{goal.group(1)}` entry ... `<Field>: <timestamp of the prior Goal "
+            f"entry>` line.' rule naming a listed heading"
+        )
+    template_at = next(
+        (i for i in range(len(lines) - 1) if lines[i] == "```markdown" and lines[i + 1] == goal.group(1)), None,
+    )
+    template = []
+    for line in lines[template_at + 2:] if template_at is not None else []:
+        if line == "```":
+            break
+        template.append(line)
+    attended = [m for m in (re.fullmatch(r"([A-Za-z]+): <([a-z]+)\|[a-z]+>", line) for line in template) if m]
+    if len(attended) != 1 or attended[0].group(1) != "Attended":
+        raise ProtocolError(f"{skill_path}: the {goal.group(1)!r} template needs one 'Attended: <yes|no>' line")
+    if STATUS_HEADING not in fixed:
+        raise ProtocolError(f"{skill_path}: {STATUS_HEADING!r} is not on the heading list")
+    relock = {
+        "decision": relock.group(1),
+        "type": "Type: " + relock.group(2),
+        "attended": f"{attended[0].group(1)}: {attended[0].group(2)}",
+        "supersedes": relock.group(4) + ": ",
+    }
+
+    if EXECUTOR_HEADING not in fixed or EXECUTOR_HEADING not in cont:
+        raise ProtocolError(f"{skill_path}: {EXECUTOR_HEADING!r} is not a listed heading that may add '{CONT}'")
+    gate = os.path.join(os.path.dirname(os.path.abspath(skill_path)), GATE)
+    if not os.path.isfile(gate):
+        raise ProtocolError(f"{gate}: the grant hook the grant rule runs is missing")
+
+    return Protocol(fixed, cont, delegated, goal.group(1), stamp.group(1), first.group(1).split("|"), gate, relock)
 
 
 def read_log(path, fenced):
@@ -228,6 +286,109 @@ def check_blockers(entry, protocol, report):
             )
 
 
+def timestamp_of(entry):
+    """The value of the entry's first Timestamp: line, or None."""
+    return next((text[len("Timestamp: "):] for _, text in entry["body"] if text.startswith("Timestamp: ")), None)
+
+
+def check_relocks(entries, protocol, report):
+    rule = protocol.relock
+    goals = [index for index, entry in enumerate(entries) if entry["heading"] == protocol.goal]
+    for previous, index in zip(goals, goals[1:]):
+        entry, prior = entries[index], entries[previous]
+        body = [text for _, text in entry["body"]]
+        before = entries[index - 1]
+        if before["heading"] != rule["decision"] or rule["type"] not in (text for _, text in before["body"]):
+            report(
+                entry["line"], "re-lock",
+                f"a later {protocol.goal!r} must directly follow a {rule['decision']!r} entry with {rule['type']!r}; "
+                f"the entry above it is {before['heading']!r} at line {before['line']}",
+            )
+        if rule["attended"] not in body:
+            report(entry["line"], "re-lock", f"a re-lock needs the user, so its {protocol.goal!r} entry says {rule['attended']!r}")
+        stamp = timestamp_of(prior)
+        wanted = rule["supersedes"] + (stamp or "<the prior Goal entry's timestamp>")
+        if stamp is None or wanted not in body:
+            report(
+                entry["line"], "re-lock",
+                f"a re-lock's {protocol.goal!r} entry needs {wanted!r}, naming the Goal entry at line {prior['line']}",
+            )
+
+
+def needs_human_line(entry):
+    """The line number of a BLOCKER: line in the entry whose first non-blank
+    line after it is a needs-human: item, as the grant hook reads it."""
+    body = entry["body"]
+    for index, (number, text) in enumerate(body):
+        if re.fullmatch(r"BLOCKER:\s*", text):
+            item = next((line for _, line in body[index + 1:] if line.strip()), "")
+            if item.startswith("- needs-human:"):
+                return number
+    return None
+
+
+def check_needs_human(entries, protocol, report):
+    open_at = None
+    for entry in entries:
+        heading = entry["heading"]
+        if heading == protocol.relock["decision"]:
+            open_at = None
+        elif open_at is not None and heading not in (STATUS_HEADING, protocol.goal):
+            report(
+                entry["line"], "needs-human",
+                f"{heading!r} follows the needs-human: blocker at line {open_at} with no "
+                f"{protocol.relock['decision']!r} between them; no stage runs until the user decides",
+            )
+        found = needs_human_line(entry)
+        if found is not None:
+            open_at = found
+
+
+def gate_denial(gate, log_text):
+    """Run the grant hook as Claude Code would for a main-session executor
+    spawn, with log_text as the active log. Return None when it allows the
+    spawn, or its reason when it denies it."""
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "COMPUTE_SQUAD_LOG.md"), "w", encoding="utf-8") as handle:
+            handle.write(log_text)
+        payload = json.dumps({
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Agent",
+            "tool_input": {"subagent_type": GATE_AGENT},
+            "cwd": root,
+        })
+        # The hook looks for the log at the root of the git repository that
+        # holds cwd; the ceiling keeps git from finding one above the temp dir.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        env["GIT_CEILING_DIRECTORIES"] = os.path.dirname(root)
+        try:
+            run = subprocess.run(["sh", gate], input=payload, capture_output=True, text=True, env=env, timeout=60)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise ProtocolError(f"{gate}: could not run the grant hook with sh: {error}")
+    if run.returncode != 0:
+        raise ProtocolError(f"{gate}: the grant hook exited {run.returncode}: {run.stderr.strip()}")
+    if not run.stdout.strip():
+        return None
+    try:
+        output = json.loads(run.stdout)["hookSpecificOutput"]
+        decision, reason = output["permissionDecision"], output["permissionDecisionReason"]
+    except (ValueError, KeyError, TypeError):
+        raise ProtocolError(f"{gate}: the grant hook printed something other than a PreToolUse decision: {run.stdout.strip()!r}")
+    if decision != "deny":
+        raise ProtocolError(f"{gate}: the grant hook printed a {decision!r} decision; it only ever denies or stays silent")
+    return reason
+
+
+def check_grants(lines, entries, protocol, report):
+    for entry in entries:
+        if entry["heading"] not in (EXECUTOR_HEADING, EXECUTOR_HEADING + CONT):
+            continue
+        above = "".join(text + "\n" for number, text in lines if number < entry["line"])
+        reason = gate_denial(protocol.gate, above)
+        if reason is not None and NEEDS_HUMAN_DENIAL not in reason:
+            report(entry["line"], "grant", f"{entry['heading']!r}: the grant hook denies this executor spawn: {reason}")
+
+
 def lint(lines, protocol):
     """Return (number of entries, problems), each problem (line, rule, message)."""
     problems = []
@@ -245,6 +406,9 @@ def lint(lines, protocol):
         check_heading(entry, entries[:index], protocol, report)
         check_blockers(entry, protocol, report)
     check_timestamps(entries, protocol, report)
+    check_grants(lines, entries, protocol, report)
+    check_relocks(entries, protocol, report)
+    check_needs_human(entries, protocol, report)
     return len(entries), sorted(problems)
 
 

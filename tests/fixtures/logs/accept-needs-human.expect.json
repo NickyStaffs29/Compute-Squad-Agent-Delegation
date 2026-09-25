@@ -7,7 +7,7 @@
     },
     {
       "file": "skills/compute-squad/SKILL.md",
-      "text": "A `needs-human:` blocker returns to Stage 0"
+      "text": "A `needs-human:` blocker stops the pipeline: spawn no stage until it is resolved."
     }
   ],
   "lint": {

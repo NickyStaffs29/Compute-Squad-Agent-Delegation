@@ -46,6 +46,8 @@ The updater also refreshes the configured marketplace and plugin. The plugin com
 
 Or say any of: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `full pipeline on this`.
 
+Modes: `/squad plan <goal>` stops after the plan with no product edits. `/squad execute WO-1` runs one work order of the plan in the log, records your command as its grant, and accepts it. `/squad accept` reviews an implementation made elsewhere against that plan. Plain `/squad <goal>` runs the full pipeline, and the request itself is the execution grant.
+
 **Codex:**
 
 ```bash
@@ -55,6 +57,8 @@ codex exec --profile compute-squad "Run the squad: add rate limiting to the pass
 ```
 
 The first form opens an interactive session; `codex exec` is the non-interactive form. Either way, run it from your project root, in a session that can read and write the repo.
+
+An unattended run (`codex exec`, or a headless or scheduled Claude run) stops at the first decision that needs you, leaves the log intact, and reports the stage to resume from.
 
 ## 3. Get updates automatically
 
@@ -147,8 +151,8 @@ Snapshot of `models.conf`, reviewed 2026-09-24. Routing reads `models.conf`; thi
 
 ## How a run works
 
-Six stages run in order, every time. Nothing skips, even for a one-line change — the entries can be
-short, but the discipline can't.
+In a full run, six stages run in order. Nothing skips within a mode, even for a one-line change: the
+entries can be short, but the discipline can't.
 
 - **Stage 0 — Strategy**, your session, before any agent spawns: interrogates the goal, clarifies
   gaps with you, locks the goal and acceptance criteria into the log's `## Goal — Locked` entry.
@@ -173,6 +177,7 @@ A run creates two things in your project root:
 
 - `COMPUTE_SQUAD_LOG.md`, the active log every stage appends to.
 - `compute-squad-archive/`, copies of past runs named by UTC time and run ID. The log is archived before a new run starts and again on PASS, and an existing archive is never overwritten, so a failed run is never lost.
+  - `compute-squad-archive/usage.jsonl` (Claude Code only): one line per stage with its model, elapsed time and tokens, written by a plugin hook and never cleared.
 
 Both are run state, not source. Add them to your `.gitignore` unless you specifically want run history in version control:
 
@@ -241,7 +246,7 @@ stages by hand when the plugin path is unavailable.
 ```
 Compute-Squad-Agent-Delegation/
 ├── .claude-plugin/
-│   ├── plugin.json           # plugin manifest
+│   ├── plugin.json           # plugin manifest, including the grant-gate and usage-ledger hooks
 │   └── marketplace.json      # makes this repo installable in Claude Code
 ├── .codex-plugin/
 │   └── plugin.json           # native Codex plugin manifest
@@ -251,6 +256,9 @@ Compute-Squad-Agent-Delegation/
 │   └── ci.yml                # runs scripts/verify.sh on every push; weekly Codex catalog check
 ├── skills/compute-squad/
 │   ├── SKILL.md              # the orchestration protocol
+│   ├── hooks/
+│   │   ├── grant-gate.sh     # Claude Code only: refuses an executor spawn without a logged grant, and any recon, PM, helper, or executor spawn while a needs-human blocker is open
+│   │   └── usage-ledger.sh   # Claude Code only: appends each stage's model, time, and tokens to compute-squad-archive/usage.jsonl
 │   └── references/
 │       └── audit-prompts.md  # finder and skeptic briefs for audit-grade runs
 ├── agents/
@@ -262,7 +270,7 @@ Compute-Squad-Agent-Delegation/
 │   ├── squad-helper.md       # delegated execution-tier subtasks
 │   └── squad-mech.md         # bottom rung · the intern
 ├── commands/
-│   └── squad.md              # /squad <goal> — starts the pipeline at Stage 0
+│   └── squad.md              # /squad [plan|execute|accept] <goal>: starts at Stage 0
 ├── codex/
 │   ├── README.md             # Codex install, routing, and manual fallback
 │   ├── SKILL.md              # reading copy with Codex model names; no host loads it
@@ -275,7 +283,7 @@ Compute-Squad-Agent-Delegation/
 ├── scripts/
 │   ├── build-plugin.sh       # rebuilds dist/ from the git-tracked source set
 │   └── verify.sh             # the CI gate; run it before every commit
-├── tests/                    # check 8 log linter and fixtures (not packaged)
+├── tests/                    # check 8 linter and fixtures, and the live scenario harness (not packaged)
 ├── dist/compute-squad.plugin # drag-and-drop install for Claude Cowork
 ├── models.conf               # model assignments by rung and role; build-agents.py reads it
 ├── .gitignore                # excludes COMPUTE_SQUAD_LOG.md and its archive
@@ -304,10 +312,10 @@ Durability and auditability. FAILs re-run stages against full history. Failed ru
 The stages are mandatory. Their length is not. A one-line change gets a three-sentence Recon entry and a four-line plan. The discipline is the constant; the overhead scales with the work.
 
 **What does a run cost?**
-The floor is five agent spawns: the intern, Recon, the PM twice, and the Executor. DELEGATE helpers, FAIL re-runs, and an audit fan-out add more. Snapshot 2026-09-24: one measured run of 3.9.2 on an eight-file fixture repo with a top-rung main session billed about 1.6M input and 47k output tokens and cost $3.00 at list prices, two thirds of it in the main session. List prices that day per million input and output tokens: Fable 5.1 $10/$50, Opus 5.5 $4/$20, Sonnet 5 $2/$10, Haiku 4.5 $1/$5. Treat it as one data point, not a quote; the real number tracks the main session's turns, how much each stage reads (re-sent on every later call), and how many stages re-run.
+A full run spawns at least five agents: the intern, Recon, the PM twice, and the Executor; a plan run spawns three. DELEGATE helpers, FAIL re-runs, and an audit fan-out add more. Snapshot 2026-09-24: one measured run of 3.9.2 on an eight-file fixture repo with a top-rung main session billed about 1.6M input and 47k output tokens and cost $3.00 at list prices, two thirds of it in the main session. List prices that day per million input and output tokens: Fable 5.1 $10/$50, Opus 5.5 $4/$20, Sonnet 5 $2/$10, Haiku 4.5 $1/$5. Treat it as one data point, not a quote; the real number tracks the main session's turns, how much each stage reads (re-sent on every later call), and how many stages re-run. On Claude Code, each run's measured usage per stage is in `compute-squad-archive/usage.jsonl`.
 
 **What if I stop a run halfway?**
-Nothing is lost. The log keeps every entry completed so far. Start a new run and Stage 1 archives it before clearing. Or say you want to resume, and the squad picks up from the last logged entry instead of starting over.
+Nothing is lost. The log keeps every entry completed so far. Start a new run and Stage 1 archives it before clearing. Or say you want to resume, and the squad picks up from the last logged entry instead of starting over. Resuming never grants execution of a shelved plan.
 
 **How do I see which agents ran?**
 Read `COMPUTE_SQUAD_LOG.md` during a run, or the timestamped copy in `compute-squad-archive/` after one. Every stage that ran has an entry with a timestamp.

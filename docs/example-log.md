@@ -2,13 +2,15 @@
 
 A complete worked run so you can see every entry format. Goal: add a 60-second resend cooldown to a password-reset email endpoint.
 
-Stage 0 (strategy) happens in the main session before the log starts: the goal gets interrogated, one gap gets clarified with the user ("should the cooldown apply per-account or per-IP?" → per-account), and the goal + acceptance criteria get locked into the `## Goal — Locked` entry below. Then `squad-mech` archives any prior log, appends that entry as the first line of the fresh log, and the pipeline writes the rest of these entries in order.
+Stage 0 (strategy) happens in the main session before the log starts: the goal gets interrogated, one gap gets clarified with the user ("should the cooldown apply per-account or per-IP?" → per-account), and the goal + acceptance criteria get locked into the `## Goal — Locked` entry below. Then `squad-mech` archives any prior log, the main session appends that entry and the first `## Status` to the fresh log, and the pipeline writes the rest of these entries in order. For brevity the example shows three of the main session's `## Status` entries; a real run appends one wherever the skill's Status rule calls for it, such as after the Recon and Executor entries.
 
 ---
 
 ```markdown
 ## Goal — Locked
 Timestamp: 2026-07-25T13:58:41Z
+Run: 2026-07-25-reset-cooldown
+Attended: yes
 
 Goal: Add a 60-second resend cooldown to the password-reset email endpoint, per-account.
 Acceptance criteria:
@@ -17,6 +19,19 @@ Acceptance criteria:
 - No response or log reveals whether an account exists (existing invariant preserved).
 Out of scope: per-IP throttling; admin-triggered resets (different service path).
 Assumptions: none.
+```
+
+```markdown
+## Status
+Timestamp: 2026-07-25T13:58:41Z
+Run: 2026-07-25-reset-cooldown
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 4f2c9a1
+Plan: none
+Grant: all revisions, full-mode request
+Next: spawn squad-recon
+Stop: after the closing archive
 ```
 
 ```markdown
@@ -81,6 +96,19 @@ risk — use the suite's existing clock helper.
 ```
 
 ```markdown
+## Status
+Timestamp: 2026-07-25T14:10:02Z
+Run: 2026-07-25-reset-cooldown
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 4f2c9a1
+Plan: r1, work order all
+Grant: all revisions, full-mode request
+Next: spawn squad-executor (STANDARD)
+Stop: after the closing archive
+```
+
+```markdown
 ## Executor
 Timestamp: 2026-07-25T14:21:52Z
 Agent: squad-executor (claude-sonnet-5)
@@ -114,9 +142,22 @@ Diff review: no scope creep, no dead code. HIGH-STAKES: yes — the change sits 
 password-reset auth path and the no-account-existence-leak invariant. Verdict: PASS.
 Leaving the active log intact for the main session's high-stakes review; the
 orchestrating session clears it afterwards.
-Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_norun.md
+Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_2026-07-25-reset-cooldown.md
+```
+
+```markdown
+## Status
+Timestamp: 2026-07-25T14:34:10Z
+Run: 2026-07-25-reset-cooldown
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 4f2c9a1
+Plan: r1, work order all
+Grant: all revisions, full-mode request
+Next: main-session high-stakes review, then the closing archive
+Stop: after the closing archive
 ```
 
 ---
 
-The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM's archive command appends that line as the entry's last, then writes the copy and verifies it with `cmp`, and the PM reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_norun.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and closes the run as its last step with the archive command, which archives the log again and clears `COMPUTE_SQUAD_LOG.md` only after `cmp` succeeds. On an ordinary, non-high-stakes change the PM's archive command writes the copy, verifies it with `cmp`, and clears the log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.
+The `## PM — PASS` entry only ever names the archive target as intent, because it is written before the copy exists. The PM's archive command appends that line as the entry's last, then writes the copy and verifies it with `cmp`, and the PM reports that verification in its final summary message — not in the log, which is append-only and would otherwise be claiming a completed action that hadn't happened yet when the entry was written. Here that summary reads something like: "PASS. Archived to compute-squad-archive/COMPUTE_SQUAD_LOG_2026-07-25_143312_2026-07-25-reset-cooldown.md, copy verified. Leaving the active log intact for the main session's high-stakes review." The main session then runs its own review of the diff against the locked criteria, reports the outcome to the user (including the concurrent-request note the PM surfaced), and closes the run as its last step with the archive command, which archives the log again and clears `COMPUTE_SQUAD_LOG.md` only after `cmp` succeeds. On an ordinary, non-high-stakes change the PM's archive command writes the copy, verifies it with `cmp`, and clears the log. On a FAIL, the last entry would instead be `## PM — FAIL` with evidence and exactly one named stage to re-run, and the log would stay intact with no archive. A mid-stage blocker looks different again: instead of improvising, the stalled stage ends its own entry with a block like `BLOCKER:` / `- rerun: Plan` / `- why: the spec didn't cover concurrent first requests`, which re-runs Plan and everything after it without waiting for a PM verdict.

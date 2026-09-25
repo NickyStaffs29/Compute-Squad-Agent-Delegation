@@ -7,7 +7,7 @@ description: >
   with COMPUTE_SQUAD_LOG.md coordination. Also use when the user names a goal and asks
   for the full pipeline treatment ("full pipeline on this", "recon-plan-execute-accept").
 metadata:
-  version: "4.0.0"
+  version: "4.1.0"
   author: "Nick Stafford"
 ---
 
@@ -40,13 +40,15 @@ Do this directly in the main session; never delegate it:
 
 1. Interrogate the goal: what outcome is actually wanted, what does done look like, what is out of scope, what could this break, is there a higher-leverage framing of the same problem.
 2. Identify gaps: ambiguities, unstated constraints, decisions with irreversible or cost-bearing consequences, conflicts with known project invariants.
-3. Clarify gaps WITH THE USER via the host's question mechanism (AskUserQuestion in Claude; request_user_input in Codex) before the pipeline starts. Batch the questions; do not drip them. If the session is clearly unattended, make the most reasonable call per gap, state each assumption explicitly, and proceed.
-4. Lock the goal (one sentence) and acceptance criteria (concrete, verifiable). Once locked, no agent may redefine them; changes come back to Stage 0.
+3. Clarify gaps WITH THE USER via the host's question mechanism (AskUserQuestion in Claude; request_user_input in Codex) before the pipeline starts. Batch the questions; do not drip them. If the session is unattended (the user said so, or the question mechanism is unavailable in this session), make the most reasonable call per gap, state each assumption explicitly, write `Attended: no` in the Goal entry, and proceed. This step is the only place an unattended run makes assumptions: once the Goal entry is written, only the user changes them. Recon reports a false goal fact in its entry; one that changes what a criterion checks is a `needs-human:` blocker.
+4. Lock the goal (one sentence) and acceptance criteria (concrete, verifiable). Once locked, no agent may redefine them; changes come back to Stage 0. Changing a command, test, or check that an acceptance criterion names counts as redefining that criterion. A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry with the full template and a `Supersedes: <timestamp of the prior Goal entry>` line. The latest `## Goal — Locked` entry governs; no other entry amends the goal, criteria, or assumptions.
 5. Compose the `## Goal — Locked` entry below, the mandatory first entry of every fresh log. Stage 0 composes it but does not write it — the fresh log doesn't exist yet — so Stage 1 appends it once the archive is done.
 
 ```markdown
 ## Goal — Locked
-<timestamp line>
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Run: <UTC date and a slug: lowercase letters, digits, hyphens>
+Attended: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
 - <concrete, verifiable item>
@@ -54,11 +56,51 @@ Out of scope: <items>
 Assumptions: <only for unattended runs; otherwise "none">
 ```
 
-If `COMPUTE_SQUAD_LOG.md` already contains entries for this same goal — read the goal from its `## Goal — Locked` entry, not from memory — offer the user a resume from the last logged entry instead of a fresh run, and archive only if they choose the fresh run.
+If `COMPUTE_SQUAD_LOG.md` already contains entries for this same goal — read the goal from its latest `## Goal — Locked` entry, not from memory — offer the user a resume from the last logged entry instead of a fresh run, and archive only if they choose the fresh run.
+
+## Modes, grants, and the Status entry
+
+Every invocation has one mode: the first word of a `/squad` request, or what the user's own words ask for. The default is `full`.
+
+- `full`: Stages 0 to 5. The request is the execution grant for every plan revision and work order of this run.
+- `plan`: Stages 0 to 3, then stop. A plan-mode run succeeds with a plan in the log and no product edits.
+- `execute <work order>`: continue the run in this worktree. The request grants that work order of the governing plan revision: record it as a `## Decision`, then execute it, accept it, and stop.
+- `accept`: accept an implementation made outside this run against the governing plan revision, then stop.
+
+The governing plan revision is the latest `## PM — Plan` entry: revision r<N>, where N counts the `## PM — Plan` entries without ` (cont.)`. A plan that does not split its tasks into work orders is one work order, `all`.
+
+Resume is not a mode and grants nothing: it performs the `Next:` action of the latest `## Status` entry. If stage entries follow that entry, first recompute `Next:` from them by the stage order and the FAIL and blocker rules, and append a fresh `## Status`. If the log has no `## Status`, ask the user what to do next.
+
+Only the main session writes `## Status` and `## Decision`. Stage 1 appends the Goal entry and the first `## Status` in one command. After that, append a `## Status` after every stage entry and every `## Decision`, and before you stop, except after a PASS that cleared the log. The latest one is the current state; everything above it is history. Print it with `awk '/^## /{s=($0=="## Status"); if(s) b=""} s{b=b $0 "\n"} END{printf "%s", b}' COMPUTE_SQUAD_LOG.md`. A re-lock `## Decision` gets its `## Status` after the new `## Goal — Locked` entry that directly follows it.
+
+```markdown
+## Status
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Run: <run ID from the Goal entry>
+Mode: <full | plan | execute | accept>
+Worktree: <repo root path and branch>
+Base: <commit SHA the governing plan was mapped against>
+Plan: <none | r<N>, work order <ID or all>>
+Grant: <none | r<N> <work order or all>, per Decision <timestamp> | all revisions, full-mode request>
+Next: <the one permitted next action, or none when the run is closed>
+Stop: <where this invocation ends>
+```
+
+A `## Decision` entry quotes words the user actually wrote, in the request or in answer to a question. It never records an assumption, so an unattended run can record only the words that started it. When the request itself grants execution, record it this way instead of asking. `plan-approved` never grants execution.
+
+```markdown
+## Decision
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Type: <grant | plan-approved | waiver | re-lock | park | abandon>
+Covers: <plan revision and work order, or criterion ID>
+User's words: "<verbatim>"
+```
+
+Spawn an executor only when the latest `## Status` grants the plan revision and work order about to run. A new plan revision voids a grant made for an earlier one, except in `full` mode. Never ask for a grant the log already records. A grant covers only the work orders it names: after their verdict, append a `## Status` and stop. On Claude Code a PreToolUse hook refuses an executor spawn whose plan revision the latest `## Status` does not grant; on Codex this rule is prose, checked by reading the log.
 
 ## Stage 1 — Archive (squad-mech)
 
-Spawn `squad-mech` to archive any non-empty `COMPUTE_SQUAD_LOG.md` to a timestamped file in `compute-squad-archive/` in the repo root, and start with an empty active log. Never discard a prior or failed run. After squad-mech reports an archive path or an already-empty log, append the `## Goal — Locked` entry composed in Stage 0 as the first entry of the fresh log, before spawning Recon. If it reports `ARCHIVE FAILED`, append nothing, give the user its message, and stop.
+When this invocation starts a new run, spawn `squad-mech` to archive any non-empty `COMPUTE_SQUAD_LOG.md` to a timestamped file in `compute-squad-archive/` in the repo root, and start with an empty active log. Never discard a prior or failed run. After squad-mech reports an archive path or an already-empty log, append the `## Goal — Locked` entry composed in Stage 0 and the first `## Status` in one Bash command, before spawning Recon. If it reports `ARCHIVE FAILED`, append nothing, give the user its message, and stop.
 
 ## Stage 2 — Recon (squad-recon)
 
@@ -68,11 +110,11 @@ Spawn `squad-recon` with the locked goal and criteria. It maps files, functions,
 
 Spawn `squad-pm` with mode PLAN. It produces the spec and ordered task breakdown, and classifies execution as MECHANICAL, STANDARD, or COMPLEX.
 
-If the PM logs a named blocker requiring a human decision, return to Stage 0: surface it to the user, resolve, re-lock, continue. Do not guess past it.
+If the PM logs a `needs-human:` blocker, follow the blocker rule under Escalation rules. Do not guess past it.
 
 ## Stage 4 — Execute (squad-executor)
 
-Route by the PM's classification:
+Check the grant (see Modes, grants, and the Status entry), then route by the PM's classification:
 
 - **MECHANICAL** → spawn `squad-executor-mechanical` (bottom rung).
 - **STANDARD** → spawn `squad-executor` (mid rung).
@@ -107,7 +149,7 @@ Typical uses: Recon delegates bulk file inventories or dependency listings to th
 - Execution runs on the higher of the latest plan's classification rung and the rung escalation has reached: `squad-executor-mechanical` (bottom), `squad-executor` (mid), `squad-executor-complex` (top). Within the three-FAIL stop, execution reaches the top rung from any classification.
 - Recon escalates by model, not by agent. In Claude Code, spawn `squad-recon` with the Agent tool's `model` parameter set to the next rung's alias from the routing block. In Codex an agent's pinned model takes precedence over a spawn argument, so Recon re-runs on its own rung. Plan runs on the top rung and re-runs there.
 - Three total FAILs on one run → stop, summarize the log history, and hand back to the user.
-- Anything that would change the locked goal or acceptance criteria → back to Stage 0 with the user. Always.
+- Anything that would change the locked goal, acceptance criteria, or assumptions → back to Stage 0 with the user. Always. With no user present, the run stops (blocker rule below).
 
 Blockers work the same way from any stage, not just the PM, and all of them use one grammar — a block at the end of a stage's own entry:
 
@@ -117,7 +159,7 @@ BLOCKER:
 - why: <one sentence, with evidence refs>
 ```
 
-A `rerun:` blocker re-runs that stage and every stage after it, and it counts toward the three-FAIL stop. A `needs-human:` blocker returns to Stage 0: surface it, resolve it with the user, re-lock, continue. Freeform prose blockers are a protocol violation — never guess past a blocker, and never log one outside this grammar.
+A `rerun:` blocker re-runs that stage and every stage after it, and it counts toward the three-FAIL stop. A `needs-human:` blocker stops the pipeline: spawn no stage until it is resolved. If the user can answer in this session, surface it, resolve it with them, record the answer as a re-lock (Stage 0 step 4), and re-spawn the stage that raised it. If the session is unattended, do not resolve it yourself, even when the answer looks obvious: append a `## Status` entry whose `Stop:` quotes the blocker and whose `Next:` names the stage to re-spawn, leave the log intact, and end the run by reporting both. Never tell a stage that the run is unattended or that it should prefer assumptions over a blocker. Freeform prose blockers are a protocol violation: never guess past a blocker, and never log one outside this grammar.
 
 ## Audit-grade runs
 
@@ -135,9 +177,10 @@ mkdir -p compute-squad-archive && (set -C; cat COMPUTE_SQUAD_LOG.md > "$t") && c
 ```
 
 - Every entry's `Timestamp:` line is the output of `date -u +%Y-%m-%dT%H:%M:%SZ` from a Bash call made just before the append, never a typed or estimated time; the main session's entries follow the same rule.
-- Every fresh log opens with a `## Goal — Locked` entry, appended by Stage 1 before Recon spawns. No stage acts on a goal it did not read from that entry.
-- Log entries use only these headings: `## Goal — Locked`, `## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS`, `## PM — FAIL`, `## Delegated — <stage>`. Only `## Recon`, `## PM — Plan`, and `## Executor` may add ` (cont.)`. Any other heading or suffix is a protocol violation.
-- No stage skips: even a one-line change gets Recon and Plan entries.
+- On Claude Code a plugin hook appends each subagent's model, elapsed seconds and token counts, plus a running total for the main session, to `compute-squad-archive/usage.jsonl`. When a run ends or stops, print this run's records with `grep '"run":"<run ID>"' compute-squad-archive/usage.jsonl | awk '!/"agent":"main"/ {print} /"agent":"main"/ {m=$0} END {print m}'` and report for each line the agent, model, elapsed seconds, billed input (input + cache_write + cache_read) and output. If no line matches, as in a Codex run, say usage is unavailable; never estimate it.
+- Every fresh log opens with a `## Goal — Locked` entry and a `## Status` entry, appended together by Stage 1 before Recon spawns. A re-lock appends another `## Goal — Locked` entry. No stage acts on a goal it did not read from the latest `## Goal — Locked` entry.
+- Log entries use only these headings: `## Goal — Locked`, `## Status`, `## Decision`, `## Recon`, `## PM — Plan`, `## Executor`, `## PM — Accept (pending)`, `## PM — PASS`, `## PM — FAIL`, `## Delegated — <stage>`. Only `## Recon`, `## PM — Plan`, and `## Executor` may add ` (cont.)`. Any other heading or suffix is a protocol violation.
+- No stage skips within a mode: even a one-line change gets Recon and Plan entries.
 - The Executor never accepts its own work; the PM never writes product code; the intern never makes judgment calls.
 - Anti-slop discipline everywhere: YAGNI, stdlib/native first, no speculative abstractions, no scaffolding.
 - If a spawn fails because its model is unavailable to the account, stop and report the setup gap with the spawn's error text. Never run that stage on a lower rung, with a different agent, or in the main session.

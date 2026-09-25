@@ -1,6 +1,6 @@
 # Compute Squad: Codex reading copy
 
-Version: 4.0.0
+Version: 4.1.0
 No host loads this file. Claude Code and the Codex plugin both load `skills/compute-squad/SKILL.md`; runtime rules live there. This copy restates it with the Codex model names for readers.
 
 Run the goal through the six-stage pipeline. The main session owns strategy and
@@ -41,15 +41,25 @@ Do this directly in the main session; never delegate it:
 2. Identify ambiguities, unstated constraints, irreversible or cost-bearing
    decisions, and conflicts with project invariants.
 3. Ask the user the batched clarifying questions before the pipeline starts. If
-   the session is unattended, make the smallest reasonable assumptions and
-   record them.
+   the session is unattended (the user said so, or request_user_input is
+   unavailable, as in `codex exec`), make the smallest reasonable assumptions,
+   record them, and write `Attended: no` in the Goal entry. Only this step makes
+   assumptions; once the Goal entry is written, only the user changes them. A
+   false goal fact that changes what a criterion checks is a `needs-human:`
+   blocker.
 4. Lock one goal sentence and concrete, verifiable acceptance criteria. No
-   later stage may redefine them; changes return here.
+   later stage may redefine them; changes return here. Changing a command,
+   test, or check that a criterion names redefines that criterion. A re-lock
+   needs the user: a `## Decision` entry of Type re-lock quoting their words,
+   then a new full `## Goal — Locked` entry with a `Supersedes:` line naming
+   the prior entry's timestamp. The latest one governs.
 5. Compose this mandatory first log entry for Stage 1 to append:
 
 ```markdown
 ## Goal — Locked
-<timestamp line>
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Run: <UTC date and a slug: lowercase letters, digits, hyphens>
+Attended: <yes|no>
 Goal: <one sentence>
 Acceptance criteria:
 - <concrete, verifiable item>
@@ -61,17 +71,46 @@ If the active log already contains a locked entry for this same goal, offer a
 resume from the last logged stage. Archive only when the user chooses a fresh
 run.
 
+## Modes, grants, and the Status entry
+
+The first word of a `/squad` request, or the user's own words, sets the mode;
+the default is `full`. `full` runs Stages 0 to 5, and the request grants
+execution of every plan revision. `plan` runs Stages 0 to 3 and stops with no
+product edits. `execute <work order>` continues the run in this worktree: it
+records the request as a `## Decision` granting that work order of the
+governing plan revision, executes and accepts it, and stops. `accept` accepts
+an implementation made outside the run against the governing plan revision,
+then stops. The governing plan revision is the latest `## PM — Plan` entry,
+r<N> by its count of `## PM — Plan` entries without `(cont.)`. Resume is not a
+mode and grants nothing: it performs the `Next:` action of the latest
+`## Status` entry. If stage entries follow that entry, first recompute `Next:`
+from them by the stage order and the FAIL and blocker rules, and append a fresh
+`## Status`. If the log has no `## Status`, ask the user what to do next.
+
+Only the main session writes `## Status` and `## Decision` entries; their
+templates are in the shared skill. Stage 1 appends the first `## Status` with
+the Goal entry, and the main session appends another after every stage entry
+and decision; a re-lock decision gets its `## Status` after the new Goal entry
+that directly follows it. A `## Decision` quotes the user's own words and never
+records an assumption; `plan-approved` never grants execution. Spawn an
+executor only when the latest `## Status` grants the plan revision and work
+order about to run. A new plan revision voids a grant made for an earlier
+one, except in `full` mode. Never ask for a grant the log already records. A
+grant covers only the work orders it names: after their verdict, append a
+`## Status` and stop. No Codex hook enforces this: an `## Executor` entry with
+no granting `## Status` above it shows in the log.
+
 ## Stage 1 — Archive (`squad-mech`, bottom rung)
 
-Spawn `squad-mech` to archive a non-empty `COMPUTE_SQUAD_LOG.md` with the
-archive command in the shared skill's Hard rules: it names the copy under
-`compute-squad-archive/` from `date -u` and the run ID, never overwrites an
-existing archive, verifies the copy with `cmp`, and only then empties the active
-log. If the log does not exist, it creates an empty one. After squad-mech
-reports an archive path or an already-empty log, append the Stage 0
-locked-goal entry as the first entry of the fresh log, before Recon starts. If
-it reports `ARCHIVE FAILED`, append nothing, give the user its message, and
-stop.
+When this invocation starts a new run, spawn `squad-mech` to archive a non-empty
+`COMPUTE_SQUAD_LOG.md` with the archive command in the shared skill's Hard
+rules: it names the copy under `compute-squad-archive/` from `date -u` and the
+run ID, never overwrites an existing archive, verifies the copy with `cmp`, and
+only then empties the active log. If the log does not exist, it creates an empty
+one. After squad-mech reports an archive path or an already-empty log, append
+the Stage 0 locked-goal entry and the first `## Status` in one command, before
+Recon starts. If it reports `ARCHIVE FAILED`, append nothing, give the user its
+message, and stop.
 
 Never discard a prior or failed run. The only clear before a PASS is the
 verified archive procedure here.
@@ -93,7 +132,7 @@ product code. Product-level, irreversible, or cost-bearing decisions become a
 
 ## Stage 4 — Execute
 
-Route exactly by the PM classification:
+Check the grant, then route exactly by the PM classification:
 
 - MECHANICAL -> spawn `squad-executor-mechanical` (bottom rung).
 - STANDARD -> spawn `squad-executor` (mid rung).
@@ -149,8 +188,12 @@ stage per run.
 - Every entry's `Timestamp:` line is the output of `date -u +%Y-%m-%dT%H:%M:%SZ`
   from a Bash call made just before the append, never a typed or estimated
   time; the main session's entries follow the same rule.
-- Every fresh run starts with `## Goal — Locked` after Stage 1 archives prior
-  state. The log clears only after a PASS and verified archive.
+- No Codex hook records usage. On Claude Code a plugin hook writes each
+  stage's model, elapsed time and tokens to `compute-squad-archive/usage.jsonl`;
+  when a Codex run ends or stops, say usage is unavailable and never estimate
+  it.
+- Every fresh run starts with `## Goal — Locked` and `## Status` after Stage 1
+  archives prior state. The log clears only after a PASS and verified archive.
 - A blocker is always:
 
 ```
@@ -176,7 +219,13 @@ BLOCKER:
   re-runs there.
 - Three total FAILs on one run → stop, summarize the log history, and hand back
   to the user.
-- Anything that changes the locked goal or criteria returns to Stage 0.
+- Anything that changes the locked goal, criteria, or assumptions returns to
+  Stage 0 and the user. A `needs-human:` blocker stops the pipeline: spawn no
+  stage until it is resolved. With the user present, resolve it with them,
+  record the re-lock, and re-spawn the stage that raised it. Unattended, do not
+  resolve it yourself: append a `## Status` entry whose `Stop:` quotes the
+  blocker and whose `Next:` names the stage to re-spawn, leave the log intact,
+  and end the run. Never tell a stage the run is unattended.
 
 ## Audit-grade runs
 
@@ -187,9 +236,9 @@ only findings that survive refutation count as acceptance failures.
 
 ## Hard rules
 
-No stage skips. No executor acceptance. No PM product-code edits. No intern
-judgment calls. The orchestrating session spawns the named agent for every
-stage and never does a stage's work (archive, map, plan, execute, accept)
+No stage skips within a mode. No executor acceptance. No PM product-code edits.
+No intern judgment calls. The orchestrating session spawns the named agent for
+every stage and never does a stage's work (archive, map, plan, execute, accept)
 itself in that agent's place. If a stage's named agent is not installed on this
 host, stop and report the setup gap instead of running a different pipeline.
 Every stage entry's `Agent:` line names the agent that wrote it, so an absorbed

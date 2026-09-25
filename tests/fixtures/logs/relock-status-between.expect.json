@@ -1,0 +1,19 @@
+{
+  "note": "The user's re-lock is recorded, but the main session appends a Status between the re-lock Decision and the new Goal entry, so the Goal entry no longer directly follows its Decision.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-lock `## Decision` gets its `## Status` after the new `## Goal — Locked` entry that directly follows it."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "re-lock"
+    ]
+  }
+}

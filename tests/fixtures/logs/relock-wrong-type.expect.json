@@ -1,0 +1,19 @@
+{
+  "note": "The user's answer is recorded and the new Goal entry directly follows it with Attended: yes and the right Supersedes: line, but the Decision has Type waiver, not re-lock, so no user re-lock authorizes the new Goal entry.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry"
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "Type: <grant | plan-approved | waiver | re-lock | park | abandon>"
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "re-lock"
+    ]
+  }
+}

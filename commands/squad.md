@@ -1,10 +1,10 @@
 ---
 description: Run the Compute Squad pipeline on a goal
-argument-hint: <goal>
+argument-hint: [plan|execute|accept] <goal or work order>
 ---
 
-Run the compute-squad skill's full pipeline, starting at Stage 0 (Strategy), using the following as the goal:
+Run the compute-squad skill on this request. If its first word is `plan`, `execute`, or `accept`, that word is the mode; otherwise the mode is `full`:
 
 $ARGUMENTS
 
-Follow `skills/compute-squad/SKILL.md` exactly: interrogate the goal, clarify gaps with the user, and lock the goal and acceptance criteria in Stage 0, then run Stage 1 (Archive) through Stage 5 (Accept) in order, coordinating exclusively through `COMPUTE_SQUAD_LOG.md`. Do not skip stages and do not start implementing before the goal is locked.
+Follow `skills/compute-squad/SKILL.md` exactly: start at Stage 0 and read the latest `## Status` entry of any existing `COMPUTE_SQUAD_LOG.md` first. Run every stage the mode permits, in order, and no other, coordinating exclusively through the log. Never spawn an executor without a grant the log records for the governing plan revision and work order.

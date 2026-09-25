@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T09:00:12Z
+Run: 2026-09-01-rename-source-id
 
 Goal: Rename the legacyId field to sourceId across the importer and its fixtures.
 Acceptance criteria:
@@ -7,6 +8,17 @@ Acceptance criteria:
 - npm test passes.
 Out of scope: the public API response shape.
 Assumptions: none.
+
+## Status
+Timestamp: 2026-09-01T09:00:12Z
+Run: 2026-09-01-rename-source-id
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 1a2b3c4
+Plan: none
+Grant: all revisions, full-mode request
+Next: spawn squad-recon
+Stop: after the PM verdict
 
 ## Recon
 Timestamp: 2026-09-01T09:03:40Z
@@ -63,4 +75,4 @@ Agent: squad-pm (claude-opus-5-5)
 - `grep -rn legacyId src/importer test/fixtures/importer` -> exit 1; no match
 Both criteria met. Refutation attempted: a fixture left out of the template set
 (none found). High-stakes: no. Verdict: PASS.
-Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-09-01_093051_norun.md
+Archive target: compute-squad-archive/COMPUTE_SQUAD_LOG_2026-09-01_093051_2026-09-01-rename-source-id.md

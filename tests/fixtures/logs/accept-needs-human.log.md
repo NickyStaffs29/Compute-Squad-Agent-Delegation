@@ -1,5 +1,6 @@
 ## Goal — Locked
 Timestamp: 2026-09-01T11:00:12Z
+Run: 2026-09-01-avatar-size
 
 Goal: Store uploaded avatars at most 512 pixels on the long side.
 Acceptance criteria:
@@ -7,6 +8,17 @@ Acceptance criteria:
 - npm test passes.
 Out of scope: existing avatars.
 Assumptions: none.
+
+## Status
+Timestamp: 2026-09-01T11:00:12Z
+Run: 2026-09-01-avatar-size
+Mode: full
+Worktree: /home/dev/app, branch main
+Base: 1a2b3c4
+Plan: none
+Grant: all revisions, full-mode request
+Next: spawn squad-recon
+Stop: after the PM verdict
 
 ## Recon
 Timestamp: 2026-09-01T11:04:09Z

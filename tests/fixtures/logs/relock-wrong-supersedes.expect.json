@@ -1,0 +1,15 @@
+{
+  "note": "A re-lock whose Supersedes: line names a timestamp other than the prior Goal entry's.",
+  "cites": [
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "a new `## Goal — Locked` entry with the full template and a `Supersedes: <timestamp of the prior Goal entry>` line."
+    }
+  ],
+  "lint": {
+    "result": "fail",
+    "rules": [
+      "re-lock"
+    ]
+  }
+}
