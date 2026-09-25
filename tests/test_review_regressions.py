@@ -78,6 +78,44 @@ User's words: "Support sessions have the same owner restriction."
         self.assertEqual([], self.lint(text))
         self.assertIn("run a new high-stakes review", resume_next.next_action(lines(text))[0])
 
+    def test_held_review_accepts_separate_answers_with_or_without_status(self):
+        for intervening_status in (False, True):
+            with self.subTest(status=intervening_status):
+                text = fixture("review-held").replace(
+                    "- a support session reads another account's PDF | open",
+                    "- a support session reads another account's PDF | open\n"
+                    "- a service session reads another account's PDF | open")
+                status = text[text.rindex("\n## Status\n"):].split("\n## High-stakes review\n", 1)[0]
+                for minute, role in ((35, "Support"), (36, "Service")):
+                    text += f'''
+## Decision
+Timestamp: 2026-09-10T09:{minute}:00Z
+Type: resolution
+Covers: ## High-stakes review, Timestamp: 2026-09-10T09:31:44Z
+User's words: "{role} sessions have the same owner restriction."
+'''
+                    self.assertEqual([], self.lint(text))
+                    self.assertIn("run a new high-stakes review", resume_next.next_action(lines(text))[0])
+                    if minute == 35 and intervening_status:
+                        text += status.replace("09:24:30Z", "09:35:30Z")
+
+    def test_resolution_rejects_a_superseded_held_review(self):
+        text = fixture("review-held")
+        new_review = text[text.rindex("\n## High-stakes review\n"):]
+        new_review = new_review.replace("09:31:44Z", "09:40:00Z").replace("Result: held", "Result: upheld")
+        new_review = new_review.replace("| open", "| owner restriction verified")
+        text += new_review
+        self.assertEqual([], self.lint(text))
+        text += '''
+## Decision
+Timestamp: 2026-09-10T09:41:00Z
+Type: resolution
+Covers: ## High-stakes review, Timestamp: 2026-09-10T09:31:44Z
+User's words: "Support sessions have the same owner restriction."
+'''
+        self.assertTrue(any(rule == "decision" for _, rule, _ in self.lint(text)))
+        self.assertIn("stop: resolution names no pending", resume_next.next_action(lines(text))[0])
+
     def test_resolution_does_not_supply_an_executor_grant(self):
         text = fixture("execute-granted") + '''
 BLOCKER:

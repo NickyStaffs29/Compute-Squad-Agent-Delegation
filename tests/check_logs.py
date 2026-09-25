@@ -627,12 +627,17 @@ def check_relocks(entries, protocol, report):
 
 
 def resolution_target(entries, index):
-    """The latest unanswered blocker or held review, identified by Covers."""
+    """The unanswered blocker or current held review, identified by Covers."""
     pending = None
     for entry in entries[:index]:
         body = dict(text.split(": ", 1) for _, text in entry["body"] if ": " in text)
         if needs_human_line(entry) or (entry["heading"] == REVIEW_HEADING and body.get("Result") == "held"):
             pending = entry
+        elif pending and pending["heading"] == REVIEW_HEADING:
+            # A held review can need several separately recorded answers.
+            # Only a new stage/review or a closed run supersedes it.
+            if entry["heading"] not in (STATUS_HEADING, DECISION_HEADING) or body.get("Type") in ("park", "abandon"):
+                pending = None
         elif entry["heading"] == DECISION_HEADING and body.get("Type") in ("resolution", "waiver", "re-lock"):
             pending = None
     covers = next((text[8:] for _, text in entries[index]["body"] if text.startswith("Covers: ")), "")
