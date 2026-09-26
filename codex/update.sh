@@ -5,9 +5,11 @@
 # installs the plugin from that local marketplace, and copies the agents and
 # profiles from the same build. --review-models asks for the choices again.
 # The source is this checkout on main, fast-forwarded to origin/main, or with
-# --source-sha exactly that commit, not pulled. --check changes nothing: it
-# reports every difference between that source (with the saved choices) and
-# what Codex runs.
+# --source-sha exactly that commit, not pulled. Whichever commit that is, the
+# build is rendered from an export of the commit itself, by that commit's own
+# renderer, never from the working tree. --check changes nothing: it reports
+# every difference between that source (with the saved choices) and what
+# Codex runs.
 set -euo pipefail
 
 usage="usage: codex/update.sh [--review-models | --check] [--source-sha <40-hex commit>]"
@@ -57,9 +59,6 @@ if [[ -z "$python_bin" ]]; then
   echo "update: python3 is required; put it on PATH" >&2
   exit 1
 fi
-export GIT_BIN="$git_bin"
-
-build_agents="$repo_root/codex/build-agents.py"
 state="$codex_home/compute-squad"
 choices="$state/choices.conf"
 build="$state/build"
@@ -80,47 +79,77 @@ git_read() {
   "$git_bin" -C "$repo_root" --no-optional-locks "$@"
 }
 
-# Compares what Codex runs with a fresh render of the source and the saved
-# choices: the plugin state, every file of the cached plugin (manifest, skill,
-# references, hooks), the seven agents, and the four profiles. It writes only
-# a temporary directory outside $codex_home, prints one MISMATCH line per
-# difference and a final verdict, and returns 1 on any mismatch.
+# Writes the files of commit $1, from git's objects and with their recorded
+# modes, into the new directory $2. Untracked files, uncommitted edits, and
+# edits git status cannot see (skip-worktree, assume-unchanged) never reach
+# it. Every python call below runs $2's codex/build-agents.py, so the renderer
+# and every file it reads come from that commit.
+export_commit() {
+  "$python_bin" - "$git_bin" "$repo_root" "$1" "$2" <<'PY'
+import os, subprocess, sys
+git, repo, commit, out = sys.argv[1:]
+def run(args, data=None):
+    return subprocess.run([git, "-C", repo, "--no-optional-locks", *args], input=data,
+                          stdout=subprocess.PIPE, check=True).stdout
+try:
+    entries = []
+    for record in run(["ls-tree", "-r", "-z", "--full-tree", commit]).split(b"\0"):
+        if record:
+            meta, path = record.split(b"\t", 1)
+            mode, kind, oid = meta.decode().split()
+            if kind != "blob":
+                sys.exit(f"export: {os.fsdecode(path)} in {commit} is a {kind}, not a file")
+            entries.append((mode, oid, os.fsdecode(path)))
+    data = run(["cat-file", "--batch"], "".join(oid + "\n" for _, oid, _ in entries).encode())
+except (OSError, subprocess.CalledProcessError) as error:
+    sys.exit(f"export: cannot read {commit}: {error}")
+at = 0
+for mode, oid, path in entries:
+    end = data.index(b"\n", at)
+    got, kind, size = data[at:end].decode().split()
+    if got != oid or kind != "blob":
+        sys.exit(f"export: git cat-file gave {got} {kind} for {oid}")
+    content, at = data[end + 1:end + 1 + int(size)], end + 2 + int(size)
+    dest = os.path.join(out, path)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    if mode == "120000":
+        os.symlink(os.fsdecode(content), dest)
+    else:
+        with open(dest, "wb") as handle:
+            handle.write(content)
+        os.chmod(dest, 0o755 if mode == "100755" else 0o644)
+PY
+}
+
+# check_install TREE PRIOR compares what Codex runs with a fresh render of
+# TREE (an export of the selected commit) and the saved choices: the plugin
+# state, every file of the cached plugin (manifest, skill, references, hooks),
+# the seven agents, and the four profiles. PRIOR is 1 when the caller already
+# reported a mismatch. It writes only a temporary directory outside
+# $codex_home, prints one MISMATCH line per difference and a final verdict,
+# and returns 1 on any mismatch.
 expected=""
+source_tree=""
 have_lock=0
 check_install() {
-  local head branch dirty listed mismatch=0
+  local tree="$1" mismatch="$2" listed
   if [[ $have_lock -eq 0 && -d "$lock" ]]; then
     echo "check: MISMATCH $lock exists: an update is running, or one was killed"
     mismatch=1
-  fi
-  if ! head="$(git_read rev-parse HEAD)" || ! branch="$(git_read rev-parse --abbrev-ref HEAD)" \
-      || ! dirty="$(git_read status --porcelain --untracked-files=no)"; then
-    echo "check: MISMATCH source: git cannot read $repo_root"
-    mismatch=1
-  else
-    echo "check: source $repo_root, $branch at $head"
-    if [[ -n "$source_sha" && "$head" != "$source_sha" ]]; then
-      echo "check: MISMATCH source: HEAD is $head, not the approved $source_sha"
-      mismatch=1
-    fi
-    if [[ -n "$dirty" ]]; then
-      echo "check: MISMATCH source: $repo_root has uncommitted changes"
-      mismatch=1
-    fi
   fi
   if [[ ! -f "$choices" ]]; then
     echo "check: MISMATCH choices: none saved in $choices, so there is nothing to compare"
     mismatch=1
   else
     expected="$(mktemp -d)"
-    if ! "$python_bin" "$build_agents" --render-codex "$expected/build" "$choices" > /dev/null; then
+    if ! "$python_bin" "$tree/codex/build-agents.py" --render-codex "$expected/build" "$choices" > /dev/null; then
       echo "check: MISMATCH source: rendering it with your choices failed"
       mismatch=1
     else
       if ! listed="$("$codex_bin" plugin list --json)"; then
         listed=""
       fi
-      if ! printf '%s' "$listed" | "$python_bin" "$build_agents" --compare-install "$expected/build" "$codex_home"; then
+      if ! printf '%s' "$listed" | "$python_bin" "$tree/codex/build-agents.py" --compare-install "$expected/build" "$codex_home"; then
         mismatch=1
       fi
     fi
@@ -136,8 +165,31 @@ check_install() {
 }
 
 if [[ $check -eq 1 ]]; then
-  trap 'if [[ -n "$expected" ]]; then rm -rf "$expected"; fi' EXIT
-  if check_install; then
+  trap 'rm -rf ${expected:+"$expected"} ${source_tree:+"$source_tree"}' EXIT
+  mismatch=0
+  if ! head="$(git_read rev-parse HEAD)" || ! branch="$(git_read rev-parse --abbrev-ref HEAD)" \
+      || ! dirty="$(git_read status --porcelain --untracked-files=no)"; then
+    echo "check: MISMATCH source: git cannot read $repo_root"
+    echo "check: FAILED: each MISMATCH line above is a difference; rerun codex/update.sh to install the source"
+    exit 1
+  fi
+  commit="${source_sha:-$head}"
+  echo "check: source $commit ($repo_root, $branch at $head)"
+  if [[ "$head" != "$commit" ]]; then
+    echo "check: MISMATCH source: HEAD is $head, not the approved $commit"
+    mismatch=1
+  fi
+  if [[ -n "$dirty" ]]; then
+    echo "check: MISMATCH source: $repo_root has uncommitted changes"
+    mismatch=1
+  fi
+  source_tree="$(mktemp -d)"
+  if ! export_commit "$commit" "$source_tree"; then
+    echo "check: MISMATCH source: commit $commit cannot be read from $repo_root"
+    echo "check: FAILED: each MISMATCH line above is a difference; rerun codex/update.sh to install the source"
+    exit 1
+  fi
+  if check_install "$source_tree" "$mismatch"; then
     exit 0
   fi
   exit 1
@@ -157,6 +209,9 @@ cleanup() {
   if [[ -n "$expected" ]]; then
     rm -rf "$expected"
   fi
+  if [[ -n "$source_tree" ]]; then
+    rm -rf "$source_tree"
+  fi
   if [[ $have_lock -eq 1 ]]; then
     rmdir "$lock" 2>/dev/null || true
   fi
@@ -174,8 +229,9 @@ have_lock=1
 
 # Select the source before anything is installed. An approved commit is never
 # pulled: the checkout must already be exactly that commit. Otherwise the
-# checkout must be main tracking origin/main, and after the fast-forward it
-# must be exactly origin/main, so no local commit rides along.
+# checkout must be main tracking origin/main with no uncommitted changes to
+# tracked files before the fast-forward, and exactly origin/main after it, so
+# no local commit rides along. Tracked files are checked again at the end.
 if [[ -n "$source_sha" ]]; then
   if ! head="$(git_read rev-parse HEAD)" || [[ "$head" != "$source_sha" ]]; then
     echo "update: $repo_root is at ${head:-an unknown commit}, not the approved $source_sha; check out that commit or drop --source-sha. $unchanged" >&2
@@ -186,6 +242,10 @@ else
   upstream="$(git_read rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
   if [[ "$branch" != main || "$upstream" != origin/main ]]; then
     echo "update: $repo_root is on ${branch:-no branch} tracking ${upstream:-nothing}; updates install main tracking origin/main. To install an approved commit instead, use --source-sha <commit>. $unchanged" >&2
+    exit 1
+  fi
+  if ! dirty="$(git_read status --porcelain --untracked-files=no)" || [[ -n "$dirty" ]]; then
+    echo "update: $repo_root has uncommitted changes (or git status failed); commit or stash them before the update pulls. $unchanged" >&2
     exit 1
   fi
   if ! "$git_bin" -C "$repo_root" pull --ff-only; then
@@ -206,6 +266,12 @@ if [[ -n "$dirty" ]]; then
   echo "update: $repo_root has uncommitted changes, and the plugin installs from this checkout; commit or stash them. $unchanged" >&2
   exit 1
 fi
+source_tree="$(mktemp -d)"
+if ! export_commit "$head" "$source_tree"; then
+  echo "update: cannot read commit $head from $repo_root; $unchanged" >&2
+  exit 1
+fi
+build_agents="$source_tree/codex/build-agents.py"
 
 # One read of the installed plugins decides everything below: another
 # enabled copy of this plugin would load a second skill, so it stops the
@@ -215,32 +281,42 @@ if ! listed="$("$codex_bin" plugin list --json)"; then
   echo "update: codex plugin list --json failed (see above); fix what it names, then rerun. $unchanged" >&2
   exit 1
 fi
+# Each enabled copy prints as its ID, then "local" when it is installed from
+# this updater's build directory, else the path it is installed from.
 if ! installed="$(printf '%s' "$listed" | "$python_bin" -c '
-import json, sys
+import json, os, sys
 try:
     installed = json.load(sys.stdin)["installed"]
     if not isinstance(installed, list) or not all(isinstance(p, dict) for p in installed):
         raise ValueError
-    ids = [p["pluginId"] for p in installed
-           if p.get("name") == "compute-squad" and p.get("enabled", True) is not False]
+    for plugin in installed:
+        if plugin.get("name") == "compute-squad" and plugin.get("enabled", True) is not False:
+            path = (plugin.get("source") or {}).get("path") or ""
+            same = path and os.path.realpath(path) == os.path.realpath(sys.argv[1])
+            print(plugin["pluginId"], "local" if same else path or "an unknown source", sep="\t")
 except Exception:
     sys.exit(2)
-print(" ".join(ids))
-')"; then
+' "$build/plugins/compute-squad")"; then
   echo "update: could not read codex plugin list --json; $unchanged" >&2
   exit 1
 fi
 remote=0
-for id in $installed; do
+while IFS=$'\t' read -r id installed_from; do
   case "$id" in
-    compute-squad@compute-squad-local) ;;
+    "") ;;
+    compute-squad@compute-squad-local)
+      if [[ "$installed_from" != local ]]; then
+        echo "update: compute-squad@compute-squad-local is installed from $installed_from, not $build/plugins/compute-squad; remove that registration first with: codex plugin marketplace remove compute-squad-local. $unchanged" >&2
+        exit 1
+      fi
+      ;;
     compute-squad@compute-squad) remote=1 ;;
     *)
       echo "update: another copy of Compute Squad is installed: $id. Two copies of the skill would load; remove it first with: codex plugin remove $id. $unchanged" >&2
       exit 1
       ;;
   esac
-done
+done <<< "$installed"
 
 catalog="$(mktemp)"
 have_catalog=1
@@ -341,7 +417,7 @@ done
 
 step cp "$build"/profiles/*.config.toml "$codex_home/"
 
-if ! check_install; then
+if ! check_install "$source_tree" 0; then
   echo "update: the installed setup does not match the source (see the mismatches above); rerun the updater. Codex may load a mix of old and new files until it matches." >&2
   exit 1
 fi

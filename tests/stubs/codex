@@ -4,11 +4,14 @@
 # to that file: the name it was called by, then its arguments.
 #
 # As git (after -C DIR and --no-optional-locks): `status --porcelain` prints
-# STUB_GIT_STATUS (empty means clean); `ls-files` runs the real git named by
-# STUB_REAL_GIT; `rev-parse` answers from STUB_GIT_BRANCH (default main),
-# STUB_GIT_UPSTREAM (default origin/main; set it empty for no upstream),
-# STUB_GIT_HEAD (default forty 1s), and STUB_GIT_UPSTREAM_HEAD (default
-# STUB_GIT_HEAD); every other call, pull included, does nothing and exits 0.
+# STUB_GIT_STATUS (empty means clean), or STUB_GIT_STATUS_AFTER_PULL once a
+# pull has created the file STUB_GIT_PULLED names; `ls-tree` and `cat-file`
+# run the real git named by STUB_REAL_GIT on the repository STUB_GIT_REPO
+# names, so a commit's objects are real; `rev-parse` answers from
+# STUB_GIT_BRANCH (default main), STUB_GIT_UPSTREAM (default origin/main; set
+# it empty for no upstream), STUB_GIT_HEAD (default forty 1s), and
+# STUB_GIT_UPSTREAM_HEAD (default STUB_GIT_HEAD); every other call does
+# nothing and exits 0.
 #
 # As codex: `debug models` prints the catalog file STUB_CATALOG names. The
 # plugin commands keep their state under STUB_STATE, outside CODEX_HOME:
@@ -43,8 +46,28 @@ if [ "${0##*/}" = git ]; then
   done
   head="${STUB_GIT_HEAD:-1111111111111111111111111111111111111111}"
   case "$command" in
-    status) printf '%s' "${STUB_GIT_STATUS:-}" ;;
-    ls-files) exec "${STUB_REAL_GIT:?STUB_REAL_GIT names no git}" "$@" ;;
+    status)
+      if [ -n "${STUB_GIT_PULLED:-}" ] && [ -e "$STUB_GIT_PULLED" ]; then
+        printf '%s' "${STUB_GIT_STATUS_AFTER_PULL:-}"
+      else
+        printf '%s' "${STUB_GIT_STATUS:-}"
+      fi
+      ;;
+    pull)
+      if [ -n "${STUB_GIT_PULLED:-}" ]; then
+        : > "$STUB_GIT_PULLED"
+      fi
+      ;;
+    ls-tree | cat-file)
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          -C) shift 2 ;;
+          --no-optional-locks) shift ;;
+          *) break ;;
+        esac
+      done
+      exec "${STUB_REAL_GIT:?STUB_REAL_GIT names no git}" -C "${STUB_GIT_REPO:?STUB_GIT_REPO names no repository}" "$@"
+      ;;
     rev-parse)
       case "$*" in
         *"--symbolic-full-name @{upstream}"*)

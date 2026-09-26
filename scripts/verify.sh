@@ -3604,18 +3604,27 @@ print(
 # saved choices byte for byte; the catalog fingerprint; a changed catalog
 # without and with a terminal;
 # unreadable saved choices; and a saved model the catalog retires or drops.
-# The source (the stub git answers rev-parse from STUB_GIT_* variables): by
-# default main tracking origin/main is confirmed before the pull and HEAD must
-# equal origin/main after it; --source-sha installs an approved commit from
-# any branch without a pull. Source drift (another branch, another or no
-# upstream, a local commit, a checkout not at the approved commit) stops
-# before any codex call. --check must report a match, then name on its own
-# each of a stale main skill, a stale referenced file, a hook without its
-# executable bit, an extra cached file, a changed agent, a missing profile, a
-# second copy of the plugin, a drifted approved commit, and uncommitted
-# changes, while leaving CODEX_HOME byte for byte, this checkout's status,
-# and every git and codex call read-only. An install the stub lands with the
-# wrong content must fail without the success line.
+# The source is a real snapshot repository of this checkout's tracked files
+# (the stub git answers rev-parse from STUB_GIT_* variables and reads its
+# objects): by default main tracking origin/main and a clean tracked tree are
+# confirmed before the pull, HEAD must equal origin/main after it, and the
+# tree is checked again; --source-sha installs an approved commit from any
+# branch without a pull. Either way the build is rendered from an export of
+# the commit. Source drift (another branch, another or no upstream, a local
+# commit, a checkout not at the approved commit) stops before any codex call.
+# --check must report a match, then name on its own each of a stale main
+# skill, a stale referenced file, lost, narrowed, or gained executable bits,
+# a same-content symlink outside the plugin (for a skill file and an agent),
+# an extra cached file, a changed agent, a missing profile, a second copy of
+# the plugin, the local plugin installed from a wrong source path,
+# uncommitted changes, and a leftover lock; name seven differences at once;
+# and name HEAD and the changed file for a drifted approved commit, while
+# leaving CODEX_HOME byte for byte, this checkout's status, and every git and
+# codex call read-only. An update stops before installing while the local
+# plugin is registered from a wrong source path. With real git, a clone
+# holding an untracked duplicate agent and a skip-worktree edit installs
+# exactly the commit. An install the stub lands with the wrong content must
+# fail without the success line.
 # Every install must put the plugin, agents, and profiles from one build that
 # carries the saved choices, check them against a fresh render, remove the
 # remote plugin, prune the retired agents, and leave the user's files and
@@ -3743,6 +3752,41 @@ with tempfile.TemporaryDirectory() as tmp:
     with open(os.path.join(stub_state, "installed", "compute-squad@compute-squad"), "w", encoding="utf-8") as f:
         f.write("4.4.0\n")
 
+    # The source: a real repository whose main commit holds this checkout's
+    # tracked files as they are on disk, and whose drift commit changes one
+    # reference file. An update exports a commit from its objects, so the stub
+    # git answers rev-parse with these commits and passes ls-tree and cat-file
+    # to the real git on this repository.
+    snapshot_repo = os.path.join(tmp, "snapshot")
+    for relpath in tracked_files():
+        if os.path.lexists(relpath):
+            os.makedirs(os.path.join(snapshot_repo, os.path.dirname(relpath)), exist_ok=True)
+            shutil.copy2(relpath, os.path.join(snapshot_repo, relpath))
+
+    def git_in(repo, *args):
+        return subprocess.run(
+            [real_git or "git", "-C", repo, "-c", "user.name=verify", "-c", "user.email=verify@example.invalid",
+             "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", *args],
+            capture_output=True, text=True, check=True, timeout=120,
+        ).stdout.strip()
+
+    git_in(snapshot_repo, "init", "-q")
+    git_in(snapshot_repo, "symbolic-ref", "HEAD", "refs/heads/main")
+    git_in(snapshot_repo, "add", "-A")
+    git_in(snapshot_repo, "commit", "-q", "-m", "this checkout's tracked files")
+    snap_head = git_in(snapshot_repo, "rev-parse", "HEAD")
+    git_in(snapshot_repo, "checkout", "-q", "-b", "drift")
+    with open(os.path.join(snapshot_repo, "skills", "compute-squad", "references", "resume.md"), "a", encoding="utf-8") as f:
+        f.write("a line only the drift commit has\n")
+    git_in(snapshot_repo, "commit", "-q", "-am", "drift")
+    drift_head = git_in(snapshot_repo, "rev-parse", "HEAD")
+    git_in(snapshot_repo, "checkout", "-q", "-b", "symlink", "main")
+    os.symlink("resume.md", os.path.join(snapshot_repo, "skills", "compute-squad", "references", "link.md"))
+    git_in(snapshot_repo, "add", "-A")
+    git_in(snapshot_repo, "commit", "-q", "-m", "a symlink in the plugin")
+    symlink_head = git_in(snapshot_repo, "rev-parse", "HEAD")
+    git_in(snapshot_repo, "checkout", "-q", "main")
+
     env = dict(
         os.environ,
         HOME=os.path.join(tmp, "home"),
@@ -3753,8 +3797,12 @@ with tempfile.TemporaryDirectory() as tmp:
         STUB_CATALOG=catalog_path,
         STUB_STATE=stub_state,
         STUB_REAL_GIT=real_git or "git",
+        STUB_GIT_REPO=snapshot_repo,
+        STUB_GIT_HEAD=snap_head,
     )
-    env.pop("STUB_GIT_STATUS", None)
+    for name in ("STUB_GIT_STATUS", "STUB_GIT_STATUS_AFTER_PULL", "STUB_GIT_PULLED", "STUB_GIT_BRANCH",
+                 "STUB_GIT_UPSTREAM", "STUB_GIT_UPSTREAM_HEAD"):
+        env.pop(name, None)
 
     runs = []
 
@@ -3835,17 +3883,21 @@ with tempfile.TemporaryDirectory() as tmp:
             return None
         return match.group(2)
 
-    # The default source: main tracking origin/main is checked before the
-    # pull, and HEAD must equal origin/main after it; the checkout's cleanliness
-    # is read last. Every read passes --no-optional-locks, so it never writes
-    # the index.
+    # The default source: main tracking origin/main and no uncommitted
+    # tracked change are checked before the pull; HEAD must equal origin/main
+    # after it, and tracked files are read again. The commit is then exported
+    # from git's objects. Every read passes --no-optional-locks, so it never
+    # writes the index.
     DEFAULT_SOURCE = [
         "--no-optional-locks rev-parse --abbrev-ref HEAD",
         "--no-optional-locks rev-parse --abbrev-ref --symbolic-full-name @{upstream}",
+        "--no-optional-locks status --porcelain --untracked-files=no",
         "pull --ff-only",
         "--no-optional-locks rev-parse HEAD",
         "--no-optional-locks rev-parse @{upstream}",
         "--no-optional-locks status --porcelain --untracked-files=no",
+        f"--no-optional-locks ls-tree -r -z --full-tree {snap_head}",
+        "--no-optional-locks cat-file --batch",
     ]
 
     def expect_default_source(label, rc, out, err, calls):
@@ -3972,15 +4024,23 @@ with tempfile.TemporaryDirectory() as tmp:
     expect_untouched("no saved choices, no terminal", before, rc, out, err, calls)
     ran.append("no choices and no terminal exits 3")
 
-    # A dirty checkout.
+    # A dirty checkout stops before the pull; a checkout the pull leaves
+    # dirty stops after it, at the retained second check.
     rc, out, err, calls = run_update("a dirty checkout", answers=typed_choices + "yes\n",
                                      extra_env={"STUB_GIT_STATUS": " M README.md\n"})
     expect("a dirty checkout", rc == 1 and "uncommitted changes" in err
-           and [git_call(c) for c in calls] == DEFAULT_SOURCE,
-           "it should stop after selecting the source and a git status that ignores untracked files",
-           rc, out, err, calls)
+           and [git_call(c) for c in calls] == DEFAULT_SOURCE[:3],
+           "it should stop at the git status before the pull, which ignores untracked files", rc, out, err, calls)
     expect_untouched("a dirty checkout", before, rc, out, err, calls)
-    ran.append("a dirty checkout stops")
+    pulled = os.path.join(tmp, "pulled")
+    rc, out, err, calls = run_update("a checkout the pull leaves dirty", answers=typed_choices + "yes\n",
+                                     extra_env={"STUB_GIT_PULLED": pulled, "STUB_GIT_STATUS_AFTER_PULL": " M README.md\n"})
+    expect("a checkout the pull leaves dirty", rc == 1 and "uncommitted changes" in err
+           and [git_call(c) for c in calls] == DEFAULT_SOURCE[:7],
+           "it should pass the first status, pull, and stop at the second status", rc, out, err, calls)
+    expect_untouched("a checkout the pull leaves dirty", before, rc, out, err, calls)
+    os.remove(pulled)
+    ran.append("a dirty checkout stops before the pull, and one the pull leaves dirty stops after it")
 
     # A plugin list Codex cannot produce stops before anything changes.
     rc, out, err, calls = run_update("a failed plugin list", answers=typed_choices + "yes\n",
@@ -4085,8 +4145,9 @@ with tempfile.TemporaryDirectory() as tmp:
     ran.append("a routine update asks nothing and keeps the choices")
 
     # The source an update installs from, and the read-only check. The stub
-    # git's HEAD is forty 1s unless a scenario sets STUB_GIT_HEAD.
-    stub_head, other_sha = "1" * 40, "2" * 40
+    # git's HEAD is the snapshot's main commit; the drift commit differs from
+    # it in references/resume.md.
+    stub_head, other_sha = snap_head, drift_head
 
     git_index = subprocess.run(["git", "rev-parse", "--git-path", "index"], capture_output=True, text=True,
                                timeout=120).stdout.strip()
@@ -4118,7 +4179,7 @@ with tempfile.TemporaryDirectory() as tmp:
         touched = sorted(p for p in set(before_stat) | set(after_stat) if before_stat.get(p) != after_stat.get(p))
         expect(label, not touched, f"--check wrote, even if only for a moment, in {touched!r}", rc, out, err, calls)
         writes = [c for c in calls if c.startswith("git ")
-                  and not re.match(r"(--no-optional-locks (rev-parse|status) |ls-files )", git_call(c) or "")]
+                  and not re.match(r"--no-optional-locks (rev-parse|status|ls-tree|cat-file) ", git_call(c) or "")]
         codex_calls = [c for c in calls if c.startswith("codex ")]
         expect(label, not writes and codex_calls == ["codex plugin list --json"],
                f"--check may only read: git calls {writes!r} and codex calls {codex_calls!r} are not reads",
@@ -4145,13 +4206,47 @@ with tempfile.TemporaryDirectory() as tmp:
             f.write(text)
 
     hook = os.path.join(skill, "hooks", "grant-gate.sh")
+    outside = os.path.join(tmp, "outside")
+    os.makedirs(outside)
+    elsewhere = os.path.join(tmp, "elsewhere")
+
+    def symlink_outside(path):
+        """Replace path with a symlink to a same-content copy outside the plugin."""
+        target = os.path.join(outside, os.path.basename(path))
+        shutil.move(path, target)
+        os.symlink(target, path)
+
+    def register_elsewhere():
+        """Register compute-squad-local from a copy of the build elsewhere, as
+        `codex plugin marketplace add` would; the cached files stay the same."""
+        if not os.path.exists(elsewhere):
+            shutil.copytree(build_dir, elsewhere)
+        with open(os.path.join(stub_state, "marketplaces", "compute-squad-local"), "w", encoding="utf-8") as f:
+            f.write(elsewhere + "\n")
+
     differences = (
         ("a stale main skill", lambda: append(os.path.join(skill, "SKILL.md")), (), {},
          os.path.join(skill, "SKILL.md") + ": differs from the source"),
         ("a stale referenced file", lambda: append(os.path.join(skill, "references", "resume.md")), (), {},
          os.path.join(skill, "references", "resume.md") + ": differs from the source"),
-        ("a hook that lost its executable bit", lambda: os.chmod(hook, 0o644), (), {},
-         hook + ": executable bit differs from the source"),
+        ("a hook that lost its executable bits", lambda: os.chmod(hook, 0o644), (), {},
+         hook + ": executable bits are 000, the source's 111"),
+        ("a hook whose group and other executable bits changed", lambda: os.chmod(hook, 0o744), (), {},
+         hook + ": executable bits are 100, the source's 111"),
+        ("a reference that gained executable bits",
+         lambda: os.chmod(os.path.join(skill, "references", "resume.md"), 0o755), (), {},
+         os.path.join(skill, "references", "resume.md") + ": executable bits are 111, the source's 000"),
+        ("a same-content symlink outside the plugin", lambda: symlink_outside(os.path.join(skill, "SKILL.md")), (), {},
+         os.path.join(skill, "SKILL.md") + ": is a symlink to " + os.path.join(outside, "SKILL.md")),
+        ("a same-content agent symlinked outside the plugin",
+         lambda: symlink_outside(os.path.join(agents_dir, "squad-recon.toml")), (), {},
+         os.path.join(agents_dir, "squad-recon.toml") + ": is a symlink to " + os.path.join(outside, "squad-recon.toml")),
+        ("a plugin cache directory symlinked outside the plugin",
+         lambda: symlink_outside(os.path.dirname(os.path.dirname(skill))), (), {},
+         os.path.dirname(os.path.dirname(skill)) + ": is a symlink to "),
+        ("the local plugin installed from a wrong source path", register_elsewhere, (), {},
+         f"compute-squad@compute-squad-local is installed from {elsewhere}/plugins/compute-squad, not "
+         f"{build_dir}/plugins/compute-squad"),
         ("an extra file in the cached skill", lambda: append(os.path.join(skill, "references", "old-notes.md")), (), {},
          os.path.join(skill, "references", "old-notes.md") + ": extra"),
         ("a changed agent", lambda: append(os.path.join(agents_dir, "squad-pm.toml")), (), {},
@@ -4161,8 +4256,6 @@ with tempfile.TemporaryDirectory() as tmp:
         ("a second copy of the plugin",
          lambda: append(os.path.join(stub_state, "installed", "compute-squad@compute-squad"), "4.4.0\n"), (), {},
          "compute-squad@compute-squad is also installed and enabled"),
-        ("an approved commit the checkout has drifted from", lambda: None, ("--source-sha", other_sha), {},
-         f"HEAD is {stub_head}, not the approved {other_sha}"),
         ("uncommitted changes in the checkout", lambda: None, (), {"STUB_GIT_STATUS": " M README.md\n"},
          "has uncommitted changes"),
         ("an update lock left behind", lambda: os.mkdir(os.path.join(codex_home, "compute-squad.lock")), (), {},
@@ -4184,6 +4277,130 @@ with tempfile.TemporaryDirectory() as tmp:
             shutil.rmtree(live)
             shutil.copytree(pristine, live, symlinks=True)
     ran.append("--check names, on its own, " + ", ".join(label for label, *_ in differences))
+
+    # Several differences at once: --check names every one, once each, and
+    # still changes nothing.
+    several = (
+        (lambda: append(os.path.join(skill, "SKILL.md")), os.path.join(skill, "SKILL.md") + ": differs from the source"),
+        (lambda: symlink_outside(os.path.join(skill, "references", "audit-prompts.md")),
+         os.path.join(skill, "references", "audit-prompts.md") + ": is a symlink to "),
+        (lambda: os.chmod(hook, 0o744), hook + ": executable bits are 100, the source's 111"),
+        (lambda: append(os.path.join(agents_dir, "squad-pm.toml")),
+         os.path.join(agents_dir, "squad-pm.toml") + ": differs from the source"),
+        (lambda: os.remove(os.path.join(codex_home, "compute-squad-mechanical.config.toml")),
+         os.path.join(codex_home, "compute-squad-mechanical.config.toml") + ": missing"),
+        (lambda: append(os.path.join(stub_state, "installed", "compute-squad@compute-squad"), "4.4.0\n"),
+         "compute-squad@compute-squad is also installed and enabled"),
+        (register_elsewhere, f"compute-squad@compute-squad-local is installed from {elsewhere}/plugins/compute-squad"),
+    )
+    for damage, _named in several:
+        damage()
+    rc, out, err, calls = run_check("--check with several differences at once")
+    found = [line for line in out.splitlines() if line.startswith("check: MISMATCH")]
+    missing = [named for _damage, named in several if sum(named in line for line in found) != 1]
+    expect("--check with several differences at once", rc == 1 and len(found) == len(several) and not missing
+           and out.rstrip().splitlines()[-1].startswith("check: FAILED"),
+           f"it should name each of the {len(several)} differences once and end on check: FAILED; "
+           f"not named exactly once: {missing!r}", rc, out, err, calls)
+    # An update stops before installing anything while compute-squad-local
+    # is registered from elsewhere, and names the command that clears it.
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("an update with the local plugin from a wrong source path")
+    expect("an update with the local plugin from a wrong source path", rc == 1
+           and "codex plugin marketplace remove compute-squad-local" in err
+           and not any(c.startswith("codex plugin") and c != "codex plugin list --json" for c in calls),
+           "it should stop before any install and name the fix", rc, out, err, calls)
+    expect_untouched("an update with the local plugin from a wrong source path", before, rc, out, err, calls)
+    for live, pristine in ((codex_home, pristine_home), (stub_state, pristine_state)):
+        shutil.rmtree(live)
+        shutil.copytree(pristine, live, symlinks=True)
+    ran.append(f"--check names {len(several)} simultaneous differences, and an update stops on a wrong plugin source path")
+
+    # An agents directory symlinked to a same-content copy: every agent is
+    # named as reached through it.
+    symlink_outside(agents_dir)
+    rc, out, err, calls = run_check("--check with the agents directory symlinked outside")
+    found = [line for line in out.splitlines() if line.startswith("check: MISMATCH")]
+    expect("--check with the agents directory symlinked outside", rc == 1 and len(found) == len(agent_tomls)
+           and all(f"reached through the symlink {agents_dir}" in line for line in found),
+           f"it should name each of the {len(agent_tomls)} agents as reached through the symlink", rc, out, err, calls)
+    for live, pristine in ((codex_home, pristine_home), (stub_state, pristine_state)):
+        shutil.rmtree(live)
+        shutil.copytree(pristine, live, symlinks=True)
+    ran.append("--check names every agent reached through a symlinked agents directory")
+
+    # --check against an approved commit the checkout has drifted from renders
+    # that commit: it names HEAD and every file the commit changes.
+    rc, out, err, calls = run_check("--check against a drifted approved commit", ["--source-sha", other_sha])
+    found = [line for line in out.splitlines() if line.startswith("check: MISMATCH")]
+    expect("--check against a drifted approved commit", rc == 1 and len(found) == 2
+           and f"HEAD is {stub_head}, not the approved {other_sha}" in found[0]
+           and os.path.join(skill, "references", "resume.md") + ": differs from the source" in found[1],
+           "it should name HEAD and the one file the approved commit changes", rc, out, err, calls)
+    ran.append("--check against a drifted approved commit names HEAD and the changed file")
+
+    # A commit whose plugin holds a symlink could render a file from outside
+    # the commit, so installing it stops before anything is installed.
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("an approved commit whose plugin holds a symlink", ["--source-sha", symlink_head],
+                                     extra_env={"STUB_GIT_HEAD": symlink_head})
+    expect("an approved commit whose plugin holds a symlink", rc == 1 and "is a symlink" in err
+           and "rendering the build failed; nothing was installed" in err
+           and not any(c.startswith("codex plugin") and c != "codex plugin list --json" for c in calls),
+           "it should refuse to render and install nothing", rc, out, err, calls)
+    expect_untouched("an approved commit whose plugin holds a symlink", before, rc, out, err, calls)
+    ran.append("an approved commit whose plugin holds a symlink installs nothing")
+
+    # With real git: a clone of the snapshot with an untracked duplicate
+    # agent (named squad-pm, with a marked body) and a modified reference
+    # marked skip-worktree, both invisible to git status. An update with
+    # --source-sha, then a default update, must install exactly the commit:
+    # the same agents and plugin files as this CODEX_HOME, installed from the
+    # same commit with the same choices, and neither marker; --check in the
+    # clone then passes.
+    origin = os.path.join(tmp, "origin.git")
+    clone = os.path.join(tmp, "clone")
+    git_in(tmp, "clone", "-q", "--bare", snapshot_repo, origin)
+    git_in(tmp, "clone", "-q", origin, clone)
+    with open(os.path.join(clone, "agents", "squad-pm.md"), encoding="utf-8") as f:
+        duplicate = f.read() + "\nUNTRACKED DUPLICATE MARKER\n"
+    with open(os.path.join(clone, "agents", "zz-duplicate-pm.md"), "w", encoding="utf-8") as f:
+        f.write(duplicate)
+    reference = os.path.join("skills", "compute-squad", "references", "resume.md")
+    append(os.path.join(clone, reference), "SKIP-WORKTREE MARKER\n")
+    git_in(clone, "update-index", "--skip-worktree", reference)
+    if git_in(clone, "status", "--porcelain", "--untracked-files=no"):
+        fail("the clone's skip-worktree edit should be invisible to git status")
+    clone_home = os.path.join(tmp, "clone-home")
+    clone_state = os.path.join(tmp, "clone-state")
+    os.makedirs(os.path.join(clone_home, "compute-squad"))
+    os.makedirs(os.path.join(clone_state, "installed"))
+    shutil.copyfile(choices_path, os.path.join(clone_home, "compute-squad", "choices.conf"))
+    clone_env = dict(env, CODEX_HOME=clone_home, GIT_BIN=real_git or "git", STUB_STATE=clone_state,
+                     STUB_LOG=os.path.join(tmp, "clone-calls.txt"))
+    clone_cache = os.path.join(clone_home, "plugins", "cache", "compute-squad-local", "compute-squad", version)
+    for label, args in (("an approved commit with hidden edits in its checkout", ["--source-sha", snap_head]),
+                        ("a default update with hidden edits in its checkout", []),
+                        ("--check with hidden edits in the checkout", ["--check"]),
+                        ("--check --source-sha with hidden edits in the checkout", ["--check", "--source-sha", snap_head])):
+        run = subprocess.run(["bash", os.path.join(clone, "codex", "update.sh"), *args], env=clone_env,
+                             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+        rc, out, err, calls = run.returncode, run.stdout, run.stderr, []
+        expect(label, rc == 0 and out.rstrip().endswith(("check: OK", "Start a new Codex session. Running sessions keep "
+                                                                       "the skill and agents they loaded; a run resumed in "
+                                                                       "a new session uses these models from its next stage.")),
+               "it should succeed", rc, out, err, calls)
+        installed = {name: read(os.path.join(clone_home, "agents", name)) for name in os.listdir(os.path.join(clone_home, "agents"))}
+        expect(label, installed == {name: read(os.path.join(agents_dir, name)) for name in installed}
+               and sorted(installed) == sorted(os.path.basename(p) for p in agent_tomls)
+               and not any("UNTRACKED DUPLICATE MARKER" in text for text in installed.values()),
+               "the installed agents should be exactly the commit's, with nothing from the untracked duplicate",
+               rc, out, err, calls)
+        expect(label, snapshot(clone_cache) == snapshot(os.path.join(build_dir, "plugins", "compute-squad"))
+               and "SKIP-WORKTREE MARKER" not in read(os.path.join(clone_cache, reference)),
+               "the cached plugin should be exactly the commit's, without the skip-worktree edit", rc, out, err, calls)
+    ran.append("with real git, an untracked duplicate agent and a skip-worktree edit never reach an install, "
+               "with or without --source-sha, and --check passes")
 
     # An approved local commit installs from any branch, with no upstream and
     # no pull, and --review-models works with it.

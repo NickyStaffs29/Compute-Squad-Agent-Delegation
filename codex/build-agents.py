@@ -49,7 +49,7 @@ import os
 import pathlib
 import re
 import shutil
-import subprocess
+import stat
 import sys
 import tempfile
 
@@ -1109,27 +1109,28 @@ def catalog_status(catalog_path: str, choices_path: str) -> int:
 
 def render_codex(outdir: str, choices_path: str) -> int:
     """Write the effective Codex build into a new directory: a local
-    marketplace (compute-squad-local) whose plugin is this checkout's tracked
-    .codex-plugin/ and skills/ files, with the skill's routing block rendered
-    from the effective models; the seven agent TOMLs; and the four profile
-    files. Every file comes from one render of one manifest."""
+    marketplace (compute-squad-local) whose plugin is this tree's
+    .codex-plugin/plugin.json and skills/ files, with the skill's routing block
+    rendered from the effective models; the seven agent TOMLs; and the four
+    profile files. Every file comes from one render of one manifest. It reads
+    only the tree this script lives in, every file there; codex/update.sh runs
+    it from an export of the selected commit, so nothing uncommitted,
+    untracked, or hidden from git status in a checkout can reach the build."""
     out = pathlib.Path(outdir)
     if out.exists():
         raise BuildError(f"{outdir} already exists; --render-codex writes a new directory")
     choices = load_choices(choices_path)
     manifest = effective_manifest(load_manifest(), choices)
     generated = build(manifest)
-    git = os.environ.get("GIT_BIN") or "git"
-    try:
-        listing = subprocess.run(
-            [git, "-C", str(ROOT), "ls-files", "-z", "--", ".codex-plugin", "skills"],
-            capture_output=True, check=True,
-        ).stdout.decode("utf-8")
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise BuildError(f"cannot list the plugin's tracked files with {git}: {error}") from None
-    payload = sorted(path for path in listing.split("\0") if path)
-    if ".codex-plugin/plugin.json" not in payload or "skills/compute-squad/SKILL.md" not in payload:
-        raise BuildError(f"{git} ls-files did not list .codex-plugin/plugin.json and skills/compute-squad/SKILL.md")
+    payload = [".codex-plugin/plugin.json"]
+    for dirpath, dirnames, filenames in os.walk(ROOT / "skills"):
+        for name in sorted(dirnames + filenames):
+            if os.path.islink(os.path.join(dirpath, name)):
+                raise BuildError(f"{os.path.join(dirpath, name)} is a symlink; the plugin payload holds files only")
+        payload += [pathlib.Path(dirpath, name).relative_to(ROOT).as_posix() for name in filenames]
+    payload.sort()
+    if "skills/compute-squad/SKILL.md" not in payload:
+        raise BuildError(f"{ROOT} has no skills/compute-squad/SKILL.md")
 
     plugin = out / "plugins" / "compute-squad"
     for relpath in payload:
@@ -1176,8 +1177,10 @@ def compare_install(expected: str, codex_home: str) -> int:
     """Name every difference between a rendered build and what a Codex home
     runs: the plugin state `codex plugin list --json` reports on stdin, every
     file of the cached plugin payload (the manifest and the whole skill with
-    its references and hooks, in both directions, executable bits included),
-    the agents, and the profiles. It reads and never writes."""
+    its references and hooks, in both directions), the agents, and the
+    profiles. Each must be a regular file, reached through no symlink, with
+    the source's bytes and exactly its executable bits. It reads and never
+    writes."""
     build = pathlib.Path(expected)
     home = pathlib.Path(codex_home)
     plugin = build / "plugins" / "compute-squad"
@@ -1208,32 +1211,72 @@ def compare_install(expected: str, codex_home: str) -> int:
             if other.get("pluginId") != local_id:
                 problems.append(f"plugins: {other.get('pluginId')} is also installed and enabled; two copies of the skill load")
 
-    def files_under(root: pathlib.Path) -> set:
-        return {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()} if root.is_dir() else set()
+    def entries_under(root: pathlib.Path) -> dict:
+        """{relative path: lstat} for every entry under root, symlinks
+        included and never followed."""
+        found = {}
+        for dirpath, dirnames, filenames in os.walk(root):
+            for name in dirnames + filenames:
+                path = pathlib.Path(dirpath, name)
+                found[path.relative_to(root).as_posix()] = path.lstat()
+        return found
+
+    def symlink_on_path(path: pathlib.Path):
+        """The first symlink from CODEX_HOME down to path, if any."""
+        for part in [path, *path.parents]:
+            if part == home or home not in part.parents:
+                return None
+            if part.is_symlink():
+                return part
+        return None
+
+    def compare(source_path: pathlib.Path, installed_path: pathlib.Path, info) -> None:
+        """A regular file with the source's bytes and executable bits."""
+        if stat.S_ISLNK(info.st_mode):
+            problems.append(f"{installed_path}: is a symlink to {os.readlink(installed_path)}, not the source's file")
+            return
+        if not stat.S_ISREG(info.st_mode):
+            problems.append(f"{installed_path}: is not a regular file")
+            return
+        if installed_path.read_bytes() != source_path.read_bytes():
+            problems.append(f"{installed_path}: differs from the source")
+        want_bits, have_bits = source_path.stat().st_mode & 0o111, info.st_mode & 0o111
+        if want_bits != have_bits:
+            problems.append(f"{installed_path}: executable bits are {have_bits:03o}, the source's {want_bits:03o}")
 
     cache = home / "plugins" / "cache" / "compute-squad-local" / "compute-squad" / version
-    if not cache.is_dir():
+    link = symlink_on_path(cache)
+    if link is not None:
+        problems.append(f"{link}: is a symlink to {os.readlink(link)}; the plugin cache must be Codex's own directory")
+    elif not cache.is_dir():
         problems.append(f"{cache}: missing; the plugin is not in Codex's cache")
     else:
-        want, have = files_under(plugin), files_under(cache)
-        for relpath in sorted(want | have):
+        want, have = entries_under(plugin), entries_under(cache)
+        for relpath in sorted(set(want) | set(have)):
             installed_path = cache / relpath
             if relpath not in have:
-                problems.append(f"{installed_path}: missing")
+                if not stat.S_ISDIR(want[relpath].st_mode):
+                    problems.append(f"{installed_path}: missing")
             elif relpath not in want:
                 problems.append(f"{installed_path}: extra; the source has no such file")
-            elif installed_path.read_bytes() != (plugin / relpath).read_bytes():
-                problems.append(f"{installed_path}: differs from the source")
-            elif os.access(plugin / relpath, os.X_OK) != os.access(installed_path, os.X_OK):
-                problems.append(f"{installed_path}: executable bit differs from the source")
+            elif stat.S_ISDIR(want[relpath].st_mode):
+                if not stat.S_ISDIR(have[relpath].st_mode):
+                    problems.append(f"{installed_path}: is not a directory"
+                                    + (f" but a symlink to {os.readlink(installed_path)}"
+                                       if stat.S_ISLNK(have[relpath].st_mode) else ""))
+            else:
+                compare(plugin / relpath, installed_path, have[relpath])
 
     pairs = [(path, home / "agents" / path.name) for path in sorted((build / "agents").glob("*.toml"))]
     pairs += [(path, home / path.name) for path in sorted((build / "profiles").glob("*.config.toml"))]
     for source_path, installed_path in pairs:
-        if not installed_path.is_file():
+        link = symlink_on_path(installed_path.parent)
+        if link is not None:
+            problems.append(f"{installed_path}: reached through the symlink {link}")
+        elif not os.path.lexists(installed_path):
             problems.append(f"{installed_path}: missing")
-        elif installed_path.read_bytes() != source_path.read_bytes():
-            problems.append(f"{installed_path}: differs from the source")
+        else:
+            compare(source_path, installed_path, installed_path.lstat())
 
     for problem in problems:
         print(f"check: MISMATCH {problem}")
@@ -1241,8 +1284,9 @@ def compare_install(expected: str, codex_home: str) -> int:
         return 1
     agents = sum(1 for _ in (build / "agents").glob("*.toml"))
     profiles = sum(1 for _ in (build / "profiles").glob("*.config.toml"))
+    files = sum(1 for info in entries_under(plugin).values() if stat.S_ISREG(info.st_mode))
     print(
-        f"check: the installed plugin ({len(files_under(plugin))} files), {agents} agents, and {profiles} profiles "
+        f"check: the installed plugin ({files} files), {agents} agents, and {profiles} profiles "
         "match a fresh render of the source with your saved choices"
     )
     return 0
