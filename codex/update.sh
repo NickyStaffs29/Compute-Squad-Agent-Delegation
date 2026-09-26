@@ -59,6 +59,12 @@ if [[ -z "$python_bin" ]]; then
   echo "update: python3 is required; put it on PATH" >&2
   exit 1
 fi
+# Git reads the objects themselves: a replace ref (refs/replace/*) could
+# otherwise substitute another commit, tree, or file for the one selected,
+# under the selected commit's own name. This holds for every git call below,
+# source selection and the export included, and for the git the exporter runs.
+export GIT_NO_REPLACE_OBJECTS=1
+
 state="$codex_home/compute-squad"
 choices="$state/choices.conf"
 build="$state/build"
@@ -82,8 +88,10 @@ git_read() {
 # Writes the files of commit $1, from git's objects and with their recorded
 # modes, into the new directory $2. Untracked files, uncommitted edits, and
 # edits git status cannot see (skip-worktree, assume-unchanged) never reach
-# it. Every python call below runs $2's codex/build-agents.py, so the renderer
-# and every file it reads come from that commit.
+# it. A commit holding any symlink is refused before anything is written: the
+# renderer following one could read a file from outside the commit. Every
+# python call below runs $2's codex/build-agents.py, so the renderer and every
+# file it reads come from that commit.
 export_commit() {
   "$python_bin" - "$git_bin" "$repo_root" "$1" "$2" <<'PY'
 import os, subprocess, sys
@@ -100,6 +108,9 @@ try:
             if kind != "blob":
                 sys.exit(f"export: {os.fsdecode(path)} in {commit} is a {kind}, not a file")
             entries.append((mode, oid, os.fsdecode(path)))
+    links = [path for mode, _oid, path in entries if mode == "120000"]
+    if links:
+        sys.exit(f"export: {commit} holds symlinks, which could read files from outside it: {', '.join(links)}")
     data = run(["cat-file", "--batch"], "".join(oid + "\n" for _, oid, _ in entries).encode())
 except (OSError, subprocess.CalledProcessError) as error:
     sys.exit(f"export: cannot read {commit}: {error}")
@@ -112,12 +123,9 @@ for mode, oid, path in entries:
     content, at = data[end + 1:end + 1 + int(size)], end + 2 + int(size)
     dest = os.path.join(out, path)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    if mode == "120000":
-        os.symlink(os.fsdecode(content), dest)
-    else:
-        with open(dest, "wb") as handle:
-            handle.write(content)
-        os.chmod(dest, 0o755 if mode == "100755" else 0o644)
+    with open(dest, "wb") as handle:
+        handle.write(content)
+    os.chmod(dest, 0o755 if mode == "100755" else 0o644)
 PY
 }
 
@@ -185,7 +193,7 @@ if [[ $check -eq 1 ]]; then
   fi
   source_tree="$(mktemp -d)"
   if ! export_commit "$commit" "$source_tree"; then
-    echo "check: MISMATCH source: commit $commit cannot be read from $repo_root"
+    echo "check: MISMATCH source: commit $commit cannot be exported from $repo_root (see above)"
     echo "check: FAILED: each MISMATCH line above is a difference; rerun codex/update.sh to install the source"
     exit 1
   fi
@@ -268,7 +276,7 @@ if [[ -n "$dirty" ]]; then
 fi
 source_tree="$(mktemp -d)"
 if ! export_commit "$head" "$source_tree"; then
-  echo "update: cannot read commit $head from $repo_root; $unchanged" >&2
+  echo "update: cannot export commit $head from $repo_root (see above); $unchanged" >&2
   exit 1
 fi
 build_agents="$source_tree/codex/build-agents.py"

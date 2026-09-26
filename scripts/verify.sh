@@ -3621,10 +3621,13 @@ print(
 # and name HEAD and the changed file for a drifted approved commit, while
 # leaving CODEX_HOME byte for byte, this checkout's status, and every git and
 # codex call read-only. An update stops before installing while the local
-# plugin is registered from a wrong source path. With real git, a clone
-# holding an untracked duplicate agent and a skip-worktree edit installs
-# exactly the commit. An install the stub lands with the wrong content must
-# fail without the success line.
+# plugin is registered from a wrong source path. A commit holding a symlink
+# (in the plugin, or as an agent or the Codex manifest pointing outside the
+# commit) is never exported: an update stops before any codex call and
+# --check fails. With real git, a clone holding an untracked duplicate agent
+# and a skip-worktree edit, and then one with a blob or a commit replace ref,
+# installs and checks exactly the commit. An install the stub lands with the
+# wrong content must fail without the success line.
 # Every install must put the plugin, agents, and profiles from one build that
 # carries the saved choices, check them against a fresh render, remove the
 # remote plugin, prune the retired agents, and leave the user's files and
@@ -3785,6 +3788,36 @@ with tempfile.TemporaryDirectory() as tmp:
     git_in(snapshot_repo, "add", "-A")
     git_in(snapshot_repo, "commit", "-q", "-m", "a symlink in the plugin")
     symlink_head = git_in(snapshot_repo, "rev-parse", "HEAD")
+    # Two commits whose agent squad-pm, or whose Codex plugin manifest, is a
+    # symlink to a marked file outside the commit, and a commit whose squad-pm
+    # body is marked, for a replace ref to put in place of the main commit.
+    outside_commit = os.path.join(tmp, "outside-the-commit")
+    os.makedirs(outside_commit)
+    OUTSIDE_MARKER = "OUTSIDE-THE-COMMIT MARKER"
+    REPLACED_MARKER = "REPLACED-OBJECT MARKER"
+    squad_pm = os.path.join("agents", "squad-pm.md")
+    manifest_path = os.path.join(".codex-plugin", "plugin.json")
+    linked_heads = {}
+    for branch, relpath, text in (
+        ("symlinked-agent", squad_pm, read(squad_pm) + f"\n{OUTSIDE_MARKER}\n"),
+        ("symlinked-manifest", manifest_path,
+         read(manifest_path).replace('"description": "', f'"description": "{OUTSIDE_MARKER}. ', 1)),
+    ):
+        target = os.path.join(outside_commit, branch)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(text)
+        git_in(snapshot_repo, "checkout", "-q", "-b", branch, "main")
+        os.remove(os.path.join(snapshot_repo, relpath))
+        os.symlink(target, os.path.join(snapshot_repo, relpath))
+        git_in(snapshot_repo, "add", "-A")
+        git_in(snapshot_repo, "commit", "-q", "-m", f"{relpath} is a symlink outside the commit")
+        linked_heads[relpath] = git_in(snapshot_repo, "rev-parse", "HEAD")
+    git_in(snapshot_repo, "checkout", "-q", "-b", "replacement", "main")
+    with open(os.path.join(snapshot_repo, squad_pm), "a", encoding="utf-8") as f:
+        f.write(f"\n{REPLACED_MARKER}\n")
+    git_in(snapshot_repo, "commit", "-q", "-am", "a marked squad-pm")
+    replacement_head = git_in(snapshot_repo, "rev-parse", "HEAD")
+    replacement_blob = git_in(snapshot_repo, "rev-parse", f"{replacement_head}:agents/squad-pm.md")
     git_in(snapshot_repo, "checkout", "-q", "main")
 
     env = dict(
@@ -3801,7 +3834,7 @@ with tempfile.TemporaryDirectory() as tmp:
         STUB_GIT_HEAD=snap_head,
     )
     for name in ("STUB_GIT_STATUS", "STUB_GIT_STATUS_AFTER_PULL", "STUB_GIT_PULLED", "STUB_GIT_BRANCH",
-                 "STUB_GIT_UPSTREAM", "STUB_GIT_UPSTREAM_HEAD"):
+                 "STUB_GIT_UPSTREAM", "STUB_GIT_UPSTREAM_HEAD", "GIT_NO_REPLACE_OBJECTS"):
         env.pop(name, None)
 
     runs = []
@@ -4181,7 +4214,7 @@ with tempfile.TemporaryDirectory() as tmp:
         writes = [c for c in calls if c.startswith("git ")
                   and not re.match(r"--no-optional-locks (rev-parse|status|ls-tree|cat-file) ", git_call(c) or "")]
         codex_calls = [c for c in calls if c.startswith("codex ")]
-        expect(label, not writes and codex_calls == ["codex plugin list --json"],
+        expect(label, not writes and codex_calls in ([], ["codex plugin list --json"]),
                f"--check may only read: git calls {writes!r} and codex calls {codex_calls!r} are not reads",
                rc, out, err, calls)
         now_status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, timeout=120).stdout
@@ -4339,17 +4372,32 @@ with tempfile.TemporaryDirectory() as tmp:
            "it should name HEAD and the one file the approved commit changes", rc, out, err, calls)
     ran.append("--check against a drifted approved commit names HEAD and the changed file")
 
-    # A commit whose plugin holds a symlink could render a file from outside
-    # the commit, so installing it stops before anything is installed.
-    before = snapshot(codex_home)
-    rc, out, err, calls = run_update("an approved commit whose plugin holds a symlink", ["--source-sha", symlink_head],
-                                     extra_env={"STUB_GIT_HEAD": symlink_head})
-    expect("an approved commit whose plugin holds a symlink", rc == 1 and "is a symlink" in err
-           and "rendering the build failed; nothing was installed" in err
-           and not any(c.startswith("codex plugin") and c != "codex plugin list --json" for c in calls),
-           "it should refuse to render and install nothing", rc, out, err, calls)
-    expect_untouched("an approved commit whose plugin holds a symlink", before, rc, out, err, calls)
-    ran.append("an approved commit whose plugin holds a symlink installs nothing")
+    # A symlink in a commit could make the render read a file from outside
+    # the commit, so the export refuses any commit holding one before anything
+    # is written: an update stops before any codex call, and --check fails.
+    # The symlink may sit in the plugin, or stand in for an agent or for the
+    # Codex plugin manifest while pointing at a marked file outside.
+    linked = (
+        ("an approved commit whose plugin holds a symlink", symlink_head, "skills/compute-squad/references/link.md"),
+        ("an approved commit whose agent is a symlink outside it", linked_heads[squad_pm], "agents/squad-pm.md"),
+        ("an approved commit whose Codex manifest is a symlink outside it", linked_heads[manifest_path],
+         ".codex-plugin/plugin.json"),
+    )
+    for label, commit, relpath in linked:
+        before = snapshot(codex_home)
+        rc, out, err, calls = run_update(label, ["--source-sha", commit], extra_env={"STUB_GIT_HEAD": commit})
+        expect(label, rc == 1 and f"holds symlinks, which could read files from outside it: {relpath}" in err
+               and f"cannot export commit {commit}" in err and not any(c.startswith("codex") for c in calls),
+               "the export should refuse the symlink before any codex call", rc, out, err, calls)
+        expect_untouched(label, before, rc, out, err, calls)
+        rc, out, err, calls = run_check(f"--check of {label[3:]}", ["--source-sha", commit],
+                                        extra_env={"STUB_GIT_HEAD": commit})
+        expect(f"--check of {label[3:]}", rc == 1
+               and f"check: MISMATCH source: commit {commit} cannot be exported" in out
+               and out.rstrip().splitlines()[-1].startswith("check: FAILED") and relpath in err,
+               "it should name the symlink and fail", rc, out, err, calls)
+    ran.append("a commit holding a symlink (in the plugin, as an agent, as the Codex manifest) is never exported: "
+               "an update installs nothing and --check fails")
 
     # With real git: a clone of the snapshot with an untracked duplicate
     # agent (named squad-pm, with a marked body) and a modified reference
@@ -4379,10 +4427,10 @@ with tempfile.TemporaryDirectory() as tmp:
     clone_env = dict(env, CODEX_HOME=clone_home, GIT_BIN=real_git or "git", STUB_STATE=clone_state,
                      STUB_LOG=os.path.join(tmp, "clone-calls.txt"))
     clone_cache = os.path.join(clone_home, "plugins", "cache", "compute-squad-local", "compute-squad", version)
-    for label, args in (("an approved commit with hidden edits in its checkout", ["--source-sha", snap_head]),
-                        ("a default update with hidden edits in its checkout", []),
-                        ("--check with hidden edits in the checkout", ["--check"]),
-                        ("--check --source-sha with hidden edits in the checkout", ["--check", "--source-sha", snap_head])):
+
+    def expect_clone_installs_commit(label, args):
+        """Run the clone's updater with args: it must succeed, and the clone's
+        CODEX_HOME must hold exactly the snapshot's main commit, no marker."""
         run = subprocess.run(["bash", os.path.join(clone, "codex", "update.sh"), *args], env=clone_env,
                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
         rc, out, err, calls = run.returncode, run.stdout, run.stderr, []
@@ -4393,14 +4441,40 @@ with tempfile.TemporaryDirectory() as tmp:
         installed = {name: read(os.path.join(clone_home, "agents", name)) for name in os.listdir(os.path.join(clone_home, "agents"))}
         expect(label, installed == {name: read(os.path.join(agents_dir, name)) for name in installed}
                and sorted(installed) == sorted(os.path.basename(p) for p in agent_tomls)
-               and not any("UNTRACKED DUPLICATE MARKER" in text for text in installed.values()),
-               "the installed agents should be exactly the commit's, with nothing from the untracked duplicate",
-               rc, out, err, calls)
+               and not any(marker in text for text in installed.values()
+                           for marker in ("UNTRACKED DUPLICATE MARKER", REPLACED_MARKER)),
+               "the installed agents should be exactly the commit's, with nothing from the untracked duplicate "
+               "or a replacement object", rc, out, err, calls)
         expect(label, snapshot(clone_cache) == snapshot(os.path.join(build_dir, "plugins", "compute-squad"))
                and "SKIP-WORKTREE MARKER" not in read(os.path.join(clone_cache, reference)),
                "the cached plugin should be exactly the commit's, without the skip-worktree edit", rc, out, err, calls)
+
+    for label, args in (("an approved commit with hidden edits in its checkout", ["--source-sha", snap_head]),
+                        ("a default update with hidden edits in its checkout", []),
+                        ("--check with hidden edits in the checkout", ["--check"]),
+                        ("--check --source-sha with hidden edits in the checkout", ["--check", "--source-sha", snap_head])):
+        expect_clone_installs_commit(label, args)
     ran.append("with real git, an untracked duplicate agent and a skip-worktree edit never reach an install, "
                "with or without --source-sha, and --check passes")
+
+    # With real git, a replace ref (refs/replace/*) makes git read another
+    # object under a selected object's name. A blob replace ref swaps in a
+    # marked squad-pm body while git status stays clean; a commit replace ref
+    # swaps in a commit with that body while rev-parse still names the main
+    # commit. Updates with and without --source-sha, and --check, must still
+    # install and compare exactly the main commit.
+    original_blob = git_in(clone, "rev-parse", f"{snap_head}:agents/squad-pm.md")
+    for kind, replaced, replacement in (("blob", original_blob, replacement_blob),
+                                        ("commit", snap_head, replacement_head)):
+        git_in(clone, "replace", replaced, replacement)
+        for label, args in ((f"an approved commit under a {kind} replace ref", ["--source-sha", snap_head]),
+                            (f"a default update under a {kind} replace ref", []),
+                            (f"--check under a {kind} replace ref", ["--check"]),
+                            (f"--check --source-sha under a {kind} replace ref", ["--check", "--source-sha", snap_head])):
+            expect_clone_installs_commit(label, args)
+        git_in(clone, "replace", "-d", replaced)
+    ran.append("with real git, a blob or commit replace ref never reaches an install or a check, "
+               "with or without --source-sha")
 
     # An approved local commit installs from any branch, with no upstream and
     # no pull, and --review-models works with it.
