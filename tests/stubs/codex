@@ -3,9 +3,15 @@
 # command it was called as. When STUB_LOG is set, every call appends one line
 # to that file: the name it was called by, then its arguments.
 #
-# As git: `status --porcelain` prints STUB_GIT_STATUS (empty means clean),
-# `ls-files` runs the real git named by STUB_REAL_GIT, and every other call
-# does nothing and exits 0.
+# As git (after -C DIR and --no-optional-locks): `status --porcelain` prints
+# STUB_GIT_STATUS (empty means clean), or STUB_GIT_STATUS_AFTER_PULL once a
+# pull has created the file STUB_GIT_PULLED names; `ls-tree` and `cat-file`
+# run the real git named by STUB_REAL_GIT on the repository STUB_GIT_REPO
+# names, so a commit's objects are real; `rev-parse` answers from
+# STUB_GIT_BRANCH (default main), STUB_GIT_UPSTREAM (default origin/main; set
+# it empty for no upstream), STUB_GIT_HEAD (default forty 1s), and
+# STUB_GIT_UPSTREAM_HEAD (default STUB_GIT_HEAD); every other call does
+# nothing and exits 0.
 #
 # As codex: `debug models` prints the catalog file STUB_CATALOG names. The
 # plugin commands keep their state under STUB_STATE, outside CODEX_HOME:
@@ -16,8 +22,11 @@
 # $CODEX_HOME/plugins/cache/MARKET/PLUGIN/VERSION, replacing what was there,
 # as Codex 0.157.0 does (when STUB_PAUSE_DIR is set, it first creates
 # $STUB_PAUSE_DIR/paused and waits until $STUB_PAUSE_DIR/go exists, so a test
-# can hold an update mid-install); `plugin list --json` prints the installed plugins in
-# Codex's shape, or fails when STUB_FAIL_PLUGIN_LIST is set, as Codex does
+# can hold an update mid-install; when STUB_CORRUPT_INSTALL is set, it then
+# appends a line to the cached skill's references/resume.md, so the install
+# lands content the source does not have); `plugin list --json` prints the installed plugins in
+# Codex's shape, with each local plugin's source path, or fails when
+# STUB_FAIL_PLUGIN_LIST is set, as Codex does
 # when any configured marketplace cannot load; `plugin remove PLUGIN@MARKET`
 # deletes the plugin and its cache. Every other call does nothing and exits 0.
 if [ -n "${STUB_LOG:-}" ]; then
@@ -25,11 +34,52 @@ if [ -n "${STUB_LOG:-}" ]; then
 fi
 
 if [ "${0##*/}" = git ]; then
-  command="${1:-}"
-  [ "$command" = -C ] && command="${3:-}"
+  command=""
+  skip=0
+  for arg in "$@"; do
+    if [ "$skip" = 1 ]; then skip=0; continue; fi
+    case "$arg" in
+      -C) skip=1 ;;
+      --no-optional-locks) ;;
+      *) command="$arg"; break ;;
+    esac
+  done
+  head="${STUB_GIT_HEAD:-1111111111111111111111111111111111111111}"
   case "$command" in
-    status) printf '%s' "${STUB_GIT_STATUS:-}" ;;
-    ls-files) exec "${STUB_REAL_GIT:?STUB_REAL_GIT names no git}" "$@" ;;
+    status)
+      if [ -n "${STUB_GIT_PULLED:-}" ] && [ -e "$STUB_GIT_PULLED" ]; then
+        printf '%s' "${STUB_GIT_STATUS_AFTER_PULL:-}"
+      else
+        printf '%s' "${STUB_GIT_STATUS:-}"
+      fi
+      ;;
+    pull)
+      if [ -n "${STUB_GIT_PULLED:-}" ]; then
+        : > "$STUB_GIT_PULLED"
+      fi
+      ;;
+    ls-tree | cat-file)
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          -C) shift 2 ;;
+          --no-optional-locks) shift ;;
+          *) break ;;
+        esac
+      done
+      exec "${STUB_REAL_GIT:?STUB_REAL_GIT names no git}" -C "${STUB_GIT_REPO:?STUB_GIT_REPO names no repository}" "$@"
+      ;;
+    rev-parse)
+      case "$*" in
+        *"--symbolic-full-name @{upstream}"*)
+          upstream="${STUB_GIT_UPSTREAM-origin/main}"
+          [ -n "$upstream" ] || { echo "fatal: no upstream configured for branch" >&2; exit 128; }
+          echo "$upstream"
+          ;;
+        *"--abbrev-ref HEAD"*) echo "${STUB_GIT_BRANCH:-main}" ;;
+        *"@{upstream}"*) echo "${STUB_GIT_UPSTREAM_HEAD:-$head}" ;;
+        *HEAD*) echo "$head" ;;
+      esac
+      ;;
   esac
   exit 0
 fi
@@ -70,6 +120,9 @@ case "${1:-} ${2:-} ${3:-}" in
     rm -rf "$cache"
     mkdir -p "$cache" "$state/installed"
     cp -R "$source/." "$cache/"
+    if [ -n "${STUB_CORRUPT_INSTALL:-}" ]; then
+      echo "stale line from a broken install" >> "$cache/skills/compute-squad/references/resume.md"
+    fi
     printf '%s\n' "$version" > "$state/installed/$3"
     ;;
   "plugin list --json")
@@ -82,8 +135,13 @@ case "${1:-} ${2:-} ${3:-}" in
     for f in "${state:?STUB_STATE names no directory}"/installed/*; do
       [ -e "$f" ] || continue
       id="${f##*/}"
-      printf '%s{"pluginId": "%s", "name": "%s", "marketplaceName": "%s", "version": "%s", "installed": true, "enabled": true}' \
-        "$sep" "$id" "${id%@*}" "${id#*@}" "$(cat "$f")"
+      source=""
+      if [ -f "$state/marketplaces/${id#*@}" ]; then
+        source="$(printf ', "source": {"source": "local", "path": "%s/plugins/%s"}' \
+          "$(cat "$state/marketplaces/${id#*@}")" "${id%@*}")"
+      fi
+      printf '%s{"pluginId": "%s", "name": "%s", "marketplaceName": "%s", "version": "%s", "installed": true, "enabled": true%s}' \
+        "$sep" "$id" "${id%@*}" "${id#*@}" "$(cat "$f")" "$source"
       sep=", "
     done
     printf '], "available": []}\n'
