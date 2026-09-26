@@ -10,9 +10,7 @@
 #      assigns that agent's rung, and at least one <example> block in the
 #      description. Every Claude rung alias in models.conf is in that set.
 #   3. skills/compute-squad/SKILL.md frontmatter parses and its metadata.version
-#      equals plugin.json's version. codex/SKILL.md, a reading copy no host
-#      loads, opens with its reading-copy title and has a Version: line equal
-#      to that version.
+#      equals plugin.json's version.
 #   4. CHANGELOG.md has a heading for that version.
 #   5. dist/compute-squad.plugin matches skills/, agents/, commands/, README.md,
 #      and .claude-plugin/plugin.json by content (unzip + diff -r, not a rebuild+
@@ -29,13 +27,13 @@
 #      holds everything it writes (model lines, TOMLs, profiles, routing
 #      blocks, prompts) to models.conf and the agent bodies.
 #   7. Shared protocol blocks and facts read identically across files:
-#      7a the Goal — Locked template; 7b the BLOCKER block in both SKILL.md
-#      files; 7c the helper cap, and the audit's skeptic cap with the rest of
-#      finding 20's audit text; 7d each of the four files with a generated
-#      routing block has one begin and one end marker; 7e the product
-#      description; 7f the ## Status and ## Decision templates in SKILL.md
-#      and codex/README.md; 7g the PM's criteria block in both SKILL.md
-#      files, the PM body, and its Codex prompt, with the Result values the
+#      7a the Goal — Locked template; 7b SKILL.md's BLOCKER block, which the
+#      7k span must carry; 7c the helper cap, and the audit's skeptic cap with
+#      the rest of finding 20's audit text; 7d each of the three files with a
+#      generated routing block has one begin and one end marker; 7e the
+#      product description; 7f the ## Status and ## Decision templates in
+#      SKILL.md and codex/README.md; 7g the PM's criteria block in SKILL.md,
+#      the PM body, and its Codex prompt, with the Result values the
 #      log linter checks; 7h the high-stakes review: its template in SKILL.md
 #      and codex/README.md, the PM's archive-nothing step, squad-mech's close
 #      guard, the example's review, and no trace of the main session
@@ -54,23 +52,23 @@
 #      precedence sentences, final-message forms, Stage 0 bound, spawn
 #      pointer, and route grep, finding 18's per-spawn-or-continuation
 #      rule and output caps, and finding 20's audit ruling in ACCEPT; 7q the agent
-#      description budget; 7r no agent has a tool to spawn agents; 7s
-#      codex/SKILL.md stays a reading copy and both SKILL.md files carry the
+#      description budget; 7r no agent has a tool to spawn agents; 7s no
+#      SKILL.md outside skills/ has frontmatter, and SKILL.md carries the
 #      no-absorption rule; 7t no file names a renamed executor or the old
-#      escalation wording, and both SKILL.md files carry the FAIL charge rule
-#      and the setup-gap stop; 7u no file under agents/, codex/, or skills/
-#      reads the goal from the entry at the top of the log; 7v the resume
-#      table in references/resume.md routes from every stage heading, both
-#      SKILL.md files point a resume at it and carry the one-active-run rule,
+#      escalation wording, and SKILL.md carries the FAIL charge rule and the
+#      setup-gap stop; 7u no file under agents/, codex/, or skills/ reads the
+#      goal from the entry at the top of the log; 7v the resume table in
+#      references/resume.md routes from every stage heading, SKILL.md points
+#      a resume at it and carries the one-active-run rule,
 #      and squad-mech's open-run guard is in its body, prompt, and TOML; 7w
 #      the Recon and Executor templates carry the labels the log linter
 #      checks, and the PLAN template a Totals: line; 7x Recon checks the
 #      evidence prerequisites, its template's Checks: block matches the
 #      linter's forms, PLAN starts from it and reconciles its counts, and no
-#      stage keeps the old one-carve-out Bash rule; 7y both SKILL.md files
-#      bound Stage 0's reads, give every stage a pointer spawn prompt, and
-#      route from the log with a grep that names every routing field the
-#      log linter checks, and no stage ends with a summary final message; 7z
+#      stage keeps the old one-carve-out Bash rule; 7y SKILL.md bounds Stage
+#      0's reads, gives every stage a pointer spawn prompt, and routes from
+#      the log with a grep that names every routing field the log linter
+#      checks, and no stage ends with a summary final message; 7z
 #      small work stays in-stage, a BLOCKING requester is continued before it
 #      is re-spawned, and every DELEGATE: subtask caps its helper's output.
 #   8. Behavior without a model, on fixtures under tests/: log grammar,
@@ -379,26 +377,6 @@ if skill_version != plugin_version:
 
 ok(3, f"{skill_path} metadata.version matches {plugin_path} version ({plugin_version})")
 
-# codex/SKILL.md is a reading copy no host loads: Claude Code and the Codex
-# plugin both load skills/compute-squad/SKILL.md. It carries no frontmatter,
-# so it cannot pass for a second skill, and states its version on a
-# Version: line instead.
-codex_skill_path = "codex/SKILL.md"
-CODEX_SKILL_TITLE = "# Compute Squad: Codex reading copy"
-if not os.path.isfile(codex_skill_path):
-    fail(3, f"{codex_skill_path} does not exist")
-
-with open(codex_skill_path, encoding="utf-8") as f:
-    codex_skill = f.read()
-
-if codex_skill.splitlines()[:1] != [CODEX_SKILL_TITLE]:
-    fail(3, f"{codex_skill_path}: line 1 must be {CODEX_SKILL_TITLE!r}")
-codex_versions = re.findall(r"^Version:[ \t]*(\S+)[ \t]*$", codex_skill, re.MULTILINE)
-if codex_versions != [plugin_version]:
-    fail(3, f"{codex_skill_path}: needs one 'Version: {plugin_version}' line; found {codex_versions!r}")
-
-ok(3, f"{codex_skill_path} is the reading copy and its Version: line matches {plugin_path} version ({plugin_version})")
-
 
 # ---- Check 4: CHANGELOG.md has a heading for this version ----
 changelog_path = "CHANGELOG.md"
@@ -699,9 +677,9 @@ PYEOF
 # full prose in up to four files, and one of the smallest, simplest blocks
 # (the BLOCKER grammar) had already silently drifted. Consolidation moved
 # the full prose retellings into skills/compute-squad/SKILL.md, the one skill
-# both hosts load (codex/SKILL.md is a reading copy for people); this check
-# protects the blocks and facts that must still read identically in more
-# than one file, so the next drift fails CI instead of shipping.
+# both hosts load; this check protects the blocks and facts that must still
+# read identically in more than one file, so the next drift fails CI instead
+# of shipping.
 # It cannot catch prose that differs in wording while agreeing on the
 # underlying fact. Text repeated across agent bodies is pinned by the
 # shared-span table below, one row per span.
@@ -753,11 +731,10 @@ def tracked_files(*pathspecs):
     return [p for p in out.split("\0") if p]
 
 
-# ---- 7a: the Goal — Locked template is byte-identical in all three files
-# that carry it.
+# ---- 7a: the Goal — Locked template is byte-identical in both files that
+# carry it.
 goal_locked_paths = [
     "skills/compute-squad/SKILL.md",
-    "codex/SKILL.md",
     "codex/README.md",
 ]
 goal_locked_blocks = {}
@@ -772,28 +749,19 @@ for path, block in goal_locked_blocks.items():
 
 print(f"PASS: check 7: Goal — Locked template is byte-identical across {', '.join(goal_locked_paths)}")
 
-# ---- 7b: the BLOCKER grammar's fenced wire-format block is byte-identical
-# in both SKILL.md files.
-blocker_paths = ["skills/compute-squad/SKILL.md", "codex/SKILL.md"]
-blocker_blocks = {}
-for path in blocker_paths:
-    text = read(path)
-    blocker_blocks[path] = extract_fenced_block(text, path, "```", "BLOCKER:")
+# ---- 7b: the BLOCKER grammar's fenced wire-format block in SKILL.md. The
+# 7k row of the shared-span table requires the stage bodies' blocker span to
+# carry this block byte for byte, so a change on either side fails there.
+blocker_path = "skills/compute-squad/SKILL.md"
+blocker_block = extract_fenced_block(read(blocker_path), blocker_path, "```", "BLOCKER:")
 
-ref_path, ref_block = next(iter(blocker_blocks.items()))
-for path, block in blocker_blocks.items():
-    if block != ref_block:
-        fail(f"{path}: BLOCKER grammar block differs from {ref_path}")
-
-print(f"PASS: check 7: BLOCKER grammar block is byte-identical across {', '.join(blocker_paths)}")
+print(f"PASS: check 7: {blocker_path} has the fenced BLOCKER grammar block the 7k span must carry")
 
 # ---- 7c: the caps. The "5 helpers per stage per run" cap names the same
-# digit everywhere it's restated: the shared skill, the reading copy, the
-# README, and each stage body that can delegate. The audit's skeptic cap
-# follows below.
+# digit everywhere it's restated: the shared skill, the README, and each
+# stage body that can delegate. The audit's skeptic cap follows below.
 cap_paths = [
     "skills/compute-squad/SKILL.md",
-    "codex/SKILL.md",
     "README.md",
     "agents/squad-recon.md",
     "agents/squad-pm.md",
@@ -811,20 +779,18 @@ print(f"PASS: check 7: the 5-helper-per-stage-per-run cap reads '5' in {', '.joi
 # The audit's skeptic cap (finding 20) names one number everywhere it is
 # stated: the procedure and the ## Audit Findings template in
 # references/audit-prompts.md, whose template the log linter reads, and the
-# audit sections of both SKILL.md files. The rest of finding 20 stays in
-# place: the entry's heading and its UNREVIEWED and NEEDS-HUMAN verdicts in
-# SKILL.md, the brief, and the PM body and its Codex prompt; the procedure's
-# spawn type, scope read, severity field, and no-writes rule; the skeptic's
+# audit section of SKILL.md. The rest of finding 20 stays in place: the
+# entry's heading and its UNREVIEWED and NEEDS-HUMAN verdicts in SKILL.md,
+# the brief, and the PM body and its Codex prompt; the procedure's spawn
+# type, scope read, severity field, and no-writes rule; the skeptic's
 # production-only security verdict beside the concurrency and accessibility
-# carve-out; SKILL.md's routing of each verdict; the Codex reading copy's
-# pointer to the procedure; and README's tree comment. No file keeps the old
-# rule that only skeptic-confirmed findings count.
+# carve-out; SKILL.md's routing of each verdict; and README's tree comment.
+# No file keeps the old rule that only skeptic-confirmed findings count.
 AUDIT_PROMPTS = "skills/compute-squad/references/audit-prompts.md"
 AUDIT_CAP_FORMS = {
     AUDIT_PROMPTS: (r"for at most ([0-9]+) findings\. The rest are UNREVIEWED\.",
                     r"^Findings: <n>; skeptics run: <k> \(cap ([0-9]+)\)$"),
     "skills/compute-squad/SKILL.md": (r"attempt to refute each finding, for at most ([0-9]+) findings\.",),
-    "codex/SKILL.md": (r"one fresh top-rung skeptic per finding, for at most ([0-9]+) findings; the rest are UNREVIEWED\.",),
 }
 audit_caps = {}
 for path, forms in AUDIT_CAP_FORMS.items():
@@ -865,13 +831,6 @@ AUDIT_TEXT = {
     ),
     "agents/squad-pm.md": ("## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN"),
     "codex/05-pm-accept.md": ("## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN"),
-    "codex/SKILL.md": (
-        "## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN",
-        "Follow the procedure in `skills/compute-squad/references/audit-prompts.md`.",
-        "CONFIRMED and UNREVIEWED findings are FAIL evidence, a NEEDS-HUMAN finding stops for the user, and a REFUTED "
-        "finding is not evidence.",
-        "The PM rules on every CONFIRMED, UNREVIEWED, and NEEDS-HUMAN finding the entry lists",
-    ),
     "skills/compute-squad/references/resume.md": ("| `## Audit Findings` | Spawn `squad-pm` in ACCEPT mode. |",),
     "README.md": ("audit-prompts.md  # audit procedure, finder and skeptic briefs",),
 }
@@ -894,13 +853,13 @@ print(
 
 # ---- 7d: the routing blocks. codex/build-agents.py writes each block from
 # models.conf between one "<!-- routing:begin -->" line and one
-# "<!-- routing:end -->" line in four files, and check 6's --check holds
+# "<!-- routing:end -->" line in three files, and check 6's --check holds
 # their content to models.conf. Here each file must have exactly one begin
 # marker, then one end marker, each alone on its line. In the shared skill,
 # 7l bans model names everywhere outside the block.
 ROUTING_BEGIN = "<!-- routing:begin -->"
 ROUTING_END = "<!-- routing:end -->"
-routing_block_paths = ["skills/compute-squad/SKILL.md", "codex/SKILL.md", "README.md", "codex/README.md"]
+routing_block_paths = ["skills/compute-squad/SKILL.md", "README.md", "codex/README.md"]
 
 
 def routing_block_span(path, lines):
@@ -980,15 +939,15 @@ print(f"PASS: check 7: the ## Status and ## Decision templates are byte-identica
 # ---- 7g: the criteria block (finding 2). Every PASS and FAIL entry carries
 # one block: a Tested: line naming the tree, a table with one row per
 # criterion ID, then Regressions:, Outside scope:, and Executor points:
-# (finding 16). SKILL.md and its reading copy carry it as a bare-fenced block
-# that opens with the Tested: line; the PM body and its generated Codex prompt
-# carry the same lines inside the ACCEPT template's heredoc. All four match
-# byte for byte. The PM files state the Result values and the question a
-# pre-existing failure puts to the user, all four say what a PASS means, the
-# log linter's Result values are the PM's, and both SKILL.md files number the
-# Goal template's criteria (7a holds the template's three copies alike).
+# (finding 16). SKILL.md carries it as a bare-fenced block that opens with
+# the Tested: line; the PM body and its generated Codex prompt carry the same
+# lines inside the ACCEPT template's heredoc. All three match byte for byte.
+# The PM files state the Result values and the question a pre-existing
+# failure puts to the user, all three say what a PASS means, the log
+# linter's Result values are the PM's, and SKILL.md numbers the Goal
+# template's criteria (7a holds the template's two copies alike).
 CRITERIA_OPEN = "Tested: <commit SHA>, working tree <clean | N changed files>"
-CRITERIA_SKILLS = ["skills/compute-squad/SKILL.md", "codex/SKILL.md"]
+CRITERIA_SKILLS = ["skills/compute-squad/SKILL.md"]
 CRITERIA_PM = ["agents/squad-pm.md", "codex/05-pm-accept.md"]
 LOG_HEREDOC = "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'"
 criteria_blocks = {path: extract_fenced_block(read(path), path, "```", CRITERIA_OPEN) for path in CRITERIA_SKILLS}
@@ -1032,7 +991,7 @@ if sorted(pm_results) != sorted(check_logs.RESULTS):
 print(
     f"PASS: check 7: the criteria block is byte-identical across {', '.join(criteria_blocks)} (in the PM files, inside "
     f"the ACCEPT template), the PM files state its Result values ({', '.join(pm_results)}) as the log linter does, and "
-    f"both SKILL.md files number the Goal template's criteria"
+    f"SKILL.md numbers the Goal template's criteria"
 )
 
 
@@ -1203,8 +1162,8 @@ for heading in listed_headings + [h + CONT for h in cont_headings]:
 # pending entries, which the PM body derives from the FAIL template by the
 # two sentences named below, so their fields must be the FAIL fields without
 # the ones each sentence drops (Rerun, and for a pending entry High-stakes
-# too). Both SKILL.md files route from the Classification: line and count
-# FAILs from the Rerun: lines.
+# too). SKILL.md routes from the Classification: line and counts FAILs from
+# the Rerun: lines.
 HEREDOC_OPEN = "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'"
 DERIVED_FROM_FAIL = {
     "## PM — PASS": ("A PASS uses `## PM — PASS` and has no `Rerun:` line.", ("Rerun",)),
@@ -1269,11 +1228,9 @@ for heading, fields in field_table.items():
     for path in ("agents/squad-pm.md", "codex/05-pm-accept.md"):
         if sentence not in read(path):
             fail(f"{path}: must say {sentence!r}, which defines the {heading} entry from the FAIL template")
-for path in (skill_path, "codex/SKILL.md"):
-    flat = " ".join(read(path).split())
-    missing = [rule for rule in FIELD_ROUTE_RULES if rule not in flat]
-    if missing:
-        fail(f"{path}: missing the field routing rules {missing!r}")
+missing = [rule for rule in FIELD_ROUTE_RULES if rule not in " ".join(read(skill_path).split())]
+if missing:
+    fail(f"{skill_path}: missing the field routing rules {missing!r}")
 
 print(
     f"PASS: check 7: every log heading the protocol writes or names is on {skill_path}'s closed list "
@@ -1515,7 +1472,7 @@ ACCEPT_READS = (
     ("middle", "awk '/^## /{p = !/^## (Executor|Goal)/} p' COMPUTE_SQUAD_LOG.md"),
     ("executor", "awk '/^## Executor/{p=1; print; next} /^## /{p=0} p' COMPUTE_SQUAD_LOG.md"),
 )
-BLOCKER_FENCE = "\n```\n" + "\n".join(blocker_blocks[SKILL]) + "\n```\n"
+BLOCKER_FENCE = "\n```\n" + "\n".join(blocker_block) + "\n```\n"
 # Every stage reads the goal from the latest ## Goal — Locked entry, since a
 # re-lock appends a new one, and every file that can change a command names
 # the rule that doing so redefines the criterion (7u bans the old read).
@@ -1692,8 +1649,8 @@ SHARED_SPANS = [
     span_row("final message", BODIES + CODEX_STAGE_PROMPTS[:3], text=FINAL_MESSAGE),
     span_row("ACCEPT final message", PM_FILES, text=ACCEPT_FINAL_MESSAGE),
     span_row("Stage 0 bound", [SKILL], text=STAGE0_BOUND),
-    span_row("spawn pointer", [SKILL, "codex/SKILL.md"], text=SPAWN_POINTER),
-    span_row("route grep", [SKILL, "codex/SKILL.md"], text=ROUTE_GREP),
+    span_row("spawn pointer", [SKILL], text=SPAWN_POINTER),
+    span_row("route grep", [SKILL], text=ROUTE_GREP),
     span_row("delegation cap", BODIES + CODEX_STAGE_PROMPTS, text=DELEGATION_CAP),
     span_row("helper output cap", ["agents/squad-helper.md", "agents/squad-mech.md", "codex/01-archive.md"],
              text=HELPER_OUTPUT_CAP),
@@ -1863,29 +1820,27 @@ for path in tracked_files("agents/*.md"):
 
 print(f"PASS: check 7: no agent file lists a tool that spawns agents ({', '.join(SPAWN_TOOLS)})")
 
-# ---- 7s: codex/SKILL.md stays a reading copy. Codex loads skills only from
-# the manifest's ./skills/ root, so frontmatter on a SKILL.md elsewhere would
-# only make it look like a second, never-loaded skill. Both SKILL.md files
-# carry the rule that the orchestrating session never does a stage's work.
+# ---- 7s: skills load only from skills/. Codex loads skills only from the
+# manifest's ./skills/ root, so frontmatter on a SKILL.md elsewhere would
+# only make it look like a second, never-loaded skill. SKILL.md carries the
+# rule that the orchestrating session never does a stage's work.
 NO_ABSORPTION = "never does a stage's work"
 for path in tracked_files():
     if path.rsplit("/", 1)[-1] == "SKILL.md" and not path.startswith("skills/"):
         if read(path).startswith("---"):
             fail(f"{path}: a SKILL.md outside skills/ must not open with frontmatter; no host loads it")
-for path in (SKILL, "codex/SKILL.md"):
-    if NO_ABSORPTION not in " ".join(read(path).split()):
-        fail(f"{path}: missing the no-absorption rule ({NO_ABSORPTION!r})")
+if NO_ABSORPTION not in " ".join(read(SKILL).split()):
+    fail(f"{SKILL}: missing the no-absorption rule ({NO_ABSORPTION!r})")
 
-print(f"PASS: check 7: no SKILL.md outside skills/ has frontmatter, and both SKILL.md files say the orchestrating session {NO_ABSORPTION}")
+print(f"PASS: check 7: no SKILL.md outside skills/ has frontmatter, and {SKILL} says the orchestrating session {NO_ABSORPTION}")
 
 # ---- 7t: the ladder text. The executors are named by classification
 # (squad-executor-mechanical, squad-executor-complex), not by model, and a
 # FAIL moves its stage one rung, not two FAILs per tier. No tracked file
 # outside the history files, the updater (whose retired list prunes the old
 # TOMLs), this script, and dist/ names an old executor or the old escalation
-# wording; both SKILL.md files carry the FAIL charge rule and the setup-gap
-# stop. Text is compared with whitespace collapsed, so a wrapped line still
-# counts.
+# wording; SKILL.md carries the FAIL charge rule and the setup-gap stop. Text
+# is compared with whitespace collapsed, so a wrapped line still counts.
 RETIRED_LADDER_TEXT = (
     "squad-executor-haiku",
     "squad-executor-opus",
@@ -1906,15 +1861,13 @@ for path in tracked_files():
     stale_ladder.extend(f"{path}: {phrase!r}" for phrase in RETIRED_LADDER_TEXT if phrase in flat)
 if stale_ladder:
     fail("retired executor names or escalation wording: " + "; ".join(stale_ladder))
-for path in (SKILL, "codex/SKILL.md"):
-    flat = " ".join(read(path).split())
-    missing = [rule for rule in LADDER_RULES if rule not in flat]
-    if missing:
-        fail(f"{path}: missing the ladder rules {missing!r}")
+missing = [rule for rule in LADDER_RULES if rule not in " ".join(read(SKILL).split())]
+if missing:
+    fail(f"{SKILL}: missing the ladder rules {missing!r}")
 
 print(
     f"PASS: check 7: no tracked file outside {', '.join(LADDER_EXEMPT)} and dist/ names a retired executor or "
-    f"the old escalation wording, and both SKILL.md files carry {' and '.join(repr(r) for r in LADDER_RULES)}"
+    f"the old escalation wording, and {SKILL} carries {' and '.join(repr(r) for r in LADDER_RULES)}"
 )
 
 # ---- 7u: stages read the latest Goal entry. A re-lock appends a new
@@ -1948,9 +1901,9 @@ print(
 # ---- 7v: resume, handoff, and one active run (findings 10 and 11; the
 # report's 7x). references/resume.md is tracked, and its next-action table's
 # first column names every heading on SKILL.md's closed list except ## Status
-# and ## Delegated — <stage>, the two it never routes from. Both SKILL.md
-# files send a resume to it and carry the one-active-run rule; SKILL.md,
-# codex/SKILL.md, and codex/README.md stop Stage 1 on ARCHIVE REFUSED;
+# and ## Delegated — <stage>, the two it never routes from. SKILL.md sends a
+# resume to it and carries the one-active-run rule; SKILL.md and
+# codex/README.md stop Stage 1 on ARCHIVE REFUSED;
 # SKILL.md's Status rule lets resume.md's steps 2 and 3 stop without a
 # Status, so S7b's log stays unchanged; and
 # squad-mech's open-run guard, which check 8b runs, is in its body, the
@@ -1984,13 +1937,6 @@ RESUME_RULES = {
         "and a resume stop whose state the latest `## Status` already records (`references/resume.md` steps 2 and 3).",
         "The latest `## Status` is the handoff record.",
     ),
-    "codex/SKILL.md": (
-        "read `skills/compute-squad/references/resume.md`",
-        "first recompute `Next:` from `skills/compute-squad/references/resume.md`",
-        "One active run per worktree.",
-        "If it reports `ARCHIVE FAILED` or `ARCHIVE REFUSED`, append nothing",
-        "The latest `## Status` is the handoff record.",
-    ),
     "codex/README.md": ("`ARCHIVE FAILED` or `ARCHIVE REFUSED`", "references/resume.md"),
 }
 OPEN_RUN_GUARD = (
@@ -2006,8 +1952,8 @@ for path, rules in RESUME_RULES.items():
         fail(f"{path}: missing the resume and one-active-run text {missing!r}")
 
 print(
-    f"PASS: check 7: {RESUME}'s next-action table routes from {', '.join(routed)}; both SKILL.md files send a resume "
-    f"to it and carry the one-active-run rule, and squad-mech's open-run guard is in its body, prompt, and TOML"
+    f"PASS: check 7: {RESUME}'s next-action table routes from {', '.join(routed)}; {SKILL} sends a resume to it "
+    f"and carries the one-active-run rule, and squad-mech's open-run guard is in its body, prompt, and TOML"
 )
 
 # ---- 7w: entry labels (finding 16). Recon and Executor entries are labeled
@@ -2072,7 +2018,7 @@ print(
 # with needs-human: on a failure Recon's Checks block already records
 # (finding 13), so that clause names the block this check pins.
 EVIDENCE = "evidence prerequisites"
-EVIDENCE_PATHS = ["agents/squad-recon.md", "codex/02-recon.md", "skills/compute-squad/SKILL.md", "codex/SKILL.md"]
+EVIDENCE_PATHS = ["agents/squad-recon.md", "codex/02-recon.md", "skills/compute-squad/SKILL.md"]
 RECON_TEMPLATES = ["agents/squad-recon.md", "codex/02-recon.md"]
 RECON_CHECKS = [
     "Checks:",
@@ -2152,11 +2098,11 @@ print(
 # lines, and the DELEGATE: and BLOCKER: blocks, never a stage's final message,
 # which only points at the entry (the 7p rows "Stage 0 bound", "spawn
 # pointer", "route grep", "final message", and "ACCEPT final message" pin
-# the text). Both SKILL.md files carry the rules, compared with whitespace
-# collapsed; the grep names every routing field tests/check_logs.py --fields
-# lints, and its tail covers the longest entry's matching lines (heading,
-# fixed lines, DELEGATE:, BLOCKER:). No stage body or Codex prompt keeps the
-# one-paragraph summary, and neither SKILL.md passes Recon the goal.
+# the text). SKILL.md carries the rules, compared with whitespace collapsed;
+# the grep names every routing field tests/check_logs.py --fields lints, and
+# its tail covers the longest entry's matching lines (heading, fixed lines,
+# DELEGATE:, BLOCKER:). No stage body or Codex prompt keeps the one-paragraph
+# summary, and SKILL.md never passes Recon the goal.
 ECONOMY_RULES = (
     STAGE0_BOUND,
     "Every stage spawn prompt is a pointer of at most 400 characters, in exactly",
@@ -2164,13 +2110,12 @@ ECONOMY_RULES = (
     "Route on those field lines, not on the entry's prose.",
     "Spawn `squad-recon`; it reads the locked goal and criteria from the log.",
 )
-for path in (SKILL, "codex/SKILL.md"):
-    flat = " ".join(read(path).split())
-    missing = [rule for rule in ECONOMY_RULES if " ".join(rule.split()) not in flat]
-    if missing:
-        fail(f"{path}: missing the Stage 0 bound, pointer, or route-from-log text {missing!r}")
-    if "Spawn `squad-recon` with the locked goal" in flat:
-        fail(f"{path}: Recon reads the goal from the log; its spawn prompt never carries it")
+flat = " ".join(read(SKILL).split())
+missing = [rule for rule in ECONOMY_RULES if " ".join(rule.split()) not in flat]
+if missing:
+    fail(f"{SKILL}: missing the Stage 0 bound, pointer, or route-from-log text {missing!r}")
+if "Spawn `squad-recon` with the locked goal" in flat:
+    fail(f"{SKILL}: Recon reads the goal from the log; its spawn prompt never carries it")
 # squad-mech keys its two archive procedures on the pointer's values, so the
 # closing archive and the refusal-guarded new-run archive never depend on
 # prose in the prompt.
@@ -2201,7 +2146,7 @@ if stale_summary:
     fail("a stage's final message points at its entry and never summarizes it: " + "; ".join(stale_summary))
 
 print(
-    f"PASS: check 7: both SKILL.md files bound Stage 0, send every stage a pointer prompt, and route from the log "
+    f"PASS: check 7: {SKILL} bounds Stage 0, sends every stage a pointer prompt, and routes from the log "
     f"with a grep over {', '.join(grep_wanted)} (tail -n {grep_match.group(2)}, one entry matches at most "
     f"{longest_entry}), and no stage body or Codex prompt keeps a summary final message"
 )
@@ -2212,8 +2157,8 @@ print(
 # "delegation cap" and "helper output cap" pin the body sentences, and 8a's
 # delegate-cap rule holds logs to the cap). The switchboard stays: 7r keeps
 # spawning tools out of every agent file and 7p's "switchboard" row keeps
-# SKILL.md's reason. Both SKILL.md files carry the rules, compared with
-# whitespace collapsed; every stage body limits delegation to work too large
+# SKILL.md's reason. SKILL.md carries the rules, compared with whitespace
+# collapsed; every stage body limits delegation to work too large
 # to do in a few commands; no agent body or Codex prompt says a stage is
 # only re-spawned; the resume table continues or re-spawns a BLOCKING
 # requester; and a needs-human: blocker holds continuations as it holds
@@ -2232,14 +2177,6 @@ DELEGATION_RULES = {
         "the one-entry rule is per spawn or continuation, not per run.",
         "Counts, listings, and single-directory inventories stay in-stage.",
         "then continue or re-spawn the PM in ACCEPT mode for the verdict (DELEGATE step 2).",
-        "A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved.",
-    ),
-    "codex/SKILL.md": (
-        "`- [<intern|execution>] <exact procedure>; return at most <N> lines.`",
-        "counts, listings, and single-directory inventories stay in-stage",
-        "re-spawns the requester only when the host cannot message a finished agent or the message fails.",
-        "the one-entry rule is per spawn or continuation, not per run.",
-        "then continue or respawn the PM for the verdict.",
         "A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved.",
     ),
     "skills/compute-squad/references/resume.md": (
@@ -2274,8 +2211,8 @@ if old_examples:
          + "; ".join(old_examples))
 
 print(
-    f"PASS: check 7: both SKILL.md files keep small work in-stage, continue a BLOCKING requester before re-spawning "
-    f"it, and cap every subtask's output; the {len(IN_STAGE_LIMIT)} stage bodies delegate only work too large to do "
+    f"PASS: check 7: {SKILL} keeps small work in-stage, continues a BLOCKING requester before re-spawning it, "
+    f"and caps every subtask's output; the {len(IN_STAGE_LIMIT)} stage bodies delegate only work too large to do "
     f"in a few commands, no agent body or Codex prompt only re-spawns a waiting stage, and the resume table and "
     f"README agree"
 )
