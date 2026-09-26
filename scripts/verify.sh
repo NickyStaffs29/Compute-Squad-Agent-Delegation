@@ -58,19 +58,19 @@
 #      escalation wording, and SKILL.md carries the FAIL charge rule and the
 #      setup-gap stop; 7u no file under agents/, codex/, or skills/ reads the
 #      goal from the entry at the top of the log; 7v the resume table in
-#      references/resume.md routes from every stage heading, SKILL.md points
-#      a resume at it and carries the one-active-run rule,
-#      and squad-mech's open-run guard is in its body, prompt, and TOML; 7w
-#      the Recon and Executor templates carry the labels the log linter
-#      checks, and the PLAN template a Totals: line; 7x Recon checks the
-#      evidence prerequisites, its template's Checks: block matches the
-#      linter's forms, PLAN starts from it and reconciles its counts, and no
-#      stage or SKILL.md keeps the old one-carve-out Bash rule; 7y SKILL.md
-#      bounds Stage 0's reads, gives every stage a pointer spawn prompt, and
-#      routes from the log with a grep that names every routing field the log
-#      linter checks, and no stage ends with a summary final message; 7z
-#      small work stays in-stage, a BLOCKING requester is continued before it
-#      is re-spawned, and every DELEGATE: subtask caps its helper's output.
+#      references/resume.md routes from every stage heading, SKILL.md points a
+#      resume at it and carries the one-active-run rule, and squad-mech's
+#      open-run guard is in its body, prompt, and TOML; 7w the Recon and
+#      Executor templates carry the labels the log linter checks, and the PLAN
+#      template a Totals: line; 7x Recon checks the evidence prerequisites, its
+#      template's Checks: block matches the linter's forms, PLAN starts from it
+#      and reconciles its counts, and no stage or SKILL.md keeps the old
+#      one-carve-out Bash rule; 7y SKILL.md bounds Stage 0's reads, gives every
+#      stage a pointer spawn prompt, and routes from the log with a grep that
+#      names every routing field the log linter checks, and no stage ends with
+#      a summary final message; 7z small work stays in-stage, a BLOCKING
+#      requester is continued before it is re-spawned, and every DELEGATE:
+#      subtask caps its helper's output.
 #   8. Behavior without a model, on fixtures under tests/: log grammar,
 #      including the grant hook's verdict on every Executor entry, the
 #      re-lock record, the stop at a needs-human blocker, and the routing
