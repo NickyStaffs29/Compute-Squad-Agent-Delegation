@@ -10,7 +10,7 @@
 #      assigns that agent's rung, and at least one <example> block in the
 #      description. Every Claude rung alias in models.conf is in that set.
 #   3. skills/compute-squad/SKILL.md frontmatter parses and its metadata.version
-#      equals plugin.json's version.
+#      equals plugin.json's version, one token with no whitespace.
 #   4. CHANGELOG.md has a heading for that version.
 #   5. dist/compute-squad.plugin matches skills/, agents/, commands/, README.md,
 #      and .claude-plugin/plugin.json by content (unzip + diff -r, not a rebuild+
@@ -27,11 +27,11 @@
 #      holds everything it writes (model lines, TOMLs, profiles, routing
 #      blocks, prompts) to models.conf and the agent bodies.
 #   7. Shared protocol blocks and facts read identically across files:
-#      7a the Goal — Locked template; 7b SKILL.md's BLOCKER block, which the
-#      7k span must carry; 7c the helper cap, and the audit's skeptic cap with
-#      the rest of finding 20's audit text; 7d each of the three files with a
-#      generated routing block has one begin and one end marker; 7e the
-#      product description; 7f the ## Status and ## Decision templates in
+#      7a the Goal — Locked template; 7b SKILL.md's one BLOCKER block, which
+#      the 7k span must carry; 7c the helper cap, and the audit's skeptic cap
+#      with the rest of finding 20's audit text; 7d each of the three files
+#      with a generated routing block has one begin and one end marker; 7e
+#      the product description; 7f the ## Status and ## Decision templates in
 #      SKILL.md and codex/README.md; 7g the PM's criteria block in SKILL.md,
 #      the PM body, and its Codex prompt, with the Result values the
 #      log linter checks; 7h the high-stakes review: its template in SKILL.md
@@ -65,10 +65,10 @@
 #      checks, and the PLAN template a Totals: line; 7x Recon checks the
 #      evidence prerequisites, its template's Checks: block matches the
 #      linter's forms, PLAN starts from it and reconciles its counts, and no
-#      stage keeps the old one-carve-out Bash rule; 7y SKILL.md bounds Stage
-#      0's reads, gives every stage a pointer spawn prompt, and routes from
-#      the log with a grep that names every routing field the log linter
-#      checks, and no stage ends with a summary final message; 7z
+#      stage or SKILL.md keeps the old one-carve-out Bash rule; 7y SKILL.md
+#      bounds Stage 0's reads, gives every stage a pointer spawn prompt, and
+#      routes from the log with a grep that names every routing field the log
+#      linter checks, and no stage ends with a summary final message; 7z
 #      small work stays in-stage, a BLOCKING requester is continued before it
 #      is re-spawned, and every DELEGATE: subtask caps its helper's output.
 #   8. Behavior without a model, on fixtures under tests/: log grammar,
@@ -374,8 +374,11 @@ if not isinstance(metadata, dict):
 skill_version = metadata.get("version")
 if skill_version != plugin_version:
     fail(3, f"{skill_path}: metadata.version {skill_version!r} != {plugin_path} version {plugin_version!r}")
+if not isinstance(plugin_version, str) or not re.fullmatch(r"\S+", plugin_version):
+    fail(3, f"{plugin_path}: version {plugin_version!r} must be one token with no whitespace; Codex names the "
+            f"installed plugin's cache directory after it")
 
-ok(3, f"{skill_path} metadata.version matches {plugin_path} version ({plugin_version})")
+ok(3, f"{skill_path} metadata.version matches {plugin_path} version ({plugin_version}), one token with no whitespace")
 
 
 # ---- Check 4: CHANGELOG.md has a heading for this version ----
@@ -752,10 +755,18 @@ print(f"PASS: check 7: Goal — Locked template is byte-identical across {', '.j
 # ---- 7b: the BLOCKER grammar's fenced wire-format block in SKILL.md. The
 # 7k row of the shared-span table requires the stage bodies' blocker span to
 # carry this block byte for byte, so a change on either side fails there.
+# SKILL.md holds exactly one such block, so no second copy can stand in for
+# the one the orchestrator follows.
 blocker_path = "skills/compute-squad/SKILL.md"
-blocker_block = extract_fenced_block(read(blocker_path), blocker_path, "```", "BLOCKER:")
+blocker_text = read(blocker_path)
+blocker_lines = blocker_text.splitlines()
+blocker_count = sum(1 for i in range(len(blocker_lines) - 1)
+                    if blocker_lines[i] == "```" and blocker_lines[i + 1] == "BLOCKER:")
+if blocker_count != 1:
+    fail(f"{blocker_path}: needs exactly one fenced BLOCKER grammar block; found {blocker_count}")
+blocker_block = extract_fenced_block(blocker_text, blocker_path, "```", "BLOCKER:")
 
-print(f"PASS: check 7: {blocker_path} has the fenced BLOCKER grammar block the 7k span must carry")
+print(f"PASS: check 7: {blocker_path} has one fenced BLOCKER grammar block, which the 7k span must carry")
 
 # ---- 7c: the caps. The "5 helpers per stage per run" cap names the same
 # digit everywhere it's restated: the shared skill, the README, and each
@@ -2013,10 +2024,10 @@ print(
 # carries the Checks: lines, and an instance of each must match the forms the
 # log linter's recon-checks rule reads (tests/check_logs.py GOAL_FACTS_LINE,
 # BASELINE_LINE, BASELINE_SKIPPED). The Recon body and prompt carry
-# the one baseline command form and the skip line; no agent body or Codex
-# prompt keeps the old "exactly one carve-out" Bash rule. The executors stop
-# with needs-human: on a failure Recon's Checks block already records
-# (finding 13), so that clause names the block this check pins.
+# the one baseline command form and the skip line; no agent body, Codex
+# prompt, or SKILL.md keeps the old "exactly one carve-out" Bash rule. The
+# executors stop with needs-human: on a failure Recon's Checks block already
+# records (finding 13), so that clause names the block this check pins.
 EVIDENCE = "evidence prerequisites"
 EVIDENCE_PATHS = ["agents/squad-recon.md", "codex/02-recon.md", "skills/compute-squad/SKILL.md"]
 RECON_TEMPLATES = ["agents/squad-recon.md", "codex/02-recon.md"]
@@ -2082,14 +2093,14 @@ for path in PLAN_PATHS:
 for path in EXECUTOR_BODIES + ["codex/04-execute.md"]:
     if STOP_TARGET not in read(path):
         fail(f"{path}: the stop target must name Recon's Checks block: {STOP_TARGET!r}")
-stale = [path for path in tracked_files("agents/", "codex/") if OLD_CARVE_OUT in read(path)]
+stale = [path for path in tracked_files("agents/", "codex/", SKILL) if OLD_CARVE_OUT in read(path)]
 if stale:
     fail(f"{', '.join(stale)}: still say {OLD_CARVE_OUT!r}; Recon's Bash has two carve-outs, the baseline run and the log append")
 
 print(
     f"PASS: check 7: Recon checks the {EVIDENCE} ({', '.join(EVIDENCE_PATHS)}), its template's Checks: block matches "
     f"the log linter's recon-checks forms, PLAN starts from it and reconciles its counts ({', '.join(PLAN_PATHS)}), the "
-    f"executors' stop target names it, and no agent body or Codex prompt keeps {OLD_CARVE_OUT!r}"
+    f"executors' stop target names it, and no agent body, Codex prompt, or {SKILL} keeps {OLD_CARVE_OUT!r}"
 )
 
 # ---- 7y: orchestrator economy (finding 5). Stage 0 reads no product source,
