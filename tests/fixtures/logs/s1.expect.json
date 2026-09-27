@@ -1,5 +1,5 @@
 {
-  "note": "Live seed for section 6, S1, in tests/live/run.sh: the run starts from an empty log. Turn 1 is a plan-mode request, so the intern finds nothing to archive, Stage 1 opens the log, and the run stops after the plan with no product edits. Turn 2 approves the plan without granting execution.",
+  "note": "Live seed for section 6, S1, in tests/live/run.sh: the run starts from an empty log. Turn 1 is a plan-mode request, so the intern finds nothing to archive, Stage 1 opens the log, and the run stops after the plan with no product edits. Turn 2 approves the plan without granting execution. The fixture already meets the goal's privacy criterion, which its CLAUDE.md states: every reset request, known address or not, logs the same reset_requested event, so a plan can keep that criterion without a needs-human: blocker.",
   "cites": [
     {
       "file": "agents/squad-mech.md",

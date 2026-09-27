@@ -7,4 +7,4 @@ Run the compute-squad skill on this request. If its first word is `plan`, `execu
 
 $ARGUMENTS
 
-Follow `skills/compute-squad/SKILL.md` exactly: start at Stage 0 and read the latest `## Status` entry of any existing `COMPUTE_SQUAD_LOG.md` first. Run every stage the mode permits, in order, and no other, coordinating exclusively through the log. Never spawn an executor without a grant the log records for the governing plan revision and work order.
+Follow this plugin's own skill, `${CLAUDE_PLUGIN_ROOT}/skills/compute-squad/SKILL.md`, exactly: start at Stage 0 and read the latest `## Status` entry of any existing `COMPUTE_SQUAD_LOG.md` first. Run every stage the mode permits, in order, and no other, coordinating exclusively through the log. Never spawn an executor without a grant the log records for the governing plan revision and work order.

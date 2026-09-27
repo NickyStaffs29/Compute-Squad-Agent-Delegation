@@ -32,7 +32,10 @@
 #
 # Each scenario:
 #   1. copies its fixture repo into a temp dir: tests/fixtures/repo-reset/, the
-#      password-reset fixture that mirrors docs/example-log.md, or, for S5 and
+#      password-reset fixture that mirrors docs/example-log.md and honors its
+#      own CLAUDE.md (every reset request, known address or not, logs the same
+#      reset_requested event, so no log line reveals whether an account
+#      exists, as the <cooldown goal>'s criterion repeats), or, for S5 and
 #      S5b, tests/fixtures/repo-ui/, a pricing page whose unit tests pass and
 #      whose browser check (npm run check:overflow) reports a 624px table
 #      overflowing a 390px viewport; npm test passes in both;
@@ -67,11 +70,16 @@
 #      project settings only (--setting-sources project), so no user or local
 #      setting, and so no user-installed copy of the plugin, reaches it; this
 #      checkout loads through --plugin-dir. Each call also
-#      gets, through --settings, a PreToolUse hook with no matcher that
+#      gets, through --settings, two PreToolUse hooks with no matcher: one
 #      appends every tool call, the main session's and each subagent's, to a
-#      hook log (check_live.py toollog; it prints nothing and always exits 0).
-#      S8 reads it for the Stage 0 bound and the spawn pointer, and S9 for
-#      its skeptic spawns. A
+#      hook log (check_live.py toollog; it prints nothing and always exits 0),
+#      and the candidate fence (check_live.py fence) blocks any call that
+#      names Compute Squad files outside this checkout. Every turn's check
+#      proves the candidate was the one used: the init message --verbose
+#      prints lists one compute-squad plugin, at this checkout; no call in the
+#      hook log names another copy; and a first turn loads the checkout's
+#      skill. S8 reads the hook log for the Stage 0 bound and the spawn
+#      pointer, and S9 for its skeptic spawns. A
 #      scenario stops at its first failing turn, so a broken run does not
 #      keep spending.
 # Results, one directory per scenario run, stay in --out: each turn's
@@ -326,25 +334,33 @@ step() {
   fi
 }
 
-# settings_json <hook log>: the --settings value, the hook log alone: a
-# PreToolUse hook with no matcher that runs check_live.py toollog on every
-# tool call. The hook's output goes nowhere and a failure exits 0, so it never
-# blocks or changes a call.
+# settings_json <hook log>: the --settings value: two PreToolUse hooks with
+# no matcher, on every tool call. The hook log runs check_live.py toollog; its
+# output goes nowhere and a failure exits 0, so it never blocks or changes a
+# call. The candidate fence runs check_live.py fence on this checkout: it
+# blocks a call that names Compute Squad files outside the checkout (another
+# copy's skill, agents, command or manifest, or Claude Code's installed-plugin
+# store), so no installed copy can stand in for the candidate.
 settings_json() {
-  "$PYTHON" - "$CHECK" "$1" <<'PYEOF'
+  "$PYTHON" - "$CHECK" "$1" "$ROOT" <<'PYEOF'
 import json, shlex, sys
-check, log = sys.argv[1:3]
+check, log, root = sys.argv[1:4]
 hook = " ".join(shlex.quote(part) for part in (sys.executable, check, "toollog", log)) + " >/dev/null 2>&1 || true"
-print(json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": hook}]}]}},
+fence = " ".join(shlex.quote(part) for part in (sys.executable, check, "fence", root))
+print(json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": hook},
+                                                      {"type": "command", "command": fence}]}]}},
                  separators=(",", ":")))
 PYEOF
 }
 
 # claude_cmd <prompt> <session or empty> <hook log>: the section 6
-# invocation, in CMD, with the hook log in its --settings.
+# invocation, in CMD, with the hook log and the candidate fence in its
+# --settings.
 # --setting-sources project loads no user or local settings file, so an
 # installed copy of the plugin, and the user's hooks and permissions, stay
-# out of the scenario; --plugin-dir loads this checkout.
+# out of the scenario; --plugin-dir loads this checkout. --verbose makes the
+# JSON every message the call printed, so verify can read the init message's
+# list of loaded plugins and the skills the transcript loads.
 # Task joins Agent in --allowedTools because Claude Code 2.1.282 names the
 # spawn tool Task. Skill must stay: the model loads the compute-squad skill
 # through the Skill tool. --model and --max-budget-usd are added only when
@@ -354,7 +370,7 @@ claude_cmd() {
   settings=$(settings_json "$3") || die "cannot build the --settings value with $PYTHON"
   CMD=()
   [ ${#RUN_ENV[@]} -eq 0 ] || CMD=(env "${RUN_ENV[@]}")
-  CMD+=("$CLAUDE_BIN" -p "$1" --output-format json --plugin-dir "$ROOT"
+  CMD+=("$CLAUDE_BIN" -p "$1" --output-format json --verbose --plugin-dir "$ROOT"
     --setting-sources project --settings "$settings"
     --permission-mode acceptEdits)
   [ -z "$MODEL" ] || CMD+=(--model "$MODEL")
@@ -453,8 +469,7 @@ run_scenario() {
       | tee "$dir/turn$turn.check.txt" | sed 's/^/    /'
     rc=$?
     [ "$rc" -eq 0 ] || { printf '    stopping %s here; later turns skipped\n' "$name"; return "$rc"; }
-    session=$("$PYTHON" -c 'import json, sys; print(json.load(open(sys.argv[1])).get("session_id") or "")' \
-      "$dir/turn$turn.json" 2>/dev/null)
+    session=$("$PYTHON" "$CHECK" session "$dir/turn$turn.json" 2>/dev/null)
     if [ -z "$session" ] && [ "$turn" -lt ${#PROMPTS[@]} ]; then
       printf '    no session_id in turn %s; later turns skipped\n' "$turn"
       return 1

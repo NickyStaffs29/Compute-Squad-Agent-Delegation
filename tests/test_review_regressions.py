@@ -373,6 +373,146 @@ class PreflightRegressionTests(unittest.TestCase):
             self.assertEqual(1, failures())
 
 
+class CandidateRegressionTests(unittest.TestCase):
+    """The live harness proves the Compute Squad a call used is the checkout
+    under test: an S1 run on Claude Code 2.1.259 read SKILL.md by a path
+    relative to the scenario repo, then the installed 4.6.0 copy."""
+    ROOT = "/src/compute squad"   # a checkout path with a space in it
+    INSTALLED = os.path.expanduser("~/.claude/plugins/cache/compute-squad/compute-squad/4.6.0")
+    SKILL_CALL = {"tool_name": "Skill", "tool_input": {"skill": "compute-squad:compute-squad"}, "cwd": "/w"}
+
+    def failures(self, check="s1-plan", plugins=None, bases=(), events=None, verbose=True):
+        plugins = [{"name": "compute-squad", "path": self.ROOT}] if plugins is None else plugins
+        messages = None
+        if verbose:
+            messages = [{"type": "system", "subtype": "init", "plugins": plugins},
+                        *({"type": "user", "message": {"content": [{"type": "text", "text":
+                                                                     f"Base directory for this skill: {b}\n# Compute Squad"}]}}
+                          for b in bases),
+                        {"type": "result", "subtype": "success"}]
+        ctx = check_live.Context.__new__(check_live.Context)
+        ctx.repo, ctx.messages = "/w", messages
+        ctx.init = messages[0] if messages else None
+        ctx.events = [self.SKILL_CALL] if events is None else events
+        report = check_live.Report()
+        with contextlib.redirect_stdout(io.StringIO()):
+            check_live.expect_candidate(ctx, report, check, root=self.ROOT)
+        return report.failures
+
+    def test_the_candidate_alone_passes(self):
+        self.assertEqual(0, self.failures(bases=[self.ROOT + "/skills/compute-squad"]))
+        read = {"tool_name": "Bash", "tool_input": {"command": f'cat "{self.ROOT}/skills/compute-squad/SKILL.md"'}}
+        self.assertEqual(0, self.failures(events=[read]))
+
+    def test_an_installed_copy_fails_every_way_it_can_enter(self):
+        installed = {"name": "compute-squad", "path": self.INSTALLED}
+        self.assertEqual(1, self.failures(plugins=[{"name": "compute-squad", "path": self.ROOT}, installed]))
+        self.assertEqual(1, self.failures(plugins=[installed]))
+        self.assertEqual(1, self.failures(bases=[self.INSTALLED + "/skills/compute-squad"]))
+        for tried in ("skills/compute-squad/SKILL.md", self.INSTALLED + "/skills/compute-squad/SKILL.md",
+                      "~/.claude/plugins/marketplaces/compute-squad/agents/squad-pm.md"):
+            with self.subTest(tried=tried):
+                read = {"tool_name": "Read", "tool_input": {"file_path": tried}, "cwd": "/w"}
+                self.assertEqual(1, self.failures(events=[self.SKILL_CALL, read]))
+        self.assertEqual(1, self.failures(verbose=False))
+
+    def test_a_first_turn_must_load_the_candidate_skill(self):
+        other = {"tool_name": "Read", "tool_input": {"file_path": "/w/COMPUTE_SQUAD_LOG.md"}, "cwd": "/w"}
+        self.assertEqual(1, self.failures(events=[other]))
+        self.assertEqual(0, self.failures(check="s1-approve", events=[other]))
+
+    def test_a_symlinked_checkout_is_still_the_candidate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            real = Path(temp) / "real"
+            (real / "skills/compute-squad").mkdir(parents=True)
+            (Path(temp) / "link").symlink_to(real)
+            self.ROOT = str(Path(temp) / "link")
+            read = {"tool_name": "Read", "tool_input": {"file_path": str(real / "skills/compute-squad/SKILL.md")}, "cwd": "/w"}
+            self.assertEqual(0, self.failures(plugins=[{"name": "compute-squad", "path": str(real)}],
+                                              bases=[str(real / "skills/compute-squad")], events=[read]))
+
+    def test_the_archive_and_the_scenario_repo_are_not_protocol_files(self):
+        for given in ({"command": "tail -1 compute-squad-archive/usage.jsonl"}, {"file_path": "/w/src/server/log.js"},
+                      {"pattern": "reset_requested", "path": "src"}):
+            self.assertEqual([], check_live.foreign_protocol_paths(given, "/w", self.ROOT))
+
+    def test_verbose_and_plain_results_both_load(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "turn1.json"
+            path.write_text(json.dumps([{"type": "system", "subtype": "init"}, {"type": "result", "session_id": "a"}]))
+            result, messages = check_live.load_call(str(path))
+            self.assertEqual(("a", 2), (result["session_id"], len(messages)))
+            path.write_text(json.dumps({"type": "result", "session_id": "b"}))
+            self.assertEqual(({"type": "result", "session_id": "b"}, None), check_live.load_call(str(path)))
+
+
+class ResetFixtureRegressionTests(unittest.TestCase):
+    """tests/fixtures/repo-reset/ must honor its own CLAUDE.md, which the
+    cooldown goal's privacy criterion repeats: no response or log line
+    reveals whether an account exists."""
+    FIXTURE = ROOT / "tests/fixtures/repo-reset"
+    # Two requests a second apart for a known and for an unknown address;
+    # once the cooldown exists, the known address's second one is refused.
+    PROBE = """
+const { createApp } = require('./src/server/app');
+const { createFakeClock } = require('./src/server/clock');
+function requests(email) {
+  const clock = createFakeClock();
+  const app = createApp({ clock, accounts: [{ email: 'ada@example.com' }] });
+  const seen = [];
+  for (let i = 0; i < 2; i += 1) {
+    const logged = app.log.events.length;
+    const res = app.handle({ method: 'POST', path: '/api/auth/reset-request', body: { email } });
+    seen.push({ res, events: app.log.events.slice(logged) });
+    clock.advance(1000);
+  }
+  return { seen, emails: app.outbox.length };
+}
+console.log(JSON.stringify({ known: requests('ada@example.com'), unknown: requests('nobody@example.com') }));
+"""
+
+    @unittest.skipUnless(shutil.which("node") and shutil.which("git"), "needs node and git")
+    def test_reset_responses_and_log_never_tell_known_from_unknown(self):
+        # The base tree, WO-1 as S2c, S4, and S6a apply it, and S4b's commit C.
+        for patches in ((), ("wo1",), ("wo1", "wo2-event")):
+            with self.subTest(patches=patches), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp) / "repo"
+                shutil.copytree(self.FIXTURE, repo)
+                subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True, capture_output=True)
+                for name in patches:
+                    subprocess.run(["git", "-C", str(repo), "apply", str(ROOT / f"tests/live/repo-reset-{name}.patch")],
+                                   check=True, capture_output=True)
+                run = subprocess.run(["node", "-e", self.PROBE], cwd=repo, capture_output=True, text=True, timeout=60)
+                self.assertEqual(0, run.returncode, run.stderr)
+                seen = json.loads(run.stdout)
+                self.assertGreater(seen["known"]["emails"], 0, "the known address must get its email")
+                self.assertEqual(0, seen["unknown"]["emails"])
+                self.assertEqual(seen["known"]["seen"], seen["unknown"]["seen"],
+                                 "each response and each request's log events must match for both addresses")
+
+    def test_live_seed_map_quotes_match_the_fixture_lines_they_cite(self):
+        # The seeds run.sh's scenarios put on this fixture (REPO defaults to it).
+        blocks = re.findall(r"^    (s\w+)\)\n(.*?);;", (ROOT / "tests/live/run.sh").read_text(), re.MULTILINE | re.DOTALL)
+        seeds = sorted({re.search(r"SEED=(\S+)", body).group(1) for _, body in blocks if "REPO=" not in body})
+        self.assertIn("s2", seeds)
+        cite = re.compile(r'^- ((?:src/|CLAUDE\.md|package\.json)\S*?):([0-9]+)(?:-[0-9]+)? [^"]*"([^"]+)"')
+        checked = 0
+        for seed in seeds:
+            log = FIXTURES / f"{seed}.log.md"
+            text = log.read_text()
+            for number, line in enumerate(text.splitlines(), 1):
+                match = cite.match(line)
+                if not match:
+                    continue
+                path, at, quote = match.groups()
+                lines = (self.FIXTURE / path).read_text().splitlines()
+                with self.subTest(log=log.name, line=number):
+                    self.assertLessEqual(int(at), len(lines), f"{path} has no line {at}")
+                    self.assertIn(quote, lines[int(at) - 1], f"{path}:{at} no longer reads {quote!r}")
+                checked += 1
+        self.assertGreater(checked, 0)
+
+
 class EvidenceRegressionTests(unittest.TestCase):
     def test_moved_base_checks_fresh_reads_not_complete_map_size(self):
         product = ["src/server/db/store.js", "src/server/middleware/rateLimit.js"]

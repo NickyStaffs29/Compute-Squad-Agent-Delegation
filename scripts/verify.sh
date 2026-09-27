@@ -93,7 +93,9 @@
 #      those outcomes, the rules of the live checks that read the hook log
 #      and the usage ledger (S8's Stage 0 bound and main-session budget,
 #      S9's skeptic cap) agreeing with the cases in tests/fixtures/live/,
-#      every claude call run.sh prints carrying the hook log, and
+#      every claude call run.sh prints carrying the hook log and the
+#      candidate fence, which must block reads of any other copy of the
+#      protocol, and --verbose, and
 #      squad-mech's open-run guard agreeing with the
 #      one-active-run rule (8b), the
 #      grant hook's decisions on synthetic PreToolUse JSON and over the live
@@ -2461,11 +2463,17 @@ print(
 # names the plugin's command by its full name (<plugin>:<command>), since the
 # Claude CLI resolves it under -p, each claude call loads project settings
 # only (--setting-sources project, so no user-installed copy of the plugin
-# loads), --dry-run prints each claude call's
-# --settings with the hook that writes the hook log and nothing else (a
-# PreToolUse hook with no
-# matcher, which, run with sh and dash on synthetic input, prints nothing,
-# exits 0, and writes one record per call), and in each repo
+# loads) and passes --verbose (so each turn's check reads the init message's
+# list of loaded plugins), --dry-run prints each claude call's
+# --settings with the hook that writes the hook log and the candidate fence
+# and nothing else (one PreToolUse group with no
+# matcher; the hook log, run with sh and dash on synthetic input, prints
+# nothing, exits 0, and writes one record per call; the fence blocks, with
+# exit 2 and the checkout's SKILL.md on stderr, each call that names another
+# copy's skill, agents, or command or the installed-plugin store, and passes
+# the rest silently), commands/squad.md names its skill through
+# ${CLAUDE_PLUGIN_ROOT}, the checks that may skip the first turn's skill-load
+# proof are exactly those run.sh runs after a first turn, and in each repo
 # --setup-only builds, HEAD
 # and git status against the seeded Base: must give the twin's state, and the
 # model over the seeded log must give the twin's action with the repo's own
@@ -2705,16 +2713,24 @@ with tempfile.TemporaryDirectory() as tmp:
     if sorted(s[0] for s in scenarios) != sorted(LIVE_TWINS):
         fail(f"{LIVE_RUN} --list names the scenarios {[s[0] for s in scenarios]!r}; each needs a static twin in "
              f"LIVE_TWINS, which names {sorted(LIVE_TWINS)!r}")
-    turn_checks = set()
+    turn_checks, later_checks = set(), set()
     for name, seed, turns in scenarios:
         twin = twin_rows[LIVE_TWINS[name]]
         if seed != twin[1]:
             fail(f"{LIVE_RUN} seeds {name} with {FIXTURES}{seed}.log.md, but its static twin {twin[0]} reads "
                  f"{FIXTURES}{twin[1]}.log.md")
-        for turn in turns.split():
+        for index, turn in enumerate(turns.split()):
             if turn not in check_live.CHECKS:
                 fail(f"{LIVE_RUN} runs check {turn!r} for {name}; {LIVE_CHECK} has no such check")
             turn_checks.add(turn)
+            if index:
+                later_checks.add(turn)
+    # A first turn must show the candidate's skill loading; a later turn
+    # resumes a session that already holds it. The two sets never meet.
+    first_checks = {turns.split()[0] for _, _, turns in scenarios}
+    if later_checks != set(check_live.LATER_TURN_CHECKS) or later_checks & first_checks:
+        fail(f"{LIVE_CHECK} LATER_TURN_CHECKS is {check_live.LATER_TURN_CHECKS!r}; {LIVE_RUN} runs "
+             f"{sorted(later_checks)!r} after a first turn and {sorted(later_checks & first_checks)!r} as a first turn too")
     unused = [c for c in check_live.CHECKS if c not in turn_checks]
     if unused:
         fail(f"{LIVE_CHECK} has checks no scenario in {LIVE_RUN} runs: {unused!r}")
@@ -2734,7 +2750,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # leading slash command itself, and a bare /squad is unknown to it.
     plugin_name = json.loads(read(".claude-plugin/plugin.json"))["name"]
     plugin_commands = {f"/{plugin_name}:{os.path.basename(p)[:-len('.md')]}" for p in tracked_files("commands/*.md")}
-    settings_seen, hook_command, slash_prompts = 0, None, 0
+    settings_seen, hook_command, fence_command, slash_prompts = 0, None, None, 0
     for line in dry.stdout.splitlines():
         if claude_stub + " -p " not in line:
             continue
@@ -2749,21 +2765,32 @@ with tempfile.TemporaryDirectory() as tmp:
             settings = json.loads(words[words.index("--settings") + 1])
             hooks = settings["hooks"]["PreToolUse"]
             command = hooks[0]["hooks"][0]["command"]
+            fence = hooks[0]["hooks"][1]["command"]
         except (ValueError, KeyError, IndexError, TypeError) as e:
-            fail(f"{LIVE_RUN} --dry-run all prints a claude call whose --settings has no hook log: {e}: {line[:300]}")
+            fail(f"{LIVE_RUN} --dry-run all prints a claude call whose --settings lacks the hook log or the candidate "
+                 f"fence: {e}: {line[:300]}")
+        formats = [words[i + 1] for i, word in enumerate(words[:-1]) if word == "--output-format"]
+        if formats != ["json"] or words.count("--verbose") != 1:
+            fail(f"{LIVE_RUN} --dry-run all: every claude call passes '--output-format json' and '--verbose' once, so "
+                 f"its JSON holds the init message that lists the plugins it loaded; got {formats!r}, "
+                 f"{words.count('--verbose')} --verbose: {line[:300]}")
         sources = [words[i + 1] for i, word in enumerate(words[:-1]) if word == "--setting-sources"]
         if sources != ["project"]:
             fail(f"{LIVE_RUN} --dry-run all: every claude call passes '--setting-sources project' once, so no user or "
                  f"local setting (an installed copy of the plugin included) reaches it; got {sources!r}: {line[:300]}")
         if (set(settings) != {"hooks"} or set(settings["hooks"]) != {"PreToolUse"} or len(hooks) != 1
-                or "matcher" in hooks[0]
+                or "matcher" in hooks[0] or len(hooks[0]["hooks"]) != 2
                 or not re.search(r"check_live\.py'? toollog '?<out>/\S+/turn[0-9]+\.tools\.jsonl'? >/dev/null 2>&1 \|\| true$",
-                                 command)):
-            fail(f"{LIVE_RUN} --dry-run all: --settings must hold the hook log alone, one PreToolUse hook with no matcher "
-                 f"running 'check_live.py toollog <out>/<run>/turn<n>.tools.jsonl >/dev/null 2>&1 || true'; got "
+                                 command)
+                or [os.path.realpath(w) if i != 1 else w for i, w in enumerate(shlex.split(fence)[1:])]
+                != [os.path.realpath(LIVE_CHECK), "fence", os.getcwd()]):
+            fail(f"{LIVE_RUN} --dry-run all: --settings must hold one PreToolUse group with no matcher and two hooks: "
+                 f"the hook log, 'check_live.py toollog <out>/<run>/turn<n>.tools.jsonl >/dev/null 2>&1 || true', "
+                 f"then the candidate fence, 'check_live.py fence <this checkout>', whose exit status reaches Claude Code; got "
                  f"{settings!r}")
         settings_seen += 1
         hook_command = hook_command or command
+        fence_command = fence_command or fence
     if settings_seen != sum(len(turns.split()) for _, _, turns in scenarios):
         fail(f"{LIVE_RUN} --dry-run all printed {settings_seen} claude calls with --settings; the scenarios have "
              f"{sum(len(turns.split()) for _, _, turns in scenarios)} turns")
@@ -2802,6 +2829,52 @@ with tempfile.TemporaryDirectory() as tmp:
             or [r.get("tool_name") for r in check_live.main_calls(hook_records)] != ["Read"] * len(hook_shells):
         fail(f"{LIVE_RUN}'s hook-log command wrote {hook_records!r}; expected {want_records!r} under each of "
              f"{hook_shells!r}")
+    # The candidate fence, run as printed with the same shells: it passes a
+    # call on this checkout's files, the scenario repo's, or the archive
+    # directory silently, and input it cannot read; it blocks (exit 2, naming
+    # this checkout's SKILL.md on stderr) the two reads an S1 run on Claude
+    # Code 2.1.259 made instead: SKILL.md by a path relative to the scenario
+    # repo, then the installed 4.6.0 copy. Another copy's agent and a search
+    # for the skill outside this checkout are blocked too.
+    fence_root = shlex.split(fence_command)[-1]
+    candidate_skill = os.path.join(fence_root, check_live.CANDIDATE_SKILL_MD)
+    fence_cases = [
+        (0, "Read", {"file_path": candidate_skill}),
+        (0, "Read", {"file_path": os.path.join(fence_root, "skills/compute-squad/references/resume.md")}),
+        (0, "Bash", {"command": f"sed -n 1,40p {shlex.quote(candidate_skill)}"}),
+        (0, "Read", {"file_path": "/w/src/server/auth/reset.service.js"}),
+        (0, "Bash", {"command": "tail -1 compute-squad-archive/usage.jsonl"}),
+        (0, "Skill", {"skill": check_live.CANDIDATE_SKILL}),
+        (2, "Read", {"file_path": "skills/compute-squad/SKILL.md"}),
+        (2, "Read", {"file_path": os.path.expanduser(
+            "~/.claude/plugins/cache/compute-squad/compute-squad/4.6.0/skills/compute-squad/SKILL.md")}),
+        (2, "Bash", {"command": "cat ~/.claude/plugins/marketplaces/compute-squad/agents/squad-pm.md"}),
+        (2, "Glob", {"pattern": "**/skills/compute-squad/SKILL.md", "path": "/Users/dev"}),
+    ]
+    fence_runs = 0
+    for shell in hook_shells:
+        payloads = [(want, json.dumps({"session_id": "s", "cwd": "/w", "hook_event_name": "PreToolUse",
+                                       "tool_name": tool, "tool_input": given}))
+                    for want, tool, given in fence_cases] + [(0, "not json"), (0, "")]
+        for want, payload in payloads:
+            run = subprocess.run([shell, "-c", fence_command], input=payload, capture_output=True, text=True, timeout=60)
+            blocked = run.returncode == 2 and not run.stdout and candidate_skill in run.stderr
+            if (want == 2 and not blocked) or (want == 0 and (run.returncode or run.stdout or run.stderr)):
+                fail(f"{LIVE_RUN}'s candidate fence under {shell} exited {run.returncode} and printed "
+                     f"{(run.stdout + run.stderr)[:300]!r} on {payload[:200]!r}; it must "
+                     + ("block the call with exit 2 and name " + candidate_skill if want == 2
+                        else "pass it silently with exit 0"))
+            fence_runs += 1
+    # The plugin's command names its skill through ${CLAUDE_PLUGIN_ROOT},
+    # which Claude Code replaces with the loading plugin's own directory, so
+    # the session is told the candidate's SKILL.md, never a path relative to
+    # the repo it runs in.
+    for path in tracked_files("commands/*.md"):
+        bare = [m.start() for m in re.finditer(r"skills/compute-squad/", read(path))
+                if not read(path)[:m.start()].endswith("${CLAUDE_PLUGIN_ROOT}/")]
+        if bare or "${CLAUDE_PLUGIN_ROOT}/" + check_live.CANDIDATE_SKILL_MD not in read(path):
+            fail(f"{path} must name its skill as ${{CLAUDE_PLUGIN_ROOT}}/{check_live.CANDIDATE_SKILL_MD} and name no "
+                 f"skills/compute-squad/ path relative to the session's working directory")
 
     out = os.path.join(tmp, "out")
     node = shutil.which("node")
@@ -2924,7 +2997,9 @@ print(
     + f"; the live {', '.join(live_rule_checks)} rules, which read the hook log and the ledger, give the "
     f"{live_cases} cases in {LIVE_RULES} their stated values, and every claude call --dry-run prints carries "
     f"the hook log in its --settings, whose command writes one record per call and prints nothing under "
-    f"{', '.join(hook_shells)}"
+    f"{', '.join(hook_shells)}, and the candidate fence, which blocks every read of another copy of the "
+    f"protocol and passes the rest ({fence_runs} runs), with --verbose, so each turn's check can read the init "
+    f"message's plugins; commands/squad.md names its skill through ${{CLAUDE_PLUGIN_ROOT}}"
     + f"; squad-mech's open-run guard agrees with the one-active-run rule "
     f"over every fixture log ({guard_checked} runs under {', '.join(guard_shells)})"
 )

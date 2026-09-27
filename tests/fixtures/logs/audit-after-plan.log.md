@@ -34,10 +34,10 @@ Checks:
 - `npm test` -> exit 0; tests 6, pass 6, fail 0; tree changed: no
 Map:
 - src/server/auth/auth.routes.js:6-13 registerAuthRoutes: POST /api/auth/reset-request answers 400 for a missing email, otherwise 200 with requestPasswordReset()'s result (line 11)
-- src/server/auth/reset.service.js:14-29 requestPasswordReset: "function requestPasswordReset({ store, log, outbox, clock }, email) {"; an unknown address gets GENERIC_RESULT (line 17); a known one gets a hashed token row (lines 21-25), an email through sendEmail() (line 26), and a reset_email_sent event with the account id (line 27)
+- src/server/auth/reset.service.js:14-29 requestPasswordReset: "function requestPasswordReset({ store, log, outbox, clock }, email) {"; every call first logs a reset_requested event with no fields (line 15); an unknown address then gets GENERIC_RESULT (line 18); a known one gets a hashed token row (lines 22-26) and an email through sendEmail() (line 27)
 - src/server/auth/reset.service.js:3-6 GENERIC_RESULT: "const GENERIC_RESULT = Object.freeze({", module-private, not exported
 - src/server/db/store.js:23-27 listResetTokens(accountId): an account's password_reset_tokens rows, oldest first; createdAt is epoch milliseconds from the injected clock
-- src/server/log.js:3 EVENT_CODES: "const EVENT_CODES = Object.freeze(['reset_email_sent']);"; event() throws on any other code (lines 11-13)
+- src/server/log.js:3 EVENT_CODES: "const EVENT_CODES = Object.freeze(['reset_requested']);"; event() throws on any other code (lines 11-13)
 - src/server/email/send.js:2-7 sendEmail: pushes the mail to the outbox
 - src/server/middleware/rateLimit.js:2 createRateLimiter: the global IP limiter, 300 requests per IP per 5 minutes; there is no per-account throttle
 Callers:
@@ -79,7 +79,7 @@ refused request returns GENERIC_RESULT, so no response changes.
 WO-1, the cooldown (AC1, AC2, AC3 and AC5):
 1. src/server/auth/reset.service.js: after GENERIC_RESULT (line 6) add
    `const RESEND_COOLDOWN_MS = 60 * 1000;`. In requestPasswordReset(), after
-   the unknown-account return (lines 16-18), add
+   the unknown-account return (lines 17-19), add
    `const tokens = store.listResetTokens(account.id);`,
    `const newest = tokens[tokens.length - 1];` and
    `if (newest && clock.now() - newest.createdAt < RESEND_COOLDOWN_MS) { return GENERIC_RESULT; }`.
@@ -131,7 +131,7 @@ Findings: 30; skeptics run: 10 (cap 10)
 - REFUTED src/server/auth/reset.service.js:20 (medium): clock.now() and a row's createdAt are in different units. Evidence: both are epoch milliseconds from the one injected clock (clock.js:8, reset.service.js:24).
 - CONFIRMED src/server/auth/auth.routes.js:4 (medium): the route's comment says every well-formed request gets a reset link, which the cooldown no longer does. Evidence: auth.routes.js:3-5 predates the change; the skeptic read both.
 - REFUTED src/server/auth/__tests__/reset.routes.test.js:74 (medium): test (a) waits on a real timer. Evidence: lines 74-86 call clock.advance(59000) on createFakeClock() and grep finds no setTimeout in the file.
-- UNREVIEWED src/server/log.js:3 (medium): EVENT_CODES has no reset_cooldown_hit, so logging the cooldown would throw. Evidence: log.js:3 reads "const EVENT_CODES = Object.freeze(['reset_email_sent']);".
+- UNREVIEWED src/server/log.js:3 (medium): EVENT_CODES has no reset_cooldown_hit, so logging the cooldown would throw. Evidence: log.js:3 reads "const EVENT_CODES = Object.freeze(['reset_requested']);".
 - UNREVIEWED src/server/middleware/rateLimit.js:2 (medium): the global limiter still lets one IP request resets for many accounts. Evidence: rateLimit.js:2 allows 300 requests per IP per 5 minutes and is keyed by IP only.
 - UNREVIEWED src/server/auth/__tests__/reset.routes.test.js:99 (medium): no test covers a request 59,999 ms after the first. Evidence: tests (a) and (b) advance 59 s and 60 s only.
 - UNREVIEWED src/server/auth/reset.service.js:8 (low): the new constant has no comment naming its unit. Evidence: line 8 reads "const RESEND_COOLDOWN_MS = 60 * 1000;".
