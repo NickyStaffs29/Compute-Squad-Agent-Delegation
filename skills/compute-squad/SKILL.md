@@ -113,7 +113,7 @@ Next: <the one permitted next action, or none when the run is closed>
 Stop: <where this invocation ends>
 ```
 
-A `## Decision` entry quotes words the user actually wrote, in the request or in answer to a question. It never records an assumption, so an unattended run can record only the words that started it. When the request itself grants execution, record it this way instead of asking. `plan-approved` never grants execution. A `resolution` quotes the user's answer without changing locked facts or waiving criteria; `Covers:` names the pending blocker or held review as `<heading>, Timestamp: <timestamp>`. It preserves the current grant, then re-spawns the blocked stage (subject to the grant rule) or reruns the held review. A resolution never grants execution.
+A `## Decision` entry quotes words the user actually wrote, in the request or in answer to a question. It never records an assumption, so an unattended run can record only the words that started it. When the request itself grants execution, record it this way instead of asking. `plan-approved` never grants execution. The `## Status` after it keeps the `Grant:` it had (`none` in a plan-mode run), and like every `## Status` it writes `Plan:` and `Grant:` only in the template's form, with any explanation on `Next:` or in prose. A `resolution` quotes the user's answer without changing locked facts or waiving criteria; `Covers:` names the pending blocker or held review as `<heading>, Timestamp: <timestamp>`. It preserves the current grant, then re-spawns the blocked stage (subject to the grant rule) or reruns the held review. A resolution never grants execution.
 
 ```markdown
 ## Decision

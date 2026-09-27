@@ -16,6 +16,10 @@
     {
       "file": "skills/compute-squad/SKILL.md",
       "text": "`plan-approved` never grants execution."
+    },
+    {
+      "file": "skills/compute-squad/SKILL.md",
+      "text": "The `## Status` after it keeps the `Grant:` it had (`none` in a plan-mode run), and like every `## Status` it writes `Plan:` and `Grant:` only in the template's form, with any explanation on `Next:` or in prose."
     }
   ],
   "lint": {

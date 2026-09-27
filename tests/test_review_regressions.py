@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Behavioral regressions found in the 4.4.0 independent review (no model calls)."""
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -9,7 +11,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import types
 import unittest
+from unittest import mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -269,6 +273,63 @@ class BudgetRegressionTests(unittest.TestCase):
         self.assertIn("unverified", detail)
         self.assertTrue(check_live.budget_judgment(records, "s", 12300)[0])
         self.assertFalse(check_live.budget_judgment(records, "s", 100)[0])
+
+
+class LedgerRegressionTests(unittest.TestCase):
+    """A resumed session's ledger lines are running totals over every turn,
+    while modelUsage covers one call: the check compares this call's share."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.ledger = Path(self.temp.name) / "compute-squad-archive" / "usage.jsonl"
+        self.ledger.parent.mkdir()
+        self.turn1 = [self.line("main", "main", 1000, 50), self.line("squad-pm", "a1", 400, 30)]
+        self.turn2 = [self.line("main", "main", 1600, 80)]
+
+    @staticmethod
+    def line(agent, agent_id, tokens, output):
+        return {"v": 1, "session": "s", "agent": agent, "agent_id": agent_id, "input": tokens, "cache_write": 0,
+                "cache_read": 0, "output": output}
+
+    def failures(self, earlier, now, host_input, host_output, by_type, totals=True):
+        before = {"ledger_ids": sorted(r["agent_id"] for r in earlier if r["agent"] != "main")}
+        if totals:
+            before["ledger_totals"] = check_live.ledger_totals(earlier)
+        self.ledger.write_text("".join(json.dumps(r) + "\n" for r in earlier + now))
+        ctx = types.SimpleNamespace(repo=self.temp.name, before=before, by_type=by_type, result={
+            "session_id": "s", "modelUsage": {"m": {"inputTokens": host_input, "outputTokens": host_output}}})
+        report = check_live.Report()
+        with contextlib.redirect_stdout(io.StringIO()):
+            check_live.check_ledger(ctx, report)
+        return report.failures
+
+    def test_first_turn_counts_every_line(self):
+        self.assertEqual(0, self.failures([], self.turn1, 1400, 80, {"squad-pm": 1}))
+
+    def test_resumed_turn_compares_this_calls_share(self):
+        self.assertEqual(0, self.failures(self.turn1, self.turn2, 600, 30, {}))
+        self.assertGreater(self.failures(self.turn1, self.turn2, 600, 30, {}, totals=False), 0)
+
+    def test_tolerance_and_spawn_checks_still_bite(self):
+        self.assertGreater(self.failures(self.turn1, self.turn2, 700, 30, {}), 0)
+        self.assertGreater(self.failures(self.turn1, self.turn2, 600, 30, {"squad-pm": 1}), 0)
+
+
+class PreflightRegressionTests(unittest.TestCase):
+    def preflight(self, script):
+        with tempfile.TemporaryDirectory() as repo, \
+                mock.patch.object(check_live, "BROWSER_CHECK", ("sh", "-c", script)), \
+                mock.patch.dict(os.environ, {"PLAYWRIGHT_BROWSERS_PATH": "/no-browsers"}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            return check_live.cmd_preflight("s5b", repo)
+
+    def test_s5b_premise_holds_with_the_browser_path_unset(self):
+        leaks = ('if [ -n "${PLAYWRIGHT_BROWSERS_PATH-}" ]; then echo "check-overflow: cannot run: no Chromium"; '
+                 'exit 2; fi; echo "check-overflow: no horizontal overflow"')
+        self.assertEqual(1, self.preflight(leaks))
+        hidden = 'echo "check-overflow: cannot run: Playwright is not installed"; exit 2'
+        self.assertEqual(0, self.preflight(hidden))
 
 
 class EvidenceRegressionTests(unittest.TestCase):

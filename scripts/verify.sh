@@ -1972,8 +1972,9 @@ print(
 # agents/squad-recon.md and codex/02-recon.md, and the Executor template in
 # agents/squad-executor.md and codex/04-execute.md (7m holds the other two
 # executors to it), carry exactly the labels tests/check_logs.py --labels
-# lints, in its order, after their fixed lines. The PLAN template states the
-# plan's totals on a Totals: line, and ACCEPT answers every Executor point.
+# lints, in its order, after their fixed lines, and the Executor's gives the
+# one no-points line the linter accepts. The PLAN template states the plan's
+# totals on a Totals: line, and ACCEPT answers every Executor point.
 labels_run = subprocess.run([sys.executable, "tests/check_logs.py", "--labels"], capture_output=True, text=True)
 try:
     label_table = json.loads(labels_run.stdout) if labels_run.returncode == 0 else None
@@ -2008,11 +2009,16 @@ for path in ("agents/squad-pm.md", "codex/03-pm-plan.md"):
 for path in CRITERIA_PM:
     if "Never PASS with an unanswered point." not in read(path):
         fail(f"{path}: ACCEPT must answer every Executor point ('Never PASS with an unanswered point.')")
+NO_POINTS = f"`{check_logs.POINTS_LABEL}: none`"
+for path in LABEL_TEMPLATES["## Executor"]:
+    if f"with no point, it is the one line {NO_POINTS}" not in read(path):
+        fail(f"{path}: the Executor must name the no-points line the log linter accepts, {NO_POINTS}")
 
 print(
     "PASS: check 7: the Recon and Executor templates carry the labels the log linter checks ("
     + "; ".join(f"{h}: {', '.join(l)}" for h, l in label_table.items())
-    + "), the PLAN template a Totals: line, and ACCEPT answers every Executor point"
+    + f"), the Executor's no-points line reads {NO_POINTS}, the PLAN template a Totals: line, and ACCEPT answers "
+    "every Executor point"
 )
 
 # ---- 7x: evidence prerequisites (finding 14). Recon checks the goal's stated
@@ -2451,7 +2457,9 @@ print(
 # <check>.json the value it states, over cases that pass and cases that fail,
 # and S9's passing cases, appended to its seed, lint clean. run.sh's --list,
 # --dry-run, and --setup-only run for every scenario with CI set and a claude
-# stub that must never be called, --dry-run prints each claude call's
+# stub that must never be called, a prompt that opens with a slash command
+# names the plugin's command by its full name (<plugin>:<command>), since the
+# Claude CLI resolves it under -p, --dry-run prints each claude call's
 # --settings with the hook that writes the hook log (a PreToolUse hook with no
 # matcher, which, run with sh and dash on synthetic input, prints nothing,
 # exits 0, and writes one record per call), and in each repo
@@ -2715,12 +2723,23 @@ with tempfile.TemporaryDirectory() as tmp:
     # Every claude call's --settings carries the hook log: a PreToolUse hook
     # with no matcher that runs check_live.py toollog on this scenario run's
     # file and can never block a call.
-    settings_seen, hook_command = 0, None
+    # A prompt that opens with a slash command names the plugin's command by
+    # its full name, <plugin>:<command>: under -p the Claude CLI resolves a
+    # leading slash command itself, and a bare /squad is unknown to it.
+    plugin_name = json.loads(read(".claude-plugin/plugin.json"))["name"]
+    plugin_commands = {f"/{plugin_name}:{os.path.basename(p)[:-len('.md')]}" for p in tracked_files("commands/*.md")}
+    settings_seen, hook_command, slash_prompts = 0, None, 0
     for line in dry.stdout.splitlines():
         if claude_stub + " -p " not in line:
             continue
         try:
             words = shlex.split(line.strip())
+            prompt = words[words.index("-p") + 1]
+            if prompt.startswith("/"):
+                slash_prompts += 1
+                if prompt.split()[0] not in plugin_commands:
+                    fail(f"{LIVE_RUN} --dry-run all prompts {prompt.split()[0]!r}; a slash command must be the "
+                         f"plugin's command by its full name, one of {sorted(plugin_commands)!r}")
             settings = json.loads(words[words.index("--settings") + 1])
             hooks = settings["hooks"]["PreToolUse"]
             command = hooks[0]["hooks"][0]["command"]
@@ -2736,6 +2755,8 @@ with tempfile.TemporaryDirectory() as tmp:
     if settings_seen != sum(len(turns.split()) for _, _, turns in scenarios):
         fail(f"{LIVE_RUN} --dry-run all printed {settings_seen} claude calls with --settings; the scenarios have "
              f"{sum(len(turns.split()) for _, _, turns in scenarios)} turns")
+    if not slash_prompts:
+        fail(f"{LIVE_RUN} --dry-run all printed no prompt that opens with the plugin's command")
     # The hook as a command hook runs, with sh (and dash where installed), on
     # synthetic PreToolUse input: it prints nothing and exits 0 on every
     # input, one it cannot parse and a log it cannot write included, and

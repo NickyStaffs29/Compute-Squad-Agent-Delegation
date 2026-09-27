@@ -42,7 +42,9 @@ lints clean with tests/check_logs.py, every earlier archive file unchanged, no
 needs-human: blocker in the new entries (finding 4: S1 and S2 log none, since
 the fixture's test script works; S5 and S5b, whose premise is a criterion that
 cannot be met as locked, assert their own), and ledger billed input within 1%
-of modelUsage with ledger output at or below it (WO-3c acceptance). It prints
+of modelUsage with ledger output at or below it (WO-3c acceptance), counting
+only what this call added to the ledger's running totals, since a resumed
+session's lines also hold its earlier turns. It prints
 one line per assertion and exits 1 when any fails, 2 when it cannot run.
 
 toollog is the hook log: run.sh passes the claude call a PreToolUse hook
@@ -272,8 +274,8 @@ def cmd_collide(repo, shim):
     return 0
 
 
-def browser_check(repo):
-    run = subprocess.run(list(BROWSER_CHECK), cwd=repo, capture_output=True, text=True, timeout=120)
+def browser_check(repo, env=None):
+    run = subprocess.run(list(BROWSER_CHECK), cwd=repo, capture_output=True, text=True, timeout=120, env=env)
     return run.returncode, (run.stdout + run.stderr).strip()
 
 
@@ -285,9 +287,13 @@ def cmd_preflight(check, repo):
         ok = code == 1 and "overflow" in output and "table.plans" in output
         want = "exit 1 with the plans table's overflow"
     elif check == "s5b":
-        code, output = browser_check(repo)
-        ok = code == 2 and "cannot run" in output
-        want = "exit 2: no browser for the check"
+        # The premise must not rest on PLAYWRIGHT_BROWSERS_PATH alone: a
+        # session that unsets it must still find no browser.
+        unset = {k: v for k, v in os.environ.items() if k != "PLAYWRIGHT_BROWSERS_PATH"}
+        runs = [browser_check(repo), browser_check(repo, unset)]
+        ok = all(code == 2 and "cannot run" in out for code, out in runs)
+        code, output = next(((c, o) for c, o in runs if not (c == 2 and "cannot run" in o)), runs[0])
+        want = "exit 2: no browser for the check, with PLAYWRIGHT_BROWSERS_PATH as set and unset"
     elif check == "s6b":
         stamp = subprocess.run(["sh", "-c", "date -u +%Y-%m-%d_%H%M%S"], cwd=repo, capture_output=True, text=True)
         run_id = log_run(read_text(os.path.join(repo, LOG)) or "")
@@ -349,6 +355,23 @@ def ledger(repo):
     return records
 
 
+LEDGER_FIELDS = ("input", "cache_write", "cache_read", "output")
+
+
+def ledger_key(record):
+    """A ledger line's running total: the main session's, per session, or
+    one subagent's."""
+    if record.get("agent") == "main":
+        return f"main:{record.get('session')}"
+    return f"agent:{record.get('agent_id')}"
+
+
+def ledger_totals(records):
+    """{key: [input, cache_write, cache_read, output]} from each key's last
+    line; every line is a running total, so the last one holds the rest."""
+    return {ledger_key(r): [int(r.get(f, 0)) for f in LEDGER_FIELDS] for r in records}
+
+
 def snapshot(repo, base):
     return {
         "base": git(repo, "rev-parse", base).strip(),
@@ -357,6 +380,7 @@ def snapshot(repo, base):
         "archives": archives(repo),
         "product": product(repo, base),
         "ledger_ids": sorted(set(str(r.get("agent_id")) for r in ledger(repo) if r.get("agent") != "main")),
+        "ledger_totals": ledger_totals(ledger(repo)),
     }
 
 
@@ -985,7 +1009,7 @@ def expect_recon_baseline(ctx, report):
 
 
 def check_s1_plan(ctx, report, protocol):
-    """S1 turn 1: /squad plan <goal> from an empty log."""
+    """S1 turn 1: /compute-squad:squad plan <goal> from an empty log."""
     expect_by_type(ctx, report, {"squad-mech": 1, "squad-recon": 1, "squad-pm": 1}, "mech 1, recon 1, pm 1")
     expect_product_unchanged(ctx, report)
     expect_log_kept(ctx, report)
@@ -1375,7 +1399,7 @@ def expect_tool_log(ctx, report):
 
 
 def check_s8(ctx, report, protocol):
-    """S8: the reference run, "/squad <goal>" on an empty log (WO-3f)."""
+    """S8: the reference run, "/compute-squad:squad <goal>" on an empty log (WO-3f)."""
     report.ok("squad-recon" in ctx.by_type, "a squad-recon spawn (Stage 2)", f"got {ctx.by_type}")
     verdicts = [e["heading"] for e in ctx.new_entries if e["heading"] in check_logs.VERDICT_HEADINGS]
     report.ok("## PM — PASS" in verdicts, "the run reaches a PM PASS, so its usage is a whole reference run's",
@@ -1454,10 +1478,14 @@ CHECKS = collections.OrderedDict([
 
 
 def check_ledger(ctx, report):
-    """WO-3c acceptance: the usage ledger's lines for this session total the
-    host's billed input within 1% and never exceed its output, and this call's
-    new lines name one agent per spawn (an agent continued with SendMessage
-    writes a line at each stop, and its last one counts)."""
+    """WO-3c acceptance: what this call added to the usage ledger's running
+    totals for this session matches the host's billed input within 1% and never
+    exceeds its output, and this call's new lines name one agent per spawn (an
+    agent continued with SendMessage writes a line at each stop, and its last
+    one counts). modelUsage covers this call only, while a resumed session's
+    main-session line and its earlier agents' lines also hold earlier turns, so
+    each key counts its last line less the running total the snapshot recorded
+    before the call."""
     session = ctx.result.get("session_id")
     records = [r for r in ledger(ctx.repo) if r.get("session") == session]
     if not records:
@@ -1474,9 +1502,12 @@ def check_ledger(ctx, report):
             agents[str(record.get("agent_id"))] = record
     if not report.ok(main is not None, f"{LEDGER} has a main-session line for session {session}"):
         return
-    rows = list(agents.values()) + [main]
-    billed = sum(int(r.get("input", 0)) + int(r.get("cache_write", 0)) + int(r.get("cache_read", 0)) for r in rows)
-    output = sum(int(r.get("output", 0)) for r in rows)
+    before = ctx.before.get("ledger_totals", {})
+    added_totals = [0] * len(LEDGER_FIELDS)
+    for key, now in ledger_totals(records).items():
+        earlier = before.get(key, [0] * len(LEDGER_FIELDS))
+        added_totals = [total + n - e for total, n, e in zip(added_totals, now, earlier)]
+    billed, output = sum(added_totals[:3]), added_totals[3]
     usage = (ctx.result.get("modelUsage") or {}).values()
     host_billed = sum(int(m.get("inputTokens", 0)) + int(m.get("cacheCreationInputTokens", 0))
                       + int(m.get("cacheReadInputTokens", 0)) for m in usage)
