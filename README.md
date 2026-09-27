@@ -276,7 +276,6 @@ Compute-Squad-Agent-Delegation/
 │   └── squad.md              # /squad [plan|execute|accept] <goal>: starts at Stage 0
 ├── codex/
 │   ├── README.md             # Codex install, routing, and manual fallback
-│   ├── SKILL.md              # reading copy with Codex model names; no host loads it
 │   ├── agents/*.toml         # generated Codex agent definitions
 │   ├── build-agents.py       # writes model lines, TOMLs, profiles, routing blocks, 01-05*.md, and the Codex build
 │   ├── profiles.toml         # generated Codex V2 profile reference

@@ -7,7 +7,7 @@ Claude agent markdown in agents/, this script writes:
 - the Codex agent TOMLs in codex/agents/;
 - codex/profiles.toml;
 - the block between the routing markers in skills/compute-squad/SKILL.md,
-  codex/SKILL.md, README.md, and codex/README.md;
+  README.md, and codex/README.md;
 - the manual Codex prompts codex/01-archive.md to codex/05-pm-accept.md.
 
 --check compares every one of them with what this script would write and
@@ -91,28 +91,25 @@ MODEL_NAME = re.compile(r"\b(Opus|Sonnet|Haiku|Fable)\b|gpt-[0-9]")
 
 # Labels for the generated routing blocks, in the order the blocks list roles.
 # They name roles and rungs, never models. Each row: role; its name in the
-# shared skill's rung lines; its Role and Agent cells in codex/SKILL.md's
-# table; its Role and Owns cells in README.md's table (no Role cell leaves it
-# out of that table). None stands for the role's name in backticks.
+# shared skill's rung lines; its Agent, Role, and Owns cells in README.md's
+# table (no Role cell leaves it out of that table). None stands for the
+# role's name in backticks.
 ROLE_LABELS = (
-    ("strategy", "main session", "Strategy and final judgment", "main session",
-     "Strategy", "Goal, gaps, acceptance criteria, final judgment"),
-    ("squad-pm", None, "Plan and acceptance", None, "PM", "The plan and the acceptance decision"),
-    ("squad-recon", None, "Recon", None, "Recon", "Mapping the codebase"),
-    ("squad-executor", None, "STANDARD execution", None, "Execution", "Implementing the plan"),
-    ("squad-executor-mechanical", None, "MECHANICAL execution", None,
-     "Execution on MECHANICAL", "The same executor protocol, {rung} rung"),
-    ("squad-executor-complex", None, "COMPLEX execution", None,
-     "Execution on COMPLEX", "The same executor protocol, {rung} rung"),
-    ("squad-helper", None, "Delegated execution", None, "Delegated execution", "Tightly-specced subtasks"),
-    ("squad-mech", None, "Intern work", None, "Intern", "Busywork. Nothing that requires judgment"),
-    ("finder", "audit finders", "Audit finders", "none", None, None),
-    ("skeptic", "audit skeptic", "Audit skeptic", "none", None, None),
+    ("strategy", "main session", "main session", "Strategy", "Goal, gaps, acceptance criteria, final judgment"),
+    ("squad-pm", None, None, "PM", "The plan and the acceptance decision"),
+    ("squad-recon", None, None, "Recon", "Mapping the codebase"),
+    ("squad-executor", None, None, "Execution", "Implementing the plan"),
+    ("squad-executor-mechanical", None, None, "Execution on MECHANICAL", "The same executor protocol, {rung} rung"),
+    ("squad-executor-complex", None, None, "Execution on COMPLEX", "The same executor protocol, {rung} rung"),
+    ("squad-helper", None, None, "Delegated execution", "Tightly-specced subtasks"),
+    ("squad-mech", None, None, "Intern", "Busywork. Nothing that requires judgment"),
+    ("finder", "audit finders", None, None, None),
+    ("skeptic", "audit skeptic", None, None, None),
 )
-Label = collections.namedtuple("Label", "role name table_role agent readme_role owns")
+Label = collections.namedtuple("Label", "role name agent readme_role owns")
 LABELS = tuple(
-    Label(role, name or f"`{role}`", table_role, agent or f"`{role}`", readme_role, owns)
-    for role, name, table_role, agent, readme_role, owns in ROLE_LABELS
+    Label(role, name or f"`{role}`", agent or f"`{role}`", readme_role, owns)
+    for role, name, agent, readme_role, owns in ROLE_LABELS
 )
 
 # codex/profiles.toml: a fixed header, then one table per profile, each taking
@@ -471,25 +468,6 @@ def render_skill_block(manifest: dict) -> str:
     return "\n".join(lines)
 
 
-def render_codex_skill_table(manifest: dict) -> str:
-    """codex/SKILL.md's table: every role, top rung first, with its Codex model."""
-    roles, rungs = manifest["roles"], manifest["rungs"]
-    lines = [
-        f"Generated from `models.conf` (reviewed {manifest['reviewed']}); edit that file, never this table.",
-        "",
-        "| Role | Agent | Rung | Codex model | Effort |",
-        "|---|---|---|---|---|",
-    ]
-    for rung in RUNGS[::-1]:
-        for label in LABELS:
-            row = roles[label.role]
-            if row["codex_rung"] == rung:
-                lines.append(
-                    f"| {label.table_role} | {label.agent} | {rung} | `{rungs[rung]['codex']}` | `{row['codex_effort']}` |"
-                )
-    return "\n".join(lines)
-
-
 def render_readme_table(manifest: dict) -> str:
     """README.md's table: each role that has an agent or is the main session."""
     roles, rungs = manifest["roles"], manifest["rungs"]
@@ -536,7 +514,6 @@ def render_manual_table(manifest: dict) -> str:
 
 ROUTING_BLOCKS = (
     ("skills/compute-squad/SKILL.md", render_skill_block),
-    ("codex/SKILL.md", render_codex_skill_table),
     ("README.md", render_readme_table),
     ("codex/README.md", render_manual_table),
 )
