@@ -354,6 +354,24 @@ class PreflightRegressionTests(unittest.TestCase):
                 self.assertEqual(2, code, output)
                 self.assertIn("cannot run", output)
 
+    def test_nobrowser_integrity_check_reads_package_json_main(self):
+        with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
+            check_live.cmd_nobrowser(repo)
+            ctx, stand_in = types.SimpleNamespace(repo=repo), Path(repo) / check_live.NOBROWSER_DIR
+
+            def failures():
+                report = check_live.Report()
+                check_live.expect_nobrowser_intact(ctx, report)
+                return report.failures
+
+            self.assertEqual(0, failures())
+            package = stand_in / "package.json"
+            before = json.loads(package.read_text())
+            package.write_text(package.read_text().replace('"main": "index.js"', '"main": "real.js"'))
+            self.assertEqual(dict(before, main="real.js"), json.loads(package.read_text()))
+            self.assertEqual(check_live.NOBROWSER_STUB, (stand_in / "index.js").read_text())
+            self.assertEqual(1, failures())
+
 
 class EvidenceRegressionTests(unittest.TestCase):
     def test_moved_base_checks_fresh_reads_not_complete_map_size(self):

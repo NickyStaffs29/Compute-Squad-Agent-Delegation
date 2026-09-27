@@ -28,7 +28,9 @@ nobrowser sets up S5b: it writes a Playwright stand-in whose Chromium never
 starts into the repo's node_modules/playwright and git-excludes node_modules/.
 The fixture's browser check loads the project's Playwright before the global
 one, so it cannot run whatever PLAYWRIGHT_BROWSERS_PATH or the npm settings
-say.
+say. The s5b check requires the stand-in's package.json and index.js to be
+intact at the end of the call; a read after the call cannot show their state
+during it.
 
 preflight runs before a live scenario spends tokens, under the environment
 the claude call gets, and exits 1 if the scenario's premise does not hold:
@@ -123,6 +125,7 @@ MISSING_WORDS = re.compile(r"missing|not installed|not found|no chromium|no brow
 S5B_BROWSER_SETTINGS = ("PLAYWRIGHT_BROWSERS_PATH",)
 S5B_NPM_SETTINGS = ("NPM_CONFIG_PREFIX", "npm_config_prefix", "NPM_CONFIG_OFFLINE", "npm_config_offline")
 NOBROWSER_DIR = os.path.join("node_modules", "playwright")
+NOBROWSER_PACKAGE = '{"name": "playwright", "version": "0.0.0-s5b", "main": "index.js"}\n'
 NOBROWSER_STUB = (
     "// S5b's Playwright stand-in (tests/live/check_live.py nobrowser): it loads,\n"
     "// and its Chromium never starts, whatever PLAYWRIGHT_BROWSERS_PATH says.\n"
@@ -132,6 +135,7 @@ NOBROWSER_STUB = (
     "}\n"
     "module.exports = { chromium: { launch } };\n"
 )
+NOBROWSER_FILES = {"package.json": NOBROWSER_PACKAGE, "index.js": NOBROWSER_STUB}
 # Preflights that need something beyond sh: S5's needs a Chromium that
 # starts, and S5b's only node, since the stand-in fails the same everywhere.
 PREFLIGHT_NEEDS = {"s5": "chromium", "s5b": "node"}
@@ -305,10 +309,9 @@ def cmd_nobrowser(repo):
     status, as a project's .gitignore would."""
     target = os.path.join(repo, NOBROWSER_DIR)
     os.makedirs(target, exist_ok=True)
-    with open(os.path.join(target, "package.json"), "w", encoding="utf-8") as handle:
-        handle.write('{"name": "playwright", "version": "0.0.0-s5b", "main": "index.js"}\n')
-    with open(os.path.join(target, "index.js"), "w", encoding="utf-8") as handle:
-        handle.write(NOBROWSER_STUB)
+    for name, text in NOBROWSER_FILES.items():
+        with open(os.path.join(target, name), "w", encoding="utf-8") as handle:
+            handle.write(text)
     exclude = os.path.join(repo, ".git", "info", "exclude")
     os.makedirs(os.path.dirname(exclude), exist_ok=True)
     with open(exclude, "a", encoding="utf-8") as handle:
@@ -1365,6 +1368,16 @@ def recon_tool_line(entry):
     return None
 
 
+def expect_nobrowser_intact(ctx, report):
+    """S5b: the stand-in's files are as nobrowser wrote them. A read after the
+    call shows them at its end only; it cannot show their state during it."""
+    changed = [name for name, text in NOBROWSER_FILES.items()
+               if read_text(os.path.join(ctx.repo, NOBROWSER_DIR, name)) != text]
+    report.ok(not changed, f"the Playwright stand-in's {' and '.join(NOBROWSER_FILES)} in {NOBROWSER_DIR}/ are intact "
+              "at the end of the call (a read after the call cannot show their state during it)",
+              "changed or removed: " + ", ".join(changed))
+
+
 def check_s5b(ctx, report, protocol):
     """S5b: no browser for the check AC2 names; "Continue the squad run." at Recon."""
     expect_by_type(ctx, report, {"squad-recon": 1}, "recon 1: no plan and no executor")
@@ -1384,9 +1397,7 @@ def check_s5b(ctx, report, protocol):
     report.ok(reason is not None and check_logs.NEEDS_HUMAN_DENIAL in reason,
               "the grant hook holds an executor spawn on the open needs-human: blocker", str(reason))
     expect_product_unchanged(ctx, report)
-    stub = read_text(os.path.join(ctx.repo, NOBROWSER_DIR, "index.js"))
-    report.ok(stub == NOBROWSER_STUB, f"the Playwright stand-in in {NOBROWSER_DIR}/ is intact, so the premise held "
-              "throughout the call", "changed or removed")
+    expect_nobrowser_intact(ctx, report)
     expect_log_kept(ctx, report)
     expect_no_new_archive(ctx, report, "the run stopped at Recon")
 
