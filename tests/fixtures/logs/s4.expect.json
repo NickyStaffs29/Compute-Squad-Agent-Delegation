@@ -28,6 +28,10 @@
     {
       "file": "agents/squad-pm.md",
       "text": "Check every invariant and every \"must NOT change\" item. Diff-review for scope creep, dead code, and slop."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "A change the plan assigns to a later work order is scope creep even when it is inert and no \"must NOT change\" item names it, whether an executor or an implementation made outside the run added it: FAIL with `Rerun: Executor`, name the file and that work order in your evidence, and leave the change to that work order."
     }
   ],
   "lint": {
