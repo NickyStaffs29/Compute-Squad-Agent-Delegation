@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -317,19 +318,41 @@ class LedgerRegressionTests(unittest.TestCase):
 
 
 class PreflightRegressionTests(unittest.TestCase):
+    ISOLATED = {"PLAYWRIGHT_BROWSERS_PATH": "/no-browsers", "NPM_CONFIG_PREFIX": "/no-npm-global",
+                "NPM_CONFIG_OFFLINE": "true"}
+
     def preflight(self, script):
         with tempfile.TemporaryDirectory() as repo, \
                 mock.patch.object(check_live, "BROWSER_CHECK", ("sh", "-c", script)), \
-                mock.patch.dict(os.environ, {"PLAYWRIGHT_BROWSERS_PATH": "/no-browsers"}), \
+                mock.patch.dict(os.environ, self.ISOLATED), \
                 contextlib.redirect_stdout(io.StringIO()):
             return check_live.cmd_preflight("s5b", repo)
 
-    def test_s5b_premise_holds_with_the_browser_path_unset(self):
-        leaks = ('if [ -n "${PLAYWRIGHT_BROWSERS_PATH-}" ]; then echo "check-overflow: cannot run: no Chromium"; '
-                 'exit 2; fi; echo "check-overflow: no horizontal overflow"')
-        self.assertEqual(1, self.preflight(leaks))
-        hidden = 'echo "check-overflow: cannot run: Playwright is not installed"; exit 2'
-        self.assertEqual(0, self.preflight(hidden))
+    def test_s5b_premise_survives_cleared_settings(self):
+        leak = 'if {}; then echo "check-overflow: no horizontal overflow"; exit 0; fi; echo "check-overflow: cannot run"; exit 2'
+        browser, npm = '[ -z "${PLAYWRIGHT_BROWSERS_PATH-}" ]', '[ -z "${NPM_CONFIG_PREFIX-}" ]'
+        for cleared in (browser, npm, f"{browser} && {npm}"):
+            with self.subTest(leaks_when=cleared):
+                self.assertEqual(1, self.preflight(leak.format(cleared)))
+        self.assertEqual(0, self.preflight('echo "check-overflow: cannot run: Playwright has no Chromium"; exit 2'))
+
+    @unittest.skipUnless(shutil.which("node") and shutil.which("git"), "needs node and git")
+    def test_nobrowser_stand_in_fails_the_check_under_any_environment(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            shutil.copytree(ROOT / "tests/fixtures/repo-ui", repo)
+            for args in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@example.invalid",
+                                                         "-c", "commit.gpgsign=false", "commit", "-q", "-m", "A"]):
+                subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+            with contextlib.redirect_stdout(io.StringIO()):
+                check_live.cmd_nobrowser(str(repo))
+            self.assertEqual("", subprocess.run(["git", "-C", str(repo), "status", "--porcelain"], check=True,
+                                                capture_output=True, text=True).stdout)
+            for env in (dict(os.environ), {k: v for k, v in os.environ.items() if k not in
+                                           check_live.S5B_BROWSER_SETTINGS + check_live.S5B_NPM_SETTINGS}):
+                code, output = check_live.browser_check(str(repo), env)
+                self.assertEqual(2, code, output)
+                self.assertIn("cannot run", output)
 
 
 class EvidenceRegressionTests(unittest.TestCase):

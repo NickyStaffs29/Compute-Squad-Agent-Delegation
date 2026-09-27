@@ -5,6 +5,7 @@ run.sh calls this script; it never calls a model itself.
 
     check_live.py seed <seed.log.md> <repo> <base>
     check_live.py collide <repo> <shim dir>
+    check_live.py nobrowser <repo>
     check_live.py preflight <check> <repo>
     check_live.py snapshot <repo> <base> <state.json>
     check_live.py verify <check> <repo> <base> <state.json> <result.json> [--tools FILE] [--summary FILE --label TEXT]
@@ -23,10 +24,18 @@ PATH), and writes an earlier archive of the seeded log's run at the name the
 archive command will give it under that clock: the log's Goal entry alone, so
 an overwrite by the full log would change its sha256.
 
+nobrowser sets up S5b: it writes a Playwright stand-in whose Chromium never
+starts into the repo's node_modules/playwright and git-excludes node_modules/.
+The fixture's browser check loads the project's Playwright before the global
+one, so it cannot run whatever PLAYWRIGHT_BROWSERS_PATH or the npm settings
+say.
+
 preflight runs before a live scenario spends tokens, under the environment
 the claude call gets, and exits 1 if the scenario's premise does not hold:
 for S5 the browser check must run and report the fixture's overflow, for S5b
-it must find no browser, and for S6b date must name the existing archive.
+it must find no browser as set, with PLAYWRIGHT_BROWSERS_PATH cleared, with
+the npm prefix and offline settings cleared, and with both cleared, and for
+S6b date must name the existing archive.
 
 snapshot records what the next claude call must extend or leave alone: the
 base and HEAD commits, the active log, the sha256 of every archive file, every
@@ -109,6 +118,23 @@ BROWSER_CHECK = ("node", "scripts/check-overflow.js")
 BROWSER_WORDS = re.compile(r"chromium|playwright|browser|check[:-]overflow", re.IGNORECASE)
 MISSING_WORDS = re.compile(r"missing|not installed|not found|no chromium|no browser|doesn't exist|does not exist|"
                            r"cannot run|can't run", re.IGNORECASE)
+# S5b: the settings a session could clear to reach a browser, and the
+# Playwright stand-in nobrowser installs, which no setting can route around.
+S5B_BROWSER_SETTINGS = ("PLAYWRIGHT_BROWSERS_PATH",)
+S5B_NPM_SETTINGS = ("NPM_CONFIG_PREFIX", "npm_config_prefix", "NPM_CONFIG_OFFLINE", "npm_config_offline")
+NOBROWSER_DIR = os.path.join("node_modules", "playwright")
+NOBROWSER_STUB = (
+    "// S5b's Playwright stand-in (tests/live/check_live.py nobrowser): it loads,\n"
+    "// and its Chromium never starts, whatever PLAYWRIGHT_BROWSERS_PATH says.\n"
+    "'use strict';\n"
+    "async function launch() {\n"
+    "  throw new Error(\"browserType.launch: Executable doesn't exist: this project's Playwright has no Chromium\");\n"
+    "}\n"
+    "module.exports = { chromium: { launch } };\n"
+)
+# Preflights that need something beyond sh: S5's needs a Chromium that
+# starts, and S5b's only node, since the stand-in fails the same everywhere.
+PREFLIGHT_NEEDS = {"s5": "chromium", "s5b": "node"}
 # S6b's clock: the second every date call reports, 2026-09-20T08:30:00Z.
 S6B_EPOCH = 1789893000
 # Checks whose scenario may end in a needs-human: blocker; each asserts its own.
@@ -274,6 +300,23 @@ def cmd_collide(repo, shim):
     return 0
 
 
+def cmd_nobrowser(repo):
+    """S5b: install the Playwright stand-in and keep node_modules/ out of git
+    status, as a project's .gitignore would."""
+    target = os.path.join(repo, NOBROWSER_DIR)
+    os.makedirs(target, exist_ok=True)
+    with open(os.path.join(target, "package.json"), "w", encoding="utf-8") as handle:
+        handle.write('{"name": "playwright", "version": "0.0.0-s5b", "main": "index.js"}\n')
+    with open(os.path.join(target, "index.js"), "w", encoding="utf-8") as handle:
+        handle.write(NOBROWSER_STUB)
+    exclude = os.path.join(repo, ".git", "info", "exclude")
+    os.makedirs(os.path.dirname(exclude), exist_ok=True)
+    with open(exclude, "a", encoding="utf-8") as handle:
+        handle.write("/node_modules/\n")
+    print(f"wrote {os.path.join(target, 'index.js')}, a Playwright whose Chromium never starts")
+    return 0
+
+
 def browser_check(repo, env=None):
     run = subprocess.run(list(BROWSER_CHECK), cwd=repo, capture_output=True, text=True, timeout=120, env=env)
     return run.returncode, (run.stdout + run.stderr).strip()
@@ -287,13 +330,19 @@ def cmd_preflight(check, repo):
         ok = code == 1 and "overflow" in output and "table.plans" in output
         want = "exit 1 with the plans table's overflow"
     elif check == "s5b":
-        # The premise must not rest on PLAYWRIGHT_BROWSERS_PATH alone: a
-        # session that unsets it must still find no browser.
-        unset = {k: v for k, v in os.environ.items() if k != "PLAYWRIGHT_BROWSERS_PATH"}
-        runs = [browser_check(repo), browser_check(repo, unset)]
-        ok = all(code == 2 and "cannot run" in out for code, out in runs)
-        code, output = next(((c, o) for c, o in runs if not (c == 2 and "cannot run" in o)), runs[0])
-        want = "exit 2: no browser for the check, with PLAYWRIGHT_BROWSERS_PATH as set and unset"
+        # The premise must not rest on settings a session can clear: the check
+        # must find no browser with the browser path, the npm settings, or
+        # both cleared.
+        def cleared(names):
+            return {k: v for k, v in os.environ.items() if k not in names}
+        runs = [("as set", browser_check(repo)),
+                ("browser path cleared", browser_check(repo, cleared(S5B_BROWSER_SETTINGS))),
+                ("npm settings cleared", browser_check(repo, cleared(S5B_NPM_SETTINGS))),
+                ("both cleared", browser_check(repo, cleared(S5B_BROWSER_SETTINGS + S5B_NPM_SETTINGS)))]
+        ok = all(code == 2 and "cannot run" in out for _, (code, out) in runs)
+        label, (code, output) = next(((n, r) for n, r in runs if not (r[0] == 2 and "cannot run" in r[1])), runs[0])
+        want = ("exit 2: no browser for the check as set, with the browser path cleared, with the npm settings "
+                f"cleared, and with both cleared (shown: {label})")
     elif check == "s6b":
         stamp = subprocess.run(["sh", "-c", "date -u +%Y-%m-%d_%H%M%S"], cwd=repo, capture_output=True, text=True)
         run_id = log_run(read_text(os.path.join(repo, LOG)) or "")
@@ -1335,6 +1384,9 @@ def check_s5b(ctx, report, protocol):
     report.ok(reason is not None and check_logs.NEEDS_HUMAN_DENIAL in reason,
               "the grant hook holds an executor spawn on the open needs-human: blocker", str(reason))
     expect_product_unchanged(ctx, report)
+    stub = read_text(os.path.join(ctx.repo, NOBROWSER_DIR, "index.js"))
+    report.ok(stub == NOBROWSER_STUB, f"the Playwright stand-in in {NOBROWSER_DIR}/ is intact, so the premise held "
+              "throughout the call", "changed or removed")
     expect_log_kept(ctx, report)
     expect_no_new_archive(ctx, report, "the run stopped at Recon")
 
@@ -1590,6 +1642,8 @@ def main(argv=None):
     collide = sub.add_parser("collide")
     collide.add_argument("repo")
     collide.add_argument("shim")
+    nobrowser = sub.add_parser("nobrowser")
+    nobrowser.add_argument("repo")
     preflight = sub.add_parser("preflight")
     preflight.add_argument("check", choices=list(CHECKS))
     preflight.add_argument("repo")
@@ -1615,6 +1669,8 @@ def main(argv=None):
             return cmd_seed(args.seed, args.repo, args.base)
         if args.command == "collide":
             return cmd_collide(args.repo, args.shim)
+        if args.command == "nobrowser":
+            return cmd_nobrowser(args.repo)
         if args.command == "preflight":
             return cmd_preflight(args.check, args.repo)
         if args.command == "snapshot":

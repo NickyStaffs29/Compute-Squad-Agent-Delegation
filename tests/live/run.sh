@@ -48,10 +48,12 @@
 #      defects for its audit to find. S3a, S3b, S4, and S4b then apply their
 #      scenario's patches and commit them, so HEAD moves past the seed's Base:
 #      (commit B for S3, the external implementation C for S4), and a prompt's
-#      <C> becomes that commit's short SHA. S5b hides every route to a
-#      browser for the claude call: PLAYWRIGHT_BROWSERS_PATH names an empty
-#      directory, the npm global prefix is an empty directory (so npm root -g
-#      finds no Playwright), and npm runs offline (so nothing is downloaded).
+#      <C> becomes that commit's short SHA. S5b runs check_live.py
+#      nobrowser, which puts a Playwright stand-in whose Chromium never starts
+#      in the repo's node_modules (git-excluded), so the fixture's browser
+#      check, which loads the project's Playwright first, cannot run whatever
+#      the environment says; the claude call also gets an empty
+#      PLAYWRIGHT_BROWSERS_PATH, an empty npm global prefix, and npm offline.
 #      S6b runs check_live.py collide, which writes a date that always reports
 #      one second and an earlier archive at the name the archive command gives
 #      the seeded log at that second, and puts that date first on the claude
@@ -61,7 +63,10 @@
 #   4. runs each turn's prompt (a second turn resumes the first turn's
 #      session) and checks subagent_stats.by_type, permission_denials, the
 #      usage ledger against modelUsage, the log's new entries, the product
-#      tree against A, and the archive files' sha256. Each claude call also
+#      tree against A, and the archive files' sha256. Each claude call loads
+#      project settings only (--setting-sources project), so no user or local
+#      setting, and so no user-installed copy of the plugin, reaches it; this
+#      checkout loads through --plugin-dir. Each call also
 #      gets, through --settings, a PreToolUse hook with no matcher that
 #      appends every tool call, the main session's and each subagent's, to a
 #      hook log (check_live.py toollog; it prints nothing and always exits 0).
@@ -265,7 +270,7 @@ if [ "$MODE" = list ]; then
       setup="$setup as '$COMMIT_MSG'"
     fi
     case $SETUP in
-      no-browser) setup="$setup, with PLAYWRIGHT_BROWSERS_PATH set to an empty directory" ;;
+      no-browser) setup="$setup, with a Playwright stand-in whose Chromium never starts, an empty PLAYWRIGHT_BROWSERS_PATH, and an empty, offline npm prefix" ;;
       date-shim) setup="$setup, with a date shim fixing the clock and an archive already at the name it gives the log" ;;
     esac
     printf '%-4s %s\n     seed tests/fixtures/logs/%s.log.md%s; turns: %s\n' "$name" "$DESC" "$SEED" "$setup" "${CHECKS[*]}"
@@ -321,24 +326,25 @@ step() {
   fi
 }
 
-# settings_json <hook log>: the --settings value. It turns off an installed
-# copy of the plugin, so only this checkout loads (--plugin-dir), and adds the
-# hook log: a PreToolUse hook with no matcher that runs check_live.py toollog
-# on every tool call. The hook's output goes nowhere and a failure exits 0, so
-# it never blocks or changes a call.
+# settings_json <hook log>: the --settings value, the hook log alone: a
+# PreToolUse hook with no matcher that runs check_live.py toollog on every
+# tool call. The hook's output goes nowhere and a failure exits 0, so it never
+# blocks or changes a call.
 settings_json() {
   "$PYTHON" - "$CHECK" "$1" <<'PYEOF'
 import json, shlex, sys
 check, log = sys.argv[1:3]
 hook = " ".join(shlex.quote(part) for part in (sys.executable, check, "toollog", log)) + " >/dev/null 2>&1 || true"
-print(json.dumps({"enabledPlugins": {"compute-squad@compute-squad": False},
-                  "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": hook}]}]}},
+print(json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": hook}]}]}},
                  separators=(",", ":")))
 PYEOF
 }
 
 # claude_cmd <prompt> <session or empty> <hook log>: the section 6
 # invocation, in CMD, with the hook log in its --settings.
+# --setting-sources project loads no user or local settings file, so an
+# installed copy of the plugin, and the user's hooks and permissions, stay
+# out of the scenario; --plugin-dir loads this checkout.
 # Task joins Agent in --allowedTools because Claude Code 2.1.282 names the
 # spawn tool Task. Skill must stay: the model loads the compute-squad skill
 # through the Skill tool. --model and --max-budget-usd are added only when
@@ -349,7 +355,7 @@ claude_cmd() {
   CMD=()
   [ ${#RUN_ENV[@]} -eq 0 ] || CMD=(env "${RUN_ENV[@]}")
   CMD+=("$CLAUDE_BIN" -p "$1" --output-format json --plugin-dir "$ROOT"
-    --settings "$settings"
+    --setting-sources project --settings "$settings"
     --permission-mode acceptEdits)
   [ -z "$MODEL" ] || CMD+=(--model "$MODEL")
   [ -z "$BUDGET" ] || CMD+=(--max-budget-usd "$BUDGET")
@@ -403,6 +409,7 @@ run_scenario() {
   fi
   case $SETUP in
     no-browser)
+      step "$PYTHON" "$CHECK" nobrowser "$repo" || return 2
       step mkdir -p "$dir/no-browsers" "$dir/no-npm-global" || return 2
       RUN_ENV=("PLAYWRIGHT_BROWSERS_PATH=$dir/no-browsers" "NPM_CONFIG_PREFIX=$dir/no-npm-global"
         "NPM_CONFIG_OFFLINE=true") ;;

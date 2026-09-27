@@ -2459,8 +2459,11 @@ print(
 # --dry-run, and --setup-only run for every scenario with CI set and a claude
 # stub that must never be called, a prompt that opens with a slash command
 # names the plugin's command by its full name (<plugin>:<command>), since the
-# Claude CLI resolves it under -p, --dry-run prints each claude call's
-# --settings with the hook that writes the hook log (a PreToolUse hook with no
+# Claude CLI resolves it under -p, each claude call loads project settings
+# only (--setting-sources project, so no user-installed copy of the plugin
+# loads), --dry-run prints each claude call's
+# --settings with the hook that writes the hook log and nothing else (a
+# PreToolUse hook with no
 # matcher, which, run with sh and dash on synthetic input, prints nothing,
 # exits 0, and writes one record per call), and in each repo
 # --setup-only builds, HEAD
@@ -2468,8 +2471,11 @@ print(
 # model over the seeded log must give the twin's action with the repo's own
 # commits in it. Where node is installed, each repo's npm test script passes,
 # so no live scenario starts on a broken tree, and a scenario that prints a
-# preflight passes it as printed (S5's and S5b's only where Playwright's
-# Chromium starts). squad-mech's open-run guard,
+# preflight passes it as printed (S5's only where Playwright's Chromium
+# starts, S5b's where node runs), and in S5b's repo the named command, npm run
+# check:overflow, cannot run even under this script's own environment, since
+# the Playwright stand-in there fails whatever the settings say. squad-mech's
+# open-run guard,
 # the command its archive procedure runs before the archive command, runs
 # with sh (and dash and bash where installed) over every fixture log, and
 # must refuse the archive for exactly the logs the one-active-run rule
@@ -2745,11 +2751,17 @@ with tempfile.TemporaryDirectory() as tmp:
             command = hooks[0]["hooks"][0]["command"]
         except (ValueError, KeyError, IndexError, TypeError) as e:
             fail(f"{LIVE_RUN} --dry-run all prints a claude call whose --settings has no hook log: {e}: {line[:300]}")
-        if (len(hooks) != 1 or "matcher" in hooks[0] or settings.get("enabledPlugins") != {"compute-squad@compute-squad": False}
+        sources = [words[i + 1] for i, word in enumerate(words[:-1]) if word == "--setting-sources"]
+        if sources != ["project"]:
+            fail(f"{LIVE_RUN} --dry-run all: every claude call passes '--setting-sources project' once, so no user or "
+                 f"local setting (an installed copy of the plugin included) reaches it; got {sources!r}: {line[:300]}")
+        if (set(settings) != {"hooks"} or set(settings["hooks"]) != {"PreToolUse"} or len(hooks) != 1
+                or "matcher" in hooks[0]
                 or not re.search(r"check_live\.py'? toollog '?<out>/\S+/turn[0-9]+\.tools\.jsonl'? >/dev/null 2>&1 \|\| true$",
                                  command)):
-            fail(f"{LIVE_RUN} --dry-run all: the --settings hook must be one PreToolUse hook with no matcher running "
-                 f"'check_live.py toollog <out>/<run>/turn<n>.tools.jsonl >/dev/null 2>&1 || true'; got {settings!r}")
+            fail(f"{LIVE_RUN} --dry-run all: --settings must hold the hook log alone, one PreToolUse hook with no matcher "
+                 f"running 'check_live.py toollog <out>/<run>/turn<n>.tools.jsonl >/dev/null 2>&1 || true'; got "
+                 f"{settings!r}")
         settings_seen += 1
         hook_command = hook_command or command
     if settings_seen != sum(len(turns.split()) for _, _, turns in scenarios):
@@ -2845,21 +2857,29 @@ with tempfile.TemporaryDirectory() as tmp:
                 fail(f"{LIVE_RUN} {name}: npm test's script ({script}) fails on the tree --setup-only builds, so the "
                      f"live scenario would start broken:\n{(test.stdout + test.stderr)[-1500:]}")
             live_tests += 1
+        # S5b's named command cannot run in its repo even under this script's
+        # own environment: no session-cleared setting can bring a browser back.
+        if name == "s5b" and node and shutil.which("npm"):
+            named = subprocess.run(["npm", "run", "--silent", "check:overflow"], cwd=repo, capture_output=True,
+                                   text=True, timeout=120)
+            if named.returncode != 2 or "cannot run" not in named.stdout + named.stderr:
+                fail(f"{LIVE_RUN} s5b: npm run check:overflow must exit 2 and say it cannot run in the repo "
+                     f"--setup-only builds, under any environment; it exited {named.returncode}: "
+                     f"{(named.stdout + named.stderr)[-600:]}")
         # A scenario whose premise needs its own environment (S5's browser,
         # S5b's missing one, S6b's clock) prints the preflight a live run
         # executes before it spends: run it here as printed. S6b's needs only
-        # sh and date; S5's and S5b's need Playwright's Chromium, so they run
-        # where it starts.
+        # sh and date, S5b's node, and S5's a Chromium that starts.
         preflight = re.search(r"^  preflight:\n    \(cd (.+) &&\n     (.+) \)$", setup.stdout, re.MULTILINE)
         if preflight:
-            if os.path.exists(os.path.join(repo, *check_live.BROWSER_CHECK[1].split("/"))):
-                if browser is None:
-                    probe = subprocess.run(list(check_live.BROWSER_CHECK) + ["--probe"], cwd=repo,
-                                           capture_output=True, text=True, timeout=120) if node else None
-                    browser = bool(probe) and probe.returncode == 0
-                if not browser:
-                    preflights_skipped.append(name)
-                    continue
+            needs = check_live.PREFLIGHT_NEEDS.get(re.search(r" preflight (\S+) ", preflight.group(2)).group(1))
+            if needs == "chromium" and browser is None:
+                probe = subprocess.run(list(check_live.BROWSER_CHECK) + ["--probe"], cwd=repo,
+                                       capture_output=True, text=True, timeout=120) if node else None
+                browser = bool(probe) and probe.returncode == 0
+            if (needs == "chromium" and not browser) or (needs == "node" and not node):
+                preflights_skipped.append(name)
+                continue
             run = subprocess.run(["bash", "-c", f"cd {preflight.group(1)} && {preflight.group(2)}"],
                                  capture_output=True, text=True, timeout=300)
             if run.returncode != 0:
@@ -2898,7 +2918,7 @@ print(
     + (f", with npm test's script passing in all {live_tests}" if live_tests else " (node is not installed, so their "
        "npm test did not run)")
     + (f"; the preflights of {', '.join(preflights_run)} hold as --setup-only prints them" if preflights_run else "")
-    + (f" ({', '.join(preflights_skipped)} not run: Playwright's Chromium does not start here)"
+    + (f" ({', '.join(preflights_skipped)} not run: what they need, Chromium or node, is missing here)"
        if preflights_skipped else "")
     + f"; the live S5 rule accepts and rejects the {judged_outcomes} outcomes its seed lists as they state"
     + f"; the live {', '.join(live_rule_checks)} rules, which read the hook log and the ledger, give the "
