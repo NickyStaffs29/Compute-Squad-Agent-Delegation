@@ -2,7 +2,7 @@
   "note": "The blocking-delegation log with a 2-line cap on its one subtask, answered by a Delegated entry of 6 lines: more than the cap plus the one line DELEGATE step 2 allows.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "each with an exact procedure, a target tier (`intern` for zero-judgment work, `execution` for tightly-specced work), and the most output lines the helper may return."
     },
     {

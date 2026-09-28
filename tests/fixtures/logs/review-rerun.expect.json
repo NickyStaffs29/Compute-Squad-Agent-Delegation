@@ -2,7 +2,7 @@
   "note": "Finding 3's 8a rule: a Rerun: line appears if and only if the review is overturned. This upheld review names a stage, which the FAIL count would charge.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/audit-prompts.md",
       "text": "`overturned` means a defect; only then write `Rerun:`, naming the earliest stage that must fix it."
     }
   ],

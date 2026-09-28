@@ -2,7 +2,7 @@
   "note": "Independent review regression: decision",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "Type: <grant | plan-approved | waiver | resolution | re-lock | park | abandon>"
     }
   ],

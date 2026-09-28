@@ -2,7 +2,7 @@
   "note": "Finding 3 with finding 9's work orders: the review upholds WO-1's high-stakes PASS while WO-2 remains, so it closes nothing; the next Status names WO-2, which awaits its own grant.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/audit-prompts.md",
       "text": "If the governing plan revision has a work order after the one this PASS accepted, spawn nothing: that Status names the next work order instead."
     },
     {

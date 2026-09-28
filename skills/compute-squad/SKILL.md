@@ -13,7 +13,7 @@ metadata:
 
 # Compute Squad Protocol (v3)
 
-Run the goal through the pipeline with the v3 role hierarchy. Each role runs on a rung of the host's model ladder (top, mid, bottom); the generated routing block below is the only place this skill names models.
+Keep main-session entries and the final response concise: one evidence record per exact command and one risk/evidence row per applicable risk, without a second prose rendering. Preserve complete criteria, assumptions, decisions and usage reporting. Run the goal through the pipeline with the v3 role hierarchy. Each role runs on a rung of the host's model ladder (top, mid, bottom); the generated routing block below is the only place this skill names models.
 
 - **Main session (top rung recommended): strategy.** Interrogates the goal, identifies gaps, clarifies them with the user, locks acceptance criteria, renders final judgment. Runs directly in the main session because only the main session can ask the user questions.
 - **PM, top rung.** Plans the work and accepts the deliverable (`squad-pm`, PLAN and ACCEPT modes).
@@ -33,6 +33,32 @@ Rungs (Claude alias, Codex ID): top `fable`, `gpt-5.6-sol`; mid `opus`, `gpt-5.6
 - Bottom: `squad-executor-mechanical`, `squad-mech`; in Claude Code also `squad-helper`.
 Codex effort: `high` for the main session, `max` for every other role. Agent files already pin their models. To spawn on a rung (escalation, finders, skeptic), pass the rung's alias as the Agent tool's `model` in Claude Code; in Codex a named agent keeps its pinned model, so pass the rung's ID and effort only for finders and the skeptic.
 <!-- routing:end -->
+
+## Reference loads
+
+Resolve references beside this candidate SKILL.md, never against the project cwd. Read only the marked section needed below; if its markers or complete instructions cannot be loaded, stop and report a setup gap.
+
+| Section | Reference | Load before |
+|---|---|---|
+| `resume` | `references/resume.md` | any spawn on a non-empty invocation log or explicit resume |
+| `decisions` | `references/resume.md` | any Decision append or resolution of a user answer |
+| `verdict` | `references/resume.md` | interpreting or reporting any verdict, including an archived PASS |
+| `delegation` | `references/resume.md` | acting on a DELEGATE block, helper or continuation |
+| `escalation` | `references/resume.md` | acting on a FAIL/rerun or resolving a blocker |
+| `high-stakes` | `references/audit-prompts.md` | opening any high-stakes PASS evidence, even when Audit is no |
+
+For a section named `section` in its candidate reference path `ref`, read its exact begin/end markers in one Bash call:
+
+```bash
+awk -v name="$section" '
+$0 == "<!-- " name ":begin -->" { b++; p=1; next }
+$0 == "<!-- " name ":end -->" { e++; p=0; next }
+p { out=out $0 "\n" }
+END { if (b!=1 || e!=1 || p || out !~ /[^[:space:]]/) exit 1; printf "%s", out }
+' "$ref"
+```
+
+A nonzero exit stops the run. Do not read all supplemental sections on a resume. Audit yes still loads the existing full finder/skeptic procedure at the audit step.
 
 ## Stage 0 — Strategy (main session, before anything spawns)
 
@@ -61,7 +87,7 @@ If `COMPUTE_SQUAD_LOG.md` already contains entries for this same goal — read t
 
 One active run per worktree. When a new run would start over a non-empty log whose latest `Next:` line is not `Next: none`, do not spawn the archive. Append nothing to that log until the user chooses. If it is this same goal, offer the resume above; a user who chooses a fresh run instead parks or abandons this one. Otherwise ask the user to resume that run, park it (archive it now, restore it later), abandon it, or start the new goal in a separate git worktree. Record a park or abandon as a `## Decision`, then a `## Status` with `Next: none`, then run Stage 1. An unattended run stops here instead and appends nothing. To resume a parked run, restore it only onto an empty log: `test ! -s COMPUTE_SQUAD_LOG.md && cp <archive> COMPUTE_SQUAD_LOG.md && cmp <archive> COMPUTE_SQUAD_LOG.md`, then recompute `Next:` from the resume table as if the park entries were absent and append a fresh `## Status`. The archive stays.
 
-Stage 0 reads only what finding gaps in the goal needs: the user's request, the project instructions already in context, the README, at most one directory listing, files the user named, and `COMPUTE_SQUAD_LOG.md` for the checks above. It never reads product source to map it, never runs tests or builds, and never lists files or questions for Recon; mapping and the baseline run are Recon's.
+Collect independent permitted metadata in one round trip where available; reading the candidate skill, root log metadata, README and the one root listing does not require separate round trips. Goal lock follows those reads. Stage 0 reads only what finding gaps in the goal needs: the user's request, the project instructions already in context, the README, at most one directory listing, files the user named, and `COMPUTE_SQUAD_LOG.md` for the checks above. It never reads product source to map it, never runs tests or builds, and never lists files or questions for Recon; mapping and the baseline run are Recon's.
 
 ## Spawn prompts and routing
 
@@ -83,7 +109,7 @@ Route from the log, never from a stage's final message. After every spawn return
 grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: |High-stakes: |Rerun: |Result: )' COMPUTE_SQUAD_LOG.md | tail -n 12
 ```
 
-If a `DELEGATE:` or `BLOCKER:` line follows the newest heading, read that block before doing anything else. Route on those field lines, not on the entry's prose. Read a final message only for what the log cannot hold: the reports of `squad-mech` and `squad-helper`, which write no log entries (Stage 1, DELEGATE step 2), an `ARCHIVE FAILED:` line (Hard rules), and the archive path of a PM that archived and cleared the log, where you read its PASS entry (Stage 5).
+If a `DELEGATE:` or `BLOCKER:` line follows the newest heading, read that block before doing anything else. Route on those field lines, not on the entry's prose. The grep and any signaled BLOCKER/DELEGATE block are enough after Recon or Executor; do not read their whole map or implementation narrative just to route. After PLAN, read only enough of the governing attempt to establish the work-order identity/order as well as its fixed fields; expand any ambiguous read instead of inferring absence from truncated text. Acceptance and high-stakes review still read every applicable criterion and exact verification command, and the review reads the full diff. Inspect routing, append Status, then spawn sequentially; never parallelize these dependent actions. Read a final message only for what the log cannot hold: the reports of `squad-mech` and `squad-helper`, which write no log entries (Stage 1, DELEGATE step 2), an `ARCHIVE FAILED:` line (Hard rules), and the archive path of a PM that archived and cleared the log, where you read its PASS entry (Stage 5).
 
 ## Modes, grants, and the Status entry
 
@@ -113,15 +139,7 @@ Next: <the one permitted next action, or none when the run is closed>
 Stop: <where this invocation ends>
 ```
 
-A `## Decision` entry quotes words the user actually wrote, in the request or in answer to a question. It never records an assumption, so an unattended run can record only the words that started it. When the request itself grants execution, record it this way instead of asking. `plan-approved` never grants execution. The `## Status` after it keeps the `Grant:` it had (`none` in a plan-mode run), and like every `## Status` it writes `Plan:` and `Grant:` only in the template's form, with any explanation on `Next:` or in prose. A `resolution` quotes the user's answer without changing locked facts or waiving criteria; `Covers:` names the pending blocker or held review as `<heading>, Timestamp: <timestamp>`. It preserves the current grant, then re-spawns the blocked stage (subject to the grant rule) or reruns the held review. A resolution never grants execution.
-
-```markdown
-## Decision
-Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
-Type: <grant | plan-approved | waiver | resolution | re-lock | park | abandon>
-Covers: <plan revision and work order, criterion ID, or pending heading and Timestamp>
-User's words: "<verbatim>"
-```
+Only words the user actually wrote form a `## Decision`, never assumptions. `plan-approved` and `resolution` never grant execution. Before recording any Decision or resolving a user answer, load the `decisions` section of `references/resume.md`; it defines the unchanged template and response procedure.
 
 Spawn an executor only when the latest `## Status` grants the plan revision and work order about to run. A scoped `Grant: r<N> <G>, per Decision <T>` grants execution only when N is the governing plan revision, the same `## Status` reads `Plan: r<N>, work order <P>`, and the one `## Decision` with `Timestamp: <T>` comes before that Status and reads `Type: grant` and `Covers: r<N>, work order <D>`, where D is G or `all` and G is P or `all`. No other Decision type grants execution, and only the exact `Grant: all revisions, full-mode request` needs no Decision. A new plan revision voids a grant made for an earlier one, except in `full` mode. Never ask for a grant the log already records. A grant covers only the work orders it names: after their verdict, append a `## Status` and stop. On Claude Code a PreToolUse hook refuses an executor spawn whose plan revision the latest `## Status` does not grant; on Codex this rule is prose, checked by reading the log.
 
@@ -165,78 +183,27 @@ Spawn `squad-pm` with mode ACCEPT. It runs on the top rung, so it is never below
 - **FAIL:** the FAIL entry's `Rerun:` line names exactly one stage (Recon, Plan, or Executor). Re-run that stage and all stages after it with the log intact; each re-run is a new attempt (Hard rules).
 - **PM — Accept (pending):** the PM needed delegated work or a user decision before it could decide. Run its `DELEGATE:` block and append the results, or put its `needs-human:` question to the user and record the answer as a `## Decision` followed by a `## Status`; then continue or re-spawn the PM in ACCEPT mode for the verdict (DELEGATE step 2).
 
-Every PASS and FAIL entry, and every pending entry that asks the user about a criterion, carries the PM's criteria block, one row per criterion ID in the latest `## Goal — Locked` entry:
-
-```
-Tested: <commit SHA>, working tree <clean | N changed files>
-| Criterion | Result | How | Evidence |
-|---|---|---|---|
-| AC1 | met | reproduced | <the check run and the refutation attempted, and what each showed> |
-Regressions: <none | defects this change introduced>
-Outside scope: <none | defects no criterion covers that also exist on the base commit>
-Executor points:
-- F1: <the check you ran> -> <what it showed>
-```
-
-Before reporting a PASS, read that block (in the archive if the PM cleared the log). If an ID has no row, a row reads anything but `met` or `waived` (or `not checked` for a criterion only a later work order covers), a `waived` row has no matching `## Decision` of Type waiver, or `Regressions:` is not `none`, report the run as not accepted and name the rows. PASS means local acceptance of the tested tree, not PR readiness, merge, deploy, or live verification.
+Before interpreting or reporting any verdict, load the `verdict` section of `references/resume.md` and read the PM's criteria block (from the archive if it cleared the log). Check every locked criterion, waiver Decision, and regression; PASS means only local acceptance of the tested tree.
 
 ### High-stakes review procedure
 
-Run this in the main session on every high-stakes PASS; never delegate it.
-
-1. Before reading the PASS entry, list from the latest `## Goal — Locked` entry what could go wrong in each class the change touches: auth (who reaches the changed path; what another account or an anonymous caller sees), payments (amount, currency, rounding, retry idempotency), migrations (forward and backward run, locks, existing rows), privacy (personal data newly reaching logs, errors, analytics, third parties), production config (defaults, secrets, blast radius).
-2. Read the full diff against the run's base commit and re-run the plan's verification commands yourself, recording each as a check line. Fill `Tested:` as ACCEPT does: `git rev-parse --short=12 HEAD`, and `clean` or the number of paths `git status --porcelain` lists outside the log and archive.
-3. For each risk, record what rules it out (a diff line, or a check line), or write `open`.
-4. List every decision after the first `## Goal — Locked` entry that changed a criterion, a verification command, or the scope. Only a `## Decision` entry quoting the user approves one; your own earlier agreement does not. Put unapproved ones to the user if present and record each answer as a `## Decision`; in an unattended run they stay unapproved.
-5. Append the entry below with the Bash heredoc form. `upheld` needs every risk ruled out and every decision approved. `overturned` means a defect; only then write `Rerun:`, naming the earliest stage that must fix it. `held` means an open risk or an unapproved decision, and no defect.
-6. Append a `## Status` after the entry, as after every entry. On `upheld`, spawn `squad-mech` to close the run: its archive command copies the log, now ending with your review and that Status, verifies the copy with `cmp`, and clears the active log. If the governing plan revision has a work order after the one this PASS accepted, spawn nothing: that Status names the next work order instead. On `overturned`, the entry counts as a FAIL: re-run the named stage and every later stage with the log intact; the next high-stakes PASS gets a new review. On `held`, leave the log intact and hand the open items to the user. Then report the result and its evidence to the user.
-
-```markdown
-## High-stakes review
-Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
-Agent: main session (<model ID as your context states it>)
-Result: <upheld | overturned | held>
-Rerun: <Recon|Plan|Executor>
-Tested: <commit SHA>, working tree <clean | N changed files>
-Checked:
-- `<command>` -> exit <code>; <summary line>
-Risks:
-- <risk> | <diff line or check line; or open>
-Decisions after lock:
-- <none, or: decision | approving `## Decision` timestamp, or unapproved>
-```
+On every high-stakes PASS, even when `Audit: no`, load the `high-stakes` section of `references/audit-prompts.md` before opening the PASS evidence. Derive risks from the latest Goal first. Run its complete review in the main session, never delegate it; only an upheld final-work-order review permits squad-mech's closing archive.
 
 ## Intra-stage delegation (the DELEGATE protocol)
 
-The role hierarchy is fractal: every level pushes its own busywork down a tier. Stages do not spawn agents themselves: no squad agent is given a tool for it, and some hosts disable nested spawning. So the orchestrating session acts as the switchboard:
-
-1. Any stage may end its log entry with a `DELEGATE:` block listing subtasks below its tier, each with an exact procedure, a target tier (`intern` for zero-judgment work, `execution` for tightly-specced work), and the most output lines the helper may return. Delegate only work too large to do in a few commands: a count, a listing, or an inventory of one directory costs less in-stage than the orchestrating session's spawn and append turns, so the stage does it and puts the result in its own entry. Each subtask is one item: `- [<intern|execution>] <exact procedure>; return at most <N> lines.`
-2. On seeing a `DELEGATE:` block, spawn the requested helpers (`squad-mech` for intern tasks; `squad-helper` for execution tasks). Helpers return their results in their final message; you append those results to the log under `## Delegated — <stage>`, then continue the pipeline. Each appended result keeps to its subtask's line cap, plus one line saying how the procedure ran and how many lines were cut. If a helper refused a step or reports one that did not run as the procedure says, append that report the same way and re-spawn the requesting stage even if its request was not `BLOCKING` (a `BLOCKING` one is continued as below); the stage does that step itself or ends its entry with a `BLOCKER:` block. A stage whose request was not `BLOCKING` appends a new, complete entry under its plain heading, never `(cont.)`. If the requesting stage marked the block `BLOCKING`, continue that stage's agent with SendMessage (load it through ToolSearch if it is listed only by name) and point it at the new `## Delegated — <stage>` entry, in the pointer form of Spawn prompts and routing; re-spawn the stage only when the host cannot message a finished agent or the message fails. A continued or re-spawned `BLOCKING` requester appends a `## <Stage> (cont.)` entry covering only the remainder of its work (Hard rules); the one-entry rule is per spawn or continuation, not per run.
-3. Delegation only flows downward. A stage that needs a stronger model ends its entry with a `BLOCKER:` block naming its own stage (`rerun: Recon`, `rerun: Plan`, or `rerun: Executor`); treat it as a FAIL of that stage under the escalation rules. A stage on the top rung asks with `needs-human:` instead.
-4. Spawn at most 5 helpers per stage per run, counted from that stage's `## Delegated — <stage>` entries. Never spawn a sixth: append `## Delegated — <stage>` listing each subtask left undone as `not run: helper cap reached`, and re-spawn the stage (or continue it, as step 2 does for a `BLOCKING` block); it does those subtasks itself under step 2's heading rule.
-
-Typical uses: the Executor delegates regenerating dozens of fixture files from an exact template; the PM delegates assembling a long changelog from many commits; Recon delegates a full-repository inventory. Counts, listings, and single-directory inventories stay in-stage.
+Stages do not spawn agents themselves: no squad agent is given a tool for it. Delegation flows only downward, at most 5 helpers per stage per run. Small counts/listings stay in-stage. On a `DELEGATE:` block, load the `delegation` section of `references/resume.md` before any helper or continuation. Each subtask is one item: `- [<intern|execution>] <exact procedure>; return at most <N> lines.` Each appended result keeps to its subtask's line cap, plus one line saying how the procedure ran and how many lines were cut.
 
 ## Escalation rules
 
-- Count FAILs from the log, never from memory: the FAIL total is the number of lines matching `^(Rerun: |- rerun: )`, and each such line charges one FAIL to the stage it names.
-- Escalate a stage only on the PM's COMPLEX classification or under the FAIL rules below, never on vibes.
-- A FAIL is charged to the stage its `Rerun:` or `- rerun:` line names, not to the stage that wrote it, and counts once toward the three-FAIL stop.
-- The named stage's next attempt runs one rung above its previous attempt: bottom to mid, mid to top. A stage already on the top rung re-runs there. Stages that re-run only because they follow the named stage keep their rung.
-- Execution runs on the higher of the latest plan's classification rung and the rung escalation has reached: `squad-executor-mechanical` (bottom), `squad-executor` (mid), `squad-executor-complex` (top). Within the three-FAIL stop, execution reaches the top rung from any classification.
-- Recon escalates by model, not by agent. In Claude Code, spawn `squad-recon` with the Agent tool's `model` parameter set to the next rung's alias from the routing block. In Codex an agent's pinned model takes precedence over a spawn argument, so Recon re-runs on its own rung. Plan runs on the top rung and re-runs there.
-- Three total FAILs on one run → stop, summarize the log history, and hand back to the user.
-- Anything that would change the locked goal, acceptance criteria, or assumptions → back to Stage 0 with the user. Always. With no user present, the run stops (blocker rule below).
+Count FAILs from the log, never from memory: the FAIL total is the number of lines matching `^(Rerun: |- rerun: )`, and each such line charges one FAIL to the stage it names. A FAIL is charged to the stage its `Rerun:` or `- rerun:` line names, not to the stage that wrote it, and counts once toward the three-FAIL stop. Three total FAILs on one run → stop, summarize the log history, and hand back to the user. On any FAIL or rerun, load the `escalation` section of `references/resume.md` before selecting a rung or next stage.
 
-Blockers work the same way from any stage, not just the PM, and all of them use one grammar — a block at the end of a stage's own entry:
+A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved. Changes to locked facts, criteria or assumptions require the user at Stage 0; never guess past a blocker. Before resolving one, load `escalation` and `decisions`. All blockers use this grammar at the end of their stage entry:
 
 ```
 BLOCKER:
 - rerun: <Recon|Plan|Executor>   (or)   needs-human: <the decision required>
 - why: <one sentence, with evidence refs>
 ```
-
-A `rerun:` blocker re-runs that stage and every stage after it, and it counts toward the three-FAIL stop. A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved. If the user can answer in this session, surface it, resolve it with them, record a re-lock only if locked goal, criteria, or assumptions change (Stage 0 step 4), a waiver for an explicitly waived criterion, or a resolution for any other answer, and re-spawn the stage that raised it. If the session is unattended, do not resolve it yourself, even when the answer looks obvious: append a `## Status` entry whose `Stop:` quotes the blocker and whose `Next:` names the stage to re-spawn, leave the log intact, and end the run by reporting both. Never tell a stage that the run is unattended or that it should prefer assumptions over a blocker. Freeform prose blockers are a protocol violation: never guess past a blocker, and never log one outside this grammar.
 
 ## Audit-grade runs
 

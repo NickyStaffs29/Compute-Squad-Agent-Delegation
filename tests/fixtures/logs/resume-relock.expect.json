@@ -6,7 +6,7 @@
       "text": "Spawn `squad-recon`. After a re-lock that answers a `needs-human:` blocker, re-spawn the stage that raised it instead."
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "record a re-lock only if locked goal, criteria, or assumptions change (Stage 0 step 4), a waiver for an explicitly waived criterion, or a resolution for any other answer, and re-spawn the stage that raised it."
     }
   ],

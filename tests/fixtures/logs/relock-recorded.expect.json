@@ -6,7 +6,7 @@
       "text": "A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry with the full template and a `Supersedes: <timestamp of the prior Goal entry>` line."
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "record a re-lock only if locked goal, criteria, or assumptions change (Stage 0 step 4), a waiver for an explicitly waived criterion, or a resolution for any other answer, and re-spawn the stage that raised it."
     }
   ],

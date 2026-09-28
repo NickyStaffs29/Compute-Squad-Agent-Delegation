@@ -6,11 +6,11 @@
       "text": "**PASS, high-stakes:** when any line in the log reads `High-stakes: yes`, the PM appends its PASS entry and archives and clears nothing."
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/audit-prompts.md",
       "text": "Run this in the main session on every high-stakes PASS; never delegate it."
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/audit-prompts.md",
       "text": "On `upheld`, spawn `squad-mech` to close the run: its archive command copies the log, now ending with your review and that Status, verifies the copy with `cmp`, and clears the active log."
     },
     {

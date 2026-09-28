@@ -2,7 +2,7 @@
   "note": "Finding 3: a high-stakes PASS on the plan's only work order, then an upheld ## High-stakes review; the session ended before the Status after it. Resuming spawns squad-mech for the closing archive, and check 8d runs squad-mech's close guard and archive command over this log.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/audit-prompts.md",
       "text": "Run this in the main session on every high-stakes PASS; never delegate it."
     },
     {

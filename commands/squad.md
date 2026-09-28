@@ -3,7 +3,7 @@ description: Run the Compute Squad pipeline on a goal
 argument-hint: [plan|execute|accept] <goal or work order>
 ---
 
-Run the compute-squad skill on this request. If its first word is `plan`, `execute`, or `accept`, that word is the mode; otherwise the mode is `full`:
+Process this request with the Compute Squad protocol. This slash command is already expanded: do not invoke `Skill` for `compute-squad:squad` again. Read the candidate SKILL.md named below directly once (unless its complete contents are already loaded). If its first word is `plan`, `execute`, or `accept`, that word is the mode; otherwise the mode is `full`:
 
 $ARGUMENTS
 

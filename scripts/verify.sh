@@ -736,6 +736,69 @@ def tracked_files(*pathspecs):
     return [p for p in out.split("\0") if p]
 
 
+# Moved procedures have one physical source and fail closed at load time.
+sys.dont_write_bytecode = True
+sys.path.insert(0, "tests")
+import check_logs
+import os
+import tempfile
+
+CORE = "skills/compute-squad/SKILL.md"
+RESUME = "skills/compute-squad/references/resume.md"
+core = read(CORE)
+section_files = {name: "resume.md" for name in ("resume", "decisions", "verdict", "delegation", "escalation")}
+section_files["high-stakes"] = "audit-prompts.md"
+sections = {}
+for name, reference in section_files.items():
+    try:
+        sections[name] = check_logs.read_section(CORE, reference, name)
+    except check_logs.ProtocolError as error:
+        fail(str(error))
+for forbidden in ("```markdown\n## Decision\n", "```\nTested: <commit SHA>", "```markdown\n## High-stakes review\n"):
+    if forbidden in core:
+        fail(f"{CORE}: stale moved template remains inline: {forbidden!r}")
+loads = (
+    "Resolve references beside this candidate SKILL.md, never against the project cwd.",
+    "if its markers or complete instructions cannot be loaded, stop and report a setup gap.",
+    "| `resume` | `references/resume.md` | any spawn on a non-empty invocation log or explicit resume |",
+    "| `decisions` | `references/resume.md` | any Decision append or resolution of a user answer |",
+    "| `verdict` | `references/resume.md` | interpreting or reporting any verdict, including an archived PASS |",
+    "| `delegation` | `references/resume.md` | acting on a DELEGATE block, helper or continuation |",
+    "| `escalation` | `references/resume.md` | acting on a FAIL/rerun or resolving a blocker |",
+    "| `high-stakes` | `references/audit-prompts.md` | opening any high-stakes PASS evidence, even when Audit is no |",
+    "Before recording any Decision or resolving a user answer, load the `decisions` section",
+    "Before interpreting or reporting any verdict, load the `verdict` section",
+    "On a `DELEGATE:` block, load the `delegation` section",
+    "On any FAIL or rerun, load the `escalation` section",
+    "On every high-stakes PASS, even when `Audit: no`, load the `high-stakes` section",
+    "Before resolving one, load `escalation` and `decisions`.",
+    "Do not read all supplemental sections on a resume.",
+    "Inspect routing, append Status, then spawn sequentially; never parallelize these dependent actions.",
+)
+for needed in loads:
+    if needed not in core:
+        fail(f"{CORE}: missing mandatory reference-load instruction {needed!r}")
+command = read("commands/squad.md")
+if "do not invoke `Skill` for `compute-squad:squad` again" not in command or "Read the candidate SKILL.md named below directly once" not in command:
+    fail("commands/squad.md: the expanded command must read its candidate directly without recursive Skill loading")
+reader = re.search(r"(?ms)^```bash\n(awk -v name=.*?)\n```", core)
+if not reader:
+    fail(f"{CORE}: missing anchored reference reader")
+with tempfile.TemporaryDirectory() as tmp:
+    path = os.path.join(tmp, "section.md")
+    for name, reference in section_files.items():
+        text = read("skills/compute-squad/references/" + reference)
+        begin, end = f"<!-- {name}:begin -->", f"<!-- {name}:end -->"
+        broken = (text.replace(begin, ""), text.replace(end, ""), text + "\n" + begin + "\nx\n" + end + "\n",
+                  begin + "\n \n" + end + "\n", end + "\nx\n" + begin + "\n")
+        for contents, valid in [(text, True)] + [(item, False) for item in broken]:
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(contents)
+            run = subprocess.run(["/bin/sh", "-c", reader.group(1)], text=True, capture_output=True,
+                                 env=dict(os.environ, section=name, ref=path))
+            if valid and (run.returncode or run.stdout != sections[name]) or not valid and (run.returncode == 0 or run.stdout):
+                fail(f"{CORE}: reference reader must return exactly section {name}, or fail without partial output")
+
 # ---- 7a: the Goal — Locked template is byte-identical in both files that
 # carry it.
 goal_locked_paths = [
@@ -845,7 +908,7 @@ AUDIT_TEXT = {
     "agents/squad-pm.md": ("## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN"),
     "codex/05-pm-accept.md": ("## Audit Findings", "UNREVIEWED", "NEEDS-HUMAN"),
     "skills/compute-squad/references/resume.md": ("| `## Audit Findings` | Spawn `squad-pm` in ACCEPT mode. |",),
-    "README.md": ("audit-prompts.md  # audit procedure, finder and skeptic briefs",),
+    "README.md": ("audit-prompts.md  # audit procedure, finder/skeptic briefs and high-stakes review",),
 }
 for path, needed in AUDIT_TEXT.items():
     flat = " ".join(read(path).split())
@@ -938,21 +1001,22 @@ print(
 # ---- 7f: the ## Status and ## Decision templates. Only the main session
 # writes these entries; on the manual Codex path the user writes them by hand
 # from codex/README.md, so both fenced templates are byte-identical there and
-# in SKILL.md. Check 8c builds its logs from SKILL.md's Status template.
+# in their canonical core/reference locations. Check 8c uses the core Status template.
 main_entry_paths = ["skills/compute-squad/SKILL.md", "codex/README.md"]
 for heading in ("## Status", "## Decision"):
-    blocks = {path: extract_fenced_block(read(path), path, "```markdown", heading) for path in main_entry_paths}
+    paths = main_entry_paths if heading == "## Status" else [RESUME, "codex/README.md"]
+    blocks = {path: extract_fenced_block(sections["decisions"] if path == RESUME else read(path), path, "```markdown", heading) for path in paths}
     ref_path, ref_block = next(iter(blocks.items()))
     for path, block in blocks.items():
         if block != ref_block:
             fail(f"{path}: {heading} template differs from {ref_path}")
 
-print(f"PASS: check 7: the ## Status and ## Decision templates are byte-identical across {', '.join(main_entry_paths)}")
+print(f"PASS: check 7: the ## Status template matches the manual and the moved ## Decision template in {RESUME} matches the manual")
 
 # ---- 7g: the criteria block (finding 2). Every PASS and FAIL entry carries
 # one block: a Tested: line naming the tree, a table with one row per
 # criterion ID, then Regressions:, Outside scope:, and Executor points:
-# (finding 16). SKILL.md carries it as a bare-fenced block that opens with
+# (finding 16). The verdict reference carries it as a bare-fenced block opening with
 # the Tested: line; the PM body and its generated Codex prompt carry the same
 # lines inside the ACCEPT template's heredoc. All three match byte for byte.
 # The PM files state the Result values and the question a pre-existing
@@ -960,10 +1024,10 @@ print(f"PASS: check 7: the ## Status and ## Decision templates are byte-identica
 # linter's Result values are the PM's, and SKILL.md numbers the Goal
 # template's criteria (7a holds the template's two copies alike).
 CRITERIA_OPEN = "Tested: <commit SHA>, working tree <clean | N changed files>"
-CRITERIA_SKILLS = ["skills/compute-squad/SKILL.md"]
+CRITERIA_SKILLS = [RESUME]
 CRITERIA_PM = ["agents/squad-pm.md", "codex/05-pm-accept.md"]
 LOG_HEREDOC = "cat >> COMPUTE_SQUAD_LOG.md <<'EOF'"
-criteria_blocks = {path: extract_fenced_block(read(path), path, "```", CRITERIA_OPEN) for path in CRITERIA_SKILLS}
+criteria_blocks = {path: extract_fenced_block(sections["verdict"], path, "```", CRITERIA_OPEN) for path in CRITERIA_SKILLS}
 for path in CRITERIA_PM:
     lines = read(path).splitlines()
     starts = [i for i, line in enumerate(lines) if line == CRITERIA_OPEN]
@@ -986,12 +1050,12 @@ CRITERIA_TEXT = {
     "Result is exactly one of": CRITERIA_PM,
     "needs-human: waive or re-scope <ID>": CRITERIA_PM,
     "PASS means local acceptance of the tested tree": CRITERIA_PM + CRITERIA_SKILLS,
-    "numbered AC1, AC2, and so on": CRITERIA_SKILLS,
-    "- AC1: <concrete, verifiable item>": CRITERIA_SKILLS,
+    "numbered AC1, AC2, and so on": [CORE],
+    "- AC1: <concrete, verifiable item>": [CORE],
 }
 for needed, paths in CRITERIA_TEXT.items():
     for path in paths:
-        if needed not in " ".join(read(path).split()):
+        if needed not in " ".join((sections["verdict"] if path == RESUME else read(path)).split()):
             fail(f"{path}: missing {needed!r}")
 sys.dont_write_bytecode = True
 sys.path.insert(0, "tests")
@@ -1012,15 +1076,15 @@ print(
 # archives nothing; the main session reviews the change, appends a
 # ## High-stakes review entry, and only an upheld review sends the log to
 # squad-mech's closing archive. The review template is byte-identical in
-# SKILL.md and codex/README.md (on the manual Codex path the operator writes
+# audit-prompts.md and codex/README.md (on the manual path the operator writes
 # it by hand), the PM body and its Codex prompt stop a high-stakes PASS with
 # nothing archived, squad-mech's body and its Codex prompt carry the close
 # guard (check 8d runs it), the example log's review has one Tested: line and
 # one Result: line, and no file keeps the old flow, in which the main session
 # cleared or archived the log itself.
 REVIEW_HEADING = "## High-stakes review"
-REVIEW_PATHS = ["skills/compute-squad/SKILL.md", "codex/README.md"]
-review_blocks = {path: extract_fenced_block(read(path), path, "```markdown", REVIEW_HEADING) for path in REVIEW_PATHS}
+REVIEW_PATHS = [AUDIT_PROMPTS, "codex/README.md"]
+review_blocks = {path: extract_fenced_block(sections["high-stakes"] if path == AUDIT_PROMPTS else read(path), path, "```markdown", REVIEW_HEADING) for path in REVIEW_PATHS}
 for path, block in review_blocks.items():
     if block != review_blocks[REVIEW_PATHS[0]]:
         fail(f"{path}: the {REVIEW_HEADING} template differs from {REVIEW_PATHS[0]}'s: {block!r}")
@@ -1158,11 +1222,11 @@ if off_list:
     fail(f"headings not on the list in {skill_path}'s Hard rules: " + "; ".join(off_list))
 
 runtime_mentions = set()
-for path in [skill_path] + tracked_files("agents/*.md", "codex/0*.md"):
+for path in [skill_path, RESUME, AUDIT_PROMPTS] + tracked_files("agents/*.md", "codex/0*.md"):
     runtime_mentions.update(heading for _, heading in heading_mentions(path, fenced=True))
 for heading in listed_headings + [h + CONT for h in cont_headings]:
     if heading not in runtime_mentions:
-        fail(f"{skill_path}: listed heading {heading!r} is written or named nowhere in agents/, codex/0*.md, or {skill_path}")
+        fail(f"{skill_path}: listed heading {heading!r} is written or named nowhere in agents/, codex/0*.md, or the candidate skill/reference files")
 
 # The routing fields (finding 9). tests/check_logs.py holds the table of
 # fixed lines each stage entry carries directly under its Agent: line, and
@@ -1170,7 +1234,7 @@ for heading in listed_headings + [h + CONT for h in cont_headings]:
 # (a cat >> COMPUTE_SQUAD_LOG.md <<'EOF' block) must carry exactly those
 # lines, in order, right under its Agent: line, and no other template line
 # may start with a routing field. The main session's ## High-stakes review
-# template, fenced in SKILL.md and codex/README.md (7h), is held to the same
+# template, fenced in audit-prompts.md and the manual (7h), is held to the same
 # table. Every heading in the table needs a template, except the PASS and
 # pending entries, which the PM body derives from the FAIL template by the
 # two sentences named below, so their fields must be the FAIL fields without
@@ -1662,7 +1726,7 @@ SHARED_SPANS = [
 ] + [
     # The backtick keeps squad-mech's `ARCHIVE REFUSED: open run` report from standing in for the refusal marker.
     span_row("refused", ["agents/squad-helper.md", "agents/squad-mech.md"], text="`REFUSED:"),
-    span_row("refusal route", [SKILL],
+    span_row("refusal route", [RESUME],
              text="If a helper refused a step or reports one that did not run as the procedure says, append that "
                   "report the same way and re-spawn the requesting stage even if its request was not `BLOCKING`"),
     span_row("switchboard", [SKILL], text="no squad agent is given a tool for it"),
@@ -1768,6 +1832,7 @@ def row_paths(row):
 
 
 span_texts = {path: read(path) for row in SHARED_SPANS for path in row_paths(row)}
+span_texts[RESUME] = sections["delegation"]   # the refusal route is loaded from this section
 for row in SHARED_SPANS:
     errors, _ = check_span_row(row, span_texts)
     if errors:
@@ -1944,7 +2009,7 @@ print(
 RESUME = "skills/compute-squad/references/resume.md"
 if RESUME not in tracked_files(RESUME):
     fail(f"{RESUME} is not tracked, so the plugin would ship without the resume table")
-resume_lines = read(RESUME).splitlines()
+resume_lines = sections["resume"].splitlines()
 try:
     table_at = resume_lines.index("| Last entry | Next action |")
 except ValueError:
@@ -1960,6 +2025,10 @@ unrouted = [h for h in routed if not any(cell.startswith("`" + h + "`") for cell
 if unrouted:
     fail(f"{RESUME}: the next-action table has no row whose first column names {unrouted!r}")
 RESUME_RULES = {
+    RESUME: (
+        "Then, if the block is `BLOCKING`, continue or re-spawn that stage to finish",
+        "only the session that spawned the stage's agent can continue it, so any other session re-spawns it.",
+    ),
     SKILL: (
         "read `references/resume.md` and route by it before any spawn",
         "first recompute `Next:` from `references/resume.md`",
@@ -1978,7 +2047,7 @@ OPEN_RUN_GUARD = (
 for path in ("agents/squad-mech.md", "codex/01-archive.md", "codex/agents/squad-mech.toml"):
     RESUME_RULES[path] = (OPEN_RUN_GUARD,)
 for path, rules in RESUME_RULES.items():
-    flat = " ".join(read(path).split())
+    flat = " ".join((sections["resume"] if path == RESUME else read(path)).split())
     missing = [rule for rule in rules if rule not in flat]
     if missing:
         fail(f"{path}: missing the resume and one-active-run text {missing!r}")
@@ -2195,14 +2264,14 @@ print(
 # "delegation cap" and "helper output cap" pin the body sentences, and 8a's
 # delegate-cap rule holds logs to the cap). The switchboard stays: 7r keeps
 # spawning tools out of every agent file and 7p's "switchboard" row keeps
-# SKILL.md's reason. SKILL.md carries the rules, compared with whitespace
+# SKILL.md's reason. The delegation reference carries the detailed rules, compared with whitespace
 # collapsed; every stage body limits delegation to work too large
 # to do in a few commands; no agent body or Codex prompt says a stage is
 # only re-spawned; the resume table continues or re-spawns a BLOCKING
 # requester; and a needs-human: blocker holds continuations as it holds
 # spawns.
 DELEGATION_RULES = {
-    SKILL: (
+    RESUME: (
         "Delegate only work too large to do in a few commands: a count, a listing, or an inventory of one directory "
         "costs less in-stage than the orchestrating session's spawn and append turns, so the stage does it and puts "
         "the result in its own entry.",
@@ -2214,17 +2283,15 @@ DELEGATION_RULES = {
         "re-spawn the stage only when the host cannot message a finished agent or the message fails.",
         "the one-entry rule is per spawn or continuation, not per run.",
         "Counts, listings, and single-directory inventories stay in-stage.",
+    ),
+    CORE: (
         "then continue or re-spawn the PM in ACCEPT mode for the verdict (DELEGATE step 2).",
         "A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved.",
-    ),
-    "skills/compute-squad/references/resume.md": (
-        "Then, if the block is `BLOCKING`, continue or re-spawn that stage to finish",
-        "only the session that spawned the stage's agent can continue it, so any other session re-spawns it.",
     ),
     "README.md": ("push busywork too large to do in-stage down a tier",),
 }
 for path, rules in DELEGATION_RULES.items():
-    flat = " ".join(read(path).split())
+    flat = " ".join((sections["delegation"] if path == RESUME else read(path)).split())
     missing = [rule for rule in rules if " ".join(rule.split()) not in flat]
     if missing:
         fail(f"{path}: missing finding 18's delegation text {missing!r}")
@@ -3505,7 +3572,7 @@ print(
 # left empty; the example log, whose review is upheld, must be among those
 # closed. Last, the live seeds' twins: S6a's seed, which ends in a
 # high-stakes PASS, is refused, and closed with the review in the copy once a
-# Status, the review from SKILL.md's template filled in as upheld, and a
+# Status, the review from audit-prompts.md's template filled in as upheld, and a
 # Status are appended (a log that must lint clean); over S6b's seed the
 # open-run guard allows Stage 1, and under the date shim, with an archive
 # already at the name, the command exits nonzero and changes no file.
@@ -3716,10 +3783,12 @@ with tempfile.TemporaryDirectory() as tmp:
             lines.append(text)
         return "\n".join(lines).rstrip("\n") + "\n"
 
-    review_at = next((i for i in range(len(skill_lines) - 1)
-                      if skill_lines[i] == "```markdown" and skill_lines[i + 1] == check_logs.REVIEW_HEADING), None)
+    review_path = "skills/compute-squad/references/audit-prompts.md"
+    review_lines = read(review_path).splitlines()
+    review_at = next((i for i in range(len(review_lines) - 1)
+                      if review_lines[i] == "```markdown" and review_lines[i + 1] == check_logs.REVIEW_HEADING), None)
     if review_at is None:
-        fail(f"skills/compute-squad/SKILL.md: no ```markdown block opening with {check_logs.REVIEW_HEADING}")
+        fail(f"{review_path}: no ```markdown block opening with {check_logs.REVIEW_HEADING}")
     review_values = {"Timestamp": "2026-09-15T10:36:40Z", "Agent": "main session (claude-fable-5-1)",
                      "Result": "upheld", "Tested": seed_tested[len("Tested: "):]}
     review_items = {
@@ -3729,7 +3798,7 @@ with tempfile.TemporaryDirectory() as tmp:
         "Decisions after lock": ["- none"],
     }
     review = [check_logs.REVIEW_HEADING]
-    for text in skill_lines[review_at + 2:]:
+    for text in review_lines[review_at + 2:]:
         if text == "```":
             break
         key, _, value = text.partition(": ")
@@ -3742,7 +3811,7 @@ with tempfile.TemporaryDirectory() as tmp:
         elif key in review_values:
             review.append(f"{key}: {review_values[key]}")
         else:
-            fail(f"skills/compute-squad/SKILL.md: the {check_logs.REVIEW_HEADING} template line {text!r} is new to "
+            fail(f"{review_path}: the {check_logs.REVIEW_HEADING} template line {text!r} is new to "
                  f"check 8d's S6a twin; teach it a value")
     reviewed = "\n".join([
         s6a_seed.rstrip("\n"), "", s6a_status("2026-09-15T10:31:12Z", "main-session high-stakes review").rstrip("\n"),

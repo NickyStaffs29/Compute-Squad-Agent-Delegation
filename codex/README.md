@@ -182,3 +182,5 @@ Each prompt file is generated from the matching agent definition in `agents/` by
 rules; never hand-edit it. Since you paste each stage by hand, you run any `DELEGATE:` subtask,
 append its results, and paste the next stage's prompt, in place of the orchestrating session. You,
 not any session, own the goal and acceptance criteria.
+
+For main-session control details, load only the marked section beside the candidate SKILL: `decisions`, `verdict`, `delegation`, or `escalation` in `skills/compute-squad/references/resume.md` at its trigger, and `high-stakes` in `skills/compute-squad/references/audit-prompts.md` before any high-stakes PASS evidence, even with `Audit: no`. On resume, read the marked `resume` section first. Missing or incomplete sections are setup gaps; stop. The manual templates above are unchanged.

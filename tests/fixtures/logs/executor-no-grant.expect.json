@@ -2,7 +2,7 @@
   "note": "Section 6, S1 turn 2: after a plan-approved Decision the latest Status still grants nothing, so an executor entry is a spawn the grant hook denies.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "`plan-approved` never grants execution."
     },
     {
