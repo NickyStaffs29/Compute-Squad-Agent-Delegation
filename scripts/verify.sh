@@ -1526,6 +1526,14 @@ PM_NEXT_LINE = (
     "and squad-mech's open-run guard reads the latest `Next:` line in the log to decide whether a run is open. "
     "Describe follow-up work, such as another work order or the high-stakes review, in prose or a bullet instead."
 )
+# WO-9: what Claude's grant hook enforces, stated for both hosts.
+SCOPED_GRANT_RULE = (
+    "A scoped `Grant: r<N> <G>, per Decision <T>` grants execution only when N is the governing plan revision, "
+    "the same `## Status` reads `Plan: r<N>, work order <P>`, and the one `## Decision` with `Timestamp: <T>` "
+    "comes before that Status and reads `Type: grant` and `Covers: r<N>, work order <D>`, where D is G or `all` "
+    "and G is P or `all`. No other Decision type grants execution, and only the exact "
+    "`Grant: all revisions, full-mode request` needs no Decision."
+)
 PLAN_ATTEMPT = (
     "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n "
     "is plan revision r<n>."
@@ -1662,6 +1670,7 @@ SHARED_SPANS = [
     span_row("verdict scope", PM_FILES, text=VERDICT_SCOPE),
     span_row("work-order stop", PM_FILES, text=WORK_ORDER_STOP),
     span_row("plan attempt", ["agents/squad-pm.md", "codex/03-pm-plan.md"], text=PLAN_ATTEMPT),
+    span_row("scoped grant rule", [SKILL, "codex/README.md"], text=SCOPED_GRANT_RULE),
     span_row("PM Next: line", ["agents/squad-pm.md", "codex/03-pm-plan.md", "codex/05-pm-accept.md",
                                "codex/agents/squad-pm.toml"], text=PM_NEXT_LINE),
     span_row("verdict attempt", PM_FILES, text=VERDICT_ATTEMPT),
@@ -2760,6 +2769,12 @@ with tempfile.TemporaryDirectory() as tmp:
     # leading slash command itself, and a bare /squad is unknown to it.
     plugin_name = json.loads(read(".claude-plugin/plugin.json"))["name"]
     plugin_commands = {f"/{plugin_name}:{os.path.basename(p)[:-len('.md')]}" for p in tracked_files("commands/*.md")}
+    # README teaches Claude Code the same full name (WO-9): no bare /<command>.
+    readme_text = read("README.md")
+    bare = sorted({m.group(0) for c in plugin_commands
+                   for m in re.finditer(r"(?<![\w:/.-])/" + re.escape(c.split(":", 1)[1]) + r"\b", readme_text)})
+    if bare or not all(c in readme_text for c in plugin_commands):
+        fail(f"README.md names the plugin's command {bare!r} without its plugin; write {sorted(plugin_commands)!r}")
     settings_seen, hook_command, fence_command, slash_prompts = 0, None, None, 0
     for line in dry.stdout.splitlines():
         if claude_stub + " -p " not in line:
@@ -3009,7 +3024,8 @@ print(
     f"the hook log in its --settings, whose command writes one record per call and prints nothing under "
     f"{', '.join(hook_shells)}, and the candidate fence, which blocks every read of another copy of the "
     f"protocol and passes the rest ({fence_runs} runs), with --verbose, so each turn's check can read the init "
-    f"message's plugins; commands/squad.md names its skill through ${{CLAUDE_PLUGIN_ROOT}}"
+    f"message's plugins; commands/squad.md names its skill through ${{CLAUDE_PLUGIN_ROOT}}, and README.md names the "
+    f"command only as {', '.join(sorted(plugin_commands))}"
     + f"; squad-mech's open-run guard agrees with the one-active-run rule "
     f"over every fixture log ({guard_checked} runs under {', '.join(guard_shells)})"
 )
@@ -3025,13 +3041,25 @@ print(
 # template. Every tracked executor, with and without the plugin prefix, is
 # denied with no log, with Grant: none, with no Grant line in the latest
 # Status, with a grant for another plan revision, and with a grant written
-# anywhere but the latest Status; it is allowed with a grant for the current
-# revision (the count of ## PM — Plan entries without (cont.)) or for all
-# revisions. While a needs-human: BLOCKER has no ## Decision after it, the
+# anywhere but the latest Status. It is allowed by the exact
+# "Grant: all revisions, full-mode request", or by a scoped
+# "Grant: r<N> <G>, per Decision <T>" when N is the current revision (the
+# count of ## PM — Plan entries without (cont.)), the same Status reads one
+# concrete "Plan: r<N>, work order <P>", and the one exact ## Decision with
+# "Timestamp: <T>" comes before that Status with one Timestamp:, one
+# "Type: grant", and one "Covers: r<N>, work order <D>", where D is G or all
+# and G is P or all (WO-9). Every other Decision type, a missing, later,
+# suffixed, ambiguous, or incomplete Decision, a field borrowed from another
+# entry or quoted in prose, a wider scope, a stale revision, a missing or
+# placeholder Plan:, and a malformed Grant: deny; each deny keeps the rest of
+# the reference genuine, so the named defect decides. Deny reasons are the
+# hook's own fixed strings. While a needs-human: BLOCKER has no ## Decision after it, the
 # script holds every executor and every other stage agent except squad-mech
 # (it archives a fresh run at Stage 1): squad-helper, squad-pm, and
 # squad-recon. A Decision releases the hold; a later needs-human: blocker
 # holds again, and so does a later rerun: blocker, which cannot resolve it.
+# A resolution releases it without granting anything and leaves an earlier
+# genuine scoped grant in force.
 # Every other agent, and input the script cannot read, is allowed silently.
 # Over the live seeds in tests/fixtures/logs/ that tests/live/run.sh uses
 # (8b reads them from run.sh --list, and each needs a verdict here), every
@@ -3041,7 +3069,7 @@ print(
 # (finding 9): a plan whose Attempt: line is wrong does not move the hook's
 # count, and over the fixtures with a (cont.) plan or two revisions, a grant
 # for the latest plan's Attempt: number allows and a grant for any other
-# revision denies.
+# revision denies, each backed by its own genuine grant Decision.
 # An allow prints nothing; a deny prints one PreToolUse decision, whose
 # reason names ## Status for a missing grant and the open blocker for a hold.
 GATE = "skills/compute-squad/hooks/grant-gate.sh"
@@ -3075,30 +3103,57 @@ for line in skill_lines[status_at[0] + 1:]:
     if line == "```":
         break
     status_template.append(line)
-if sum(line.startswith("Grant: ") for line in status_template) != 1:
-    fail(f"{SKILL}: the ## Status template needs exactly one 'Grant: ' line, which {GATE} reads")
+for label in ("Plan: ", "Grant: "):
+    if sum(line.startswith(label) for line in status_template) != 1:
+        fail(f"{SKILL}: the ## Status template needs exactly one {label!r} line, which {GATE} reads")
+PLAN_PLACEHOLDER = next(line for line in status_template if line.startswith("Plan: "))[len("Plan: "):]
 
 
-def status(grant):
-    """A ## Status entry from SKILL.md's template with its Grant: line set to
-    grant, or dropped when grant is None."""
+def status(grant, plan="none"):
+    """A ## Status entry from SKILL.md's template with its Plan: line set to
+    plan and its Grant: line set to grant; None drops either line."""
     lines = []
     for line in status_template:
-        if line.startswith("Grant: "):
-            if grant is None:
-                continue
-            line = "Grant: " + grant
-        lines.append(line)
+        if line.startswith("Plan: "):
+            line = None if plan is None else "Plan: " + plan
+        elif line.startswith("Grant: "):
+            line = None if grant is None else "Grant: " + grant
+        if line is not None:
+            lines.append(line)
     return "\n".join(lines) + "\n\n"
+
+
+def decision(at, covers, kind="grant", heading="## Decision", fields=None):
+    """A ## Decision entry; fields, when given, replaces its Timestamp:, Type:,
+    and Covers: lines."""
+    if fields is None:
+        fields = f"Timestamp: {at}\nType: {kind}\nCovers: {covers}\n"
+    return f"{heading}\n{fields}User's words: \"go\"\n\n"
+
+
+def scoped(revision, work_order, at):
+    """A revision-scoped Grant: value citing the Decision at timestamp at."""
+    return f"r{revision} {work_order}, per Decision {at}"
+
+
+def target(revision, work_order):
+    """A concrete Plan: value, and the Covers: value of a grant Decision."""
+    return f"r{revision}, work order {work_order}"
 
 
 GOAL = "## Goal — Locked\nTimestamp: 2026-09-01T09:00:00Z\n\nGoal: g\n\n"
 PLAN = "## PM — Plan\nTimestamp: 2026-09-01T09:05:00Z\n\nTasks.\n\n"
 PLAN_CONT = "## PM — Plan (cont.)\nTimestamp: 2026-09-01T09:06:00Z\n\nMore tasks.\n\n"
 PLAN_ATTEMPT_2 = PLAN.replace("\n\nTasks.", "\nAgent: squad-pm (m)\nAttempt: 2\n\nTasks.")
-DECISION = '## Decision\nTimestamp: 2026-09-01T09:07:00Z\nType: grant\nCovers: r1, work order all\nUser\'s words: "go"\n\n'
-R1 = "r1 all, per Decision 2026-09-01T09:07:00Z"
-R2 = "r2 WO-1, per Decision 2026-09-01T09:07:00Z"
+# Each revision-scoped grant cites its own genuine earlier Decision and names
+# a concrete Plan:, so in the counting cases only the count decides.
+T1, T2, T11 = "2026-09-01T09:07:00Z", "2026-09-01T09:07:02Z", "2026-09-01T09:07:11Z"
+DECISION = decision(T1, target(1, "all"))
+DECISION_R2 = decision(T2, target(2, "WO-1"))
+DECISION_R11 = decision(T11, target(11, "all"))
+R1, R1_AT = scoped(1, "all", T1), target(1, "all")
+R2, R2_AT = scoped(2, "WO-1", T2), target(2, "WO-1")
+R11, R11_AT = scoped(11, "all", T11), target(11, "all")
 ALL = "all revisions, full-mode request"
 GATE_CASES = [
     ("no log", None, "deny"),
@@ -3106,20 +3161,100 @@ GATE_CASES = [
     ("no Grant line in the latest Status", GOAL + status(None), "deny"),
     ("no Grant line in the latest Status after a granting one", GOAL + status(ALL) + PLAN + status(None), "deny"),
     ("Grant: all revisions", GOAL + status(ALL), "allow"),
-    ("r1 before any plan", GOAL + status(R1), "deny"),
-    ("r0 before any plan", GOAL + status("r0 all, per Decision 2026-09-01T09:07:00Z"), "deny"),
-    ("r1 over one plan", GOAL + status("none") + PLAN + status(R1), "allow"),
-    ("r2 over two plans and a (cont.)", GOAL + status("none") + PLAN + PLAN_CONT + PLAN + status(R2), "allow"),
-    ("r2 after a third plan", GOAL + status("none") + PLAN + PLAN_CONT + PLAN + status(R2) + PLAN, "deny"),
-    ("r1 over eleven plans", GOAL + PLAN * 11 + status(R1), "deny"),
-    ("r11 over eleven plans", GOAL + PLAN * 11 + status("r11 all, per Decision 2026-09-01T09:07:00Z"), "allow"),
-    ("r11 over one plan", GOAL + PLAN + status("r11 all, per Decision 2026-09-01T09:07:00Z"), "deny"),
-    ("r2 over one plan whose Attempt: line reads 2", GOAL + status("none") + PLAN_ATTEMPT_2 + status(R2), "deny"),
-    ("r1 over one plan whose Attempt: line reads 2", GOAL + status("none") + PLAN_ATTEMPT_2 + status(R1), "allow"),
+    ("r1 before any plan, with a genuine r1 Decision", GOAL + DECISION + status(R1, R1_AT), "deny"),
+    ("r0 before any plan", GOAL + decision(T1, target(0, "all")) + status(scoped(0, "all", T1), target(0, "all")), "deny"),
+    ("r1 over one plan", GOAL + status("none") + PLAN + DECISION + status(R1, R1_AT), "allow"),
+    ("r2 over two plans and a (cont.)", GOAL + status("none") + PLAN + PLAN_CONT + PLAN + DECISION_R2 + status(R2, R2_AT),
+     "allow"),
+    ("r2 after a third plan", GOAL + status("none") + PLAN + PLAN_CONT + PLAN + DECISION_R2 + status(R2, R2_AT) + PLAN,
+     "deny"),
+    ("r1 over eleven plans", GOAL + PLAN * 11 + DECISION + status(R1, R1_AT), "deny"),
+    ("r11 over eleven plans", GOAL + PLAN * 11 + DECISION_R11 + status(R11, R11_AT), "allow"),
+    ("r11 over one plan", GOAL + PLAN + DECISION_R11 + status(R11, R11_AT), "deny"),
+    ("r2 over one plan whose Attempt: line reads 2", GOAL + status("none") + PLAN_ATTEMPT_2 + DECISION_R2 + status(R2, R2_AT),
+     "deny"),
+    ("r1 over one plan whose Attempt: line reads 2", GOAL + status("none") + PLAN_ATTEMPT_2 + DECISION + status(R1, R1_AT),
+     "allow"),
     ("a Grant line outside a Status entry", GOAL + status("none") + PLAN.replace("Tasks.", "Tasks.\nGrant: " + ALL), "deny"),
     ("a grant Decision with no Status after it", GOAL + status("none") + PLAN + DECISION, "deny"),
     ("a later Status that revokes", GOAL + status(ALL) + PLAN + status("none"), "deny"),
     ("a later Status that grants", GOAL + status("none") + PLAN + status(ALL), "allow"),
+]
+# Scoped grants over one plan split into WO-1 and WO-2 (WO-9). Every deny
+# keeps the rest of the reference genuine, so the named defect decides.
+ONE = GOAL + status("none") + PLAN
+A1, A2 = target(1, "WO-1"), target(1, "WO-2")
+G1, G_ALL = scoped(1, "WO-1", T1), scoped(1, "all", T1)
+D1, D_ALL = decision(T1, A1), decision(T1, R1_AT)
+
+
+def granted(dec, grant, plan):
+    return ONE + dec + status(grant, plan)
+
+
+GATE_CASES += [
+    ("a grant Decision for r1 WO-1 and a Status for r1 WO-1", granted(D1, G1, A1), "allow"),
+    ("a grant Decision for all backing a narrower WO-1 grant", granted(D_ALL, G1, A1), "allow"),
+    ("an r1 all grant for WO-1 of a split plan", granted(D_ALL, G_ALL, A1), "allow"),
+    ("an r1 all grant for WO-2 of a split plan", granted(D_ALL, G_ALL, A2), "allow"),
+    ("a genuine grant kept after a later unrelated Decision",
+     granted(D1, G1, A1) + decision("2026-09-01T09:09:00Z", "AC2", kind="waiver") + status(G1, A1), "allow"),
+] + [
+    (f"a cited Decision of Type {kind!r} with a matching Timestamp and Covers", granted(decision(T1, A1, kind=kind), G1, A1),
+     "deny")
+    for kind in ("plan-approved", "waiver", "resolution", "re-lock", "park", "abandon", "Grant", "grant ", "approval", "")
+] + [
+    ("a cited Decision with no Type line", granted(decision(T1, A1, fields=f"Timestamp: {T1}\nCovers: {A1}\n"), G1, A1),
+     "deny"),
+    ("a Status citing a timestamp no entry has", granted(D1, scoped(1, "WO-1", "2026-09-01T09:07:01Z"), A1), "deny"),
+    ("a Status citing a plan entry's timestamp", granted(D1, scoped(1, "WO-1", "2026-09-01T09:05:00Z"), A1), "deny"),
+    ("a grant Decision only after the Status that cites it", ONE + status(G1, A1) + D1, "deny"),
+    ("a grant Decision under a suffixed heading", granted(decision(T1, A1, heading="## Decision (grant)"), G1, A1), "deny"),
+    ("a Covers: line borrowed from the next entry",
+     granted(decision(T1, A1, fields=f"Timestamp: {T1}\nType: grant\n") + f"## Recon (cont.)\nCovers: {A1}\n\n", G1, A1),
+     "deny"),
+    ("a Type: line borrowed from the next entry",
+     granted(decision(T1, A1, fields=f"Timestamp: {T1}\nCovers: {A1}\n") + "## Recon (cont.)\nType: grant\n\n", G1, A1),
+     "deny"),
+    ("a Timestamp: line borrowed from the next entry",
+     granted(decision(T1, A1, fields=f"Type: grant\nCovers: {A1}\n") + f"## Recon (cont.)\nTimestamp: {T1}\n\n", G1, A1),
+     "deny"),
+    ("Type: grant quoted as prose in a plan-approved Decision",
+     granted(decision(T1, A1, fields=f"Timestamp: {T1}\nType: plan-approved\nCovers: {A1}\nNote: Type: grant\n"
+                                     "- Type: grant\n  Type: grant\n"), G1, A1), "deny"),
+    ("a cited Decision with no Covers line", granted(decision(T1, A1, fields=f"Timestamp: {T1}\nType: grant\n"), G1, A1),
+     "deny"),
+    ("a cited Decision with two Type lines",
+     granted(decision(T1, A1, fields=f"Timestamp: {T1}\nType: grant\nType: grant\nCovers: {A1}\n"), G1, A1), "deny"),
+    ("a cited Decision with two Covers lines",
+     granted(decision(T1, A1, fields=f"Timestamp: {T1}\nType: grant\nCovers: {A1}\nCovers: {A1}\n"), G1, A1), "deny"),
+    ("a cited Decision with two Timestamp lines",
+     granted(decision(T1, A1, fields=f"Timestamp: {T1}\nTimestamp: {T1}\nType: grant\nCovers: {A1}\n"), G1, A1),
+     "deny"),
+    ("a cited Decision with a malformed Covers line", granted(decision(T1, "r1 WO-1"), G1, A1), "deny"),
+    ("two grant Decisions with the cited timestamp", granted(D1 + D1, G1, A1), "deny"),
+    ("a grant and a plan-approved Decision with the cited timestamp",
+     granted(D1 + decision(T1, A1, kind="plan-approved"), G1, A1), "deny"),
+    ("an r2 Decision backing an r1 grant", granted(decision(T1, target(2, "WO-1")), G1, A1), "deny"),
+    ("a WO-2 Decision backing a WO-1 grant", granted(decision(T1, A2), G1, A1), "deny"),
+    ("a WO-1 Decision backing an all grant", granted(D1, G_ALL, A1), "deny"),
+    ("a WO-1 grant for a Status targeting WO-2", granted(D_ALL, G1, A2), "deny"),
+    ("a genuine r1 grant after a second plan revision", granted(D1, G1, A1) + PLAN + status(G1, A1), "deny"),
+    ("no Plan: line beside a scoped grant", granted(D1, G1, None), "deny"),
+    ("the template's Plan: placeholder beside a scoped grant", granted(D1, G1, PLAN_PLACEHOLDER), "deny"),
+    ("Plan: none beside a scoped grant", granted(D1, G1, "none"), "deny"),
+    ("a Plan: line for another revision", granted(D1, G1, target(2, "WO-1")), "deny"),
+    ("two Plan: lines", granted(D1, G1, A1 + "\nPlan: " + A1), "deny"),
+    ("two Grant: lines", granted(D1, G1 + "\nGrant: " + G1, A1), "deny"),
+] + [
+    (f"a malformed scoped Grant: {grant!r}", granted(D1, grant, A1), "deny")
+    for grant in (f"r1 WO-1 per Decision {T1}", f"r1 WO-1, per decision {T1}", f"r1  WO-1, per Decision {T1}",
+                  f"r1 WO-1, per Decision {T1} (the user's go)", "r1 WO-1", f"R1 WO-1, per Decision {T1}",
+                  "r1 WO-1, per Decision ", f"r01 WO-1, per Decision {T1}")
+] + [
+    (f"a malformed full-mode Grant: {grant!r}", GOAL + status("none") + PLAN + status(grant, R1_AT), "deny")
+    for grant in ("all revisions", "all revisions, full-mode request, WO-1", "all revisions, full-mode", "All revisions, "
+                  "full-mode request", "all revisions full-mode request", ALL + " ")
 ]
 SEED_VERDICTS = [("s1", "deny"), ("s2", "allow"), ("s2b", "deny"), ("s2c", "allow"), ("s3", "allow"),
                  ("s4", "deny"), ("s5", "allow"), ("s5b", "allow"), ("s6a", "allow"), ("run-parked", "deny"),
@@ -3153,6 +3288,7 @@ RELOCK = (
     "## Decision\nTimestamp: 2026-09-01T09:08:00Z\nType: re-lock\nCovers: criterion 2\n"
     "User's words: \"change it\"\n\n"
 )
+RESOLUTION = decision("2026-09-01T09:11:00Z", "## Recon (cont.), Timestamp: 2026-09-01T09:09:00Z", kind="resolution")
 # (name, log, executor verdict, verdict for the other held agents)
 HOLD_CASES = [
     ("a log that ends in a needs-human: blocker", GOAL + status(ALL) + PLAN_NH, "hold", "hold"),
@@ -3172,12 +3308,24 @@ HOLD_CASES = [
     ("needs-human: text outside a BLOCKER: block",
      GOAL + status(ALL) + PLAN.replace("Tasks.", "Tasks. The PM weighed a `BLOCKER:` block.\n- needs-human: none"),
      "allow", "allow"),
+    # A resolution releases the hold and grants nothing, and it leaves an
+    # earlier genuine scoped grant in force.
+    ("a needs-human: blocker after a genuine scoped grant", granted(D1, G1, A1) + RECON_NH, "hold", "hold"),
+    ("a resolution and a Status after a blocker under a scoped grant",
+     granted(D1, G1, A1) + RECON_NH + RESOLUTION + status(G1, A1), "allow", "allow"),
+    ("a resolution with no Status after it, under a scoped grant", granted(D1, G1, A1) + RECON_NH + RESOLUTION,
+     "allow", "allow"),
+    ("a resolution that releases a hold under Grant: none", GOAL + status("none") + PLAN_NH + RESOLUTION + status("none"),
+     "deny", "allow"),
+    ("a resolution cited as the grant", GOAL + status("none") + PLAN_NH + RESOLUTION
+     + status(scoped(1, "WO-1", "2026-09-01T09:11:00Z"), A1), "deny", "allow"),
 ]
 shells = [sh for sh in ("sh", "dash", "bash") if shutil.which(sh)]
 if "sh" not in shells:
     fail("check 8c needs sh, which runs the hook on every host")
 gate_path = os.path.abspath(GATE)
 gate_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+gate_reasons = set()
 
 
 def gate(shell, payload, cwd):
@@ -3193,6 +3341,8 @@ def gate(shell, payload, cwd):
               and run.stdout.count("\n") == 1)
     except (ValueError, KeyError, TypeError):
         ok, reason = False, ""
+    if ok:
+        gate_reasons.add(reason)
     if ok and HOLD_REASON in reason:
         return "hold"
     if not ok or "## Status" not in reason:
@@ -3271,10 +3421,13 @@ with tempfile.TemporaryDirectory() as tmp:
             fail(f"check 8c: {FIXTURES}{seed}.log.md has no ## PM — Plan entry with an Attempt: line")
         latest = int(plan_attempts[-1])
         for revision in range(1, latest + 2):
-            grant = f"r{revision} all, per Decision 2026-09-01T09:07:00Z"
+            at = f"2026-12-31T00:00:{revision:02d}Z"
+            if at in seed_text:
+                fail(f"check 8c: {FIXTURES}{seed}.log.md already holds the timestamp {at} its revision cases add")
             expected = "allow" if revision == latest else "deny"
             with open(log, "w", encoding="utf-8") as handle:
-                handle.write(seed_text.rstrip("\n") + "\n\n" + status(grant))
+                handle.write(seed_text.rstrip("\n") + "\n\n" + decision(at, target(revision, "all"))
+                             + status(scoped(revision, "all", at), target(revision, "all")))
             for shell in shells:
                 got = gate(shell, payload("compute-squad:" + executors[0], repo), tmp)
                 checked += 1
@@ -3319,14 +3472,19 @@ with tempfile.TemporaryDirectory() as tmp:
         checked += 1
         if run.returncode != 0 or ("deny" if run.stdout else "allow") != expected:
             fail(f"{GATE}: outside a git repository, a log in cwd with {text.splitlines()[-2]!r} must {expected}")
+unfixed = sorted(r for r in gate_reasons if not r.startswith("compute-squad: ") or r[len("compute-squad: "):] not in read(GATE))
+if unfixed or len(gate_reasons) > 5:
+    fail(f"{GATE} must deny with its own fixed reasons, never text built from the log; got {sorted(gate_reasons)!r}")
 
 print(
     f"PASS: check 8: {GATE} is wired once in {CLAUDE_PLUGIN} for Agent and Task and made {checked} decisions as "
     f"specified under {', '.join(shells)}: {', '.join(executors)} denied without a grant for the current plan "
     f"revision, with and without the compute-squad: prefix, and over the live seeds "
     f"{', '.join(f'{seed} {verdict}' for seed, verdict in SEED_VERDICTS)}; allowed only for the latest plan's "
-    f"Attempt: number over {', '.join(ATTEMPT_SEEDS)}; {', '.join(executors + held)} held while a "
-    f"needs-human: blocker has no ## Decision after it; and {HOLD_EXEMPT} always allowed"
+    f"Attempt: number over {', '.join(ATTEMPT_SEEDS)}; a scoped grant only with one earlier Decision of Type grant "
+    f"covering its revision and work order and a concrete Plan: line, over {len(GATE_CASES)} named logs; "
+    f"{', '.join(executors + held)} held while a needs-human: blocker has no ## Decision after it; "
+    f"{HOLD_EXEMPT} always allowed; and {len(gate_reasons)} fixed deny reasons"
 )
 
 # ---- 8d: the archive command and the closing archive (findings 3, 11, and

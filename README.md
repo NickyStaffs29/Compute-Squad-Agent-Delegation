@@ -20,7 +20,7 @@ Or from inside a Claude Code session:
 /plugin install compute-squad@compute-squad
 ```
 
-That's everything: all seven squad agents, the orchestration skill, and the `/squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
+That's everything: all seven squad agents, the orchestration skill, and the `/compute-squad:squad` command install together. The first run in a project asks you once to trust the plugin's agents and skill. Answer it and it does not come back.
 
 **Codex.** Prerequisites: Codex CLI 0.144 or newer, a working `git`, `python3`, `/bin/bash`, and a logged-in Codex CLI. Install from a clean checkout, in a terminal:
 
@@ -41,12 +41,12 @@ If an earlier release installed `compute-squad@compute-squad` from the GitHub ma
 **Claude Code:**
 
 ```
-/squad add rate limiting to the password-reset endpoint
+/compute-squad:squad add rate limiting to the password-reset endpoint
 ```
 
 Or say any of: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `full pipeline on this`.
 
-Modes: `/squad plan <goal>` stops after the plan with no product edits. `/squad execute WO-1` runs one work order of the plan in the log, records your command as its grant, and accepts it. `/squad accept` reviews an implementation made elsewhere against that plan. Plain `/squad <goal>` runs the full pipeline, and the request itself is the execution grant.
+Modes: `/compute-squad:squad plan <goal>` stops after the plan with no product edits. `/compute-squad:squad execute WO-1` runs one work order of the plan in the log, records your command as its grant, and accepts it. `/compute-squad:squad accept` reviews an implementation made elsewhere against that plan. Plain `/compute-squad:squad <goal>` runs the full pipeline, and the request itself is the execution grant.
 
 **Codex:**
 
@@ -273,7 +273,7 @@ Compute-Squad-Agent-Delegation/
 │   ├── squad-helper.md       # delegated execution-tier subtasks
 │   └── squad-mech.md         # bottom rung · the intern
 ├── commands/
-│   └── squad.md              # /squad [plan|execute|accept] <goal>: starts at Stage 0
+│   └── squad.md              # /compute-squad:squad [plan|execute|accept] <goal>: starts at Stage 0
 ├── codex/
 │   ├── README.md             # Codex install, routing, and manual fallback
 │   ├── agents/*.toml         # generated Codex agent definitions

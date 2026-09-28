@@ -194,7 +194,7 @@ class HookRegressionTests(unittest.TestCase):
         self.repo = Path(self.temp.name)
         self.transcript = self.repo / "transcript.jsonl"
         self.transcript.write_text(self.message("old", 100))
-        (self.repo / "COMPUTE_SQUAD_LOG.md").write_text("Run: regression\n## PM — Plan\n## Status\nGrant: r1 all\n")
+        (self.repo / "COMPUTE_SQUAD_LOG.md").write_text("Run: regression\n## PM — Plan\n## Status\nGrant: all revisions, full-mode request\n")
 
     def message(self, ident, tokens):
         return json.dumps({"type": "assistant", "timestamp": "2026-09-25T10:00:00Z", "message": {
