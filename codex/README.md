@@ -117,7 +117,7 @@ Assumptions: <only for unattended runs; otherwise "none">
 Sessions 2 through 5 read the goal and acceptance criteria from that entry — nothing to fill in on
 their end.
 
-**Modes and grants.** A `plan` run is sessions 1 to 3 only. You write the `## Status` and `## Decision` entries yourself: a `## Status` right after the Goal entry, and another after every stage entry and decision (after a re-lock decision, only once its new Goal entry follows it). Paste `04-execute.md` only when the latest `## Status` grants the plan revision and work order you are about to execute.
+**Modes and grants.** A `plan` run is sessions 1 to 3 only. You write the `## Status` and `## Decision` entries yourself: a `## Status` right after the Goal entry, and another after every stage entry and decision (after a re-lock decision, only once its new Goal entry follows it). Paste `04-execute.md` only when the latest `## Status` grants the plan revision and work order you are about to execute. A scoped `Grant: r<N> <G>, per Decision <T>` grants execution only when N is the governing plan revision, the same `## Status` reads `Plan: r<N>, work order <P>`, and the one `## Decision` with `Timestamp: <T>` comes before that Status and reads `Type: grant` and `Covers: r<N>, work order <D>`, where D is G or `all` and G is P or `all`. No other Decision type grants execution, and only the exact `Grant: all revisions, full-mode request` needs no Decision.
 
 ```markdown
 ## Status

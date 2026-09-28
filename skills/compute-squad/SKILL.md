@@ -123,7 +123,7 @@ Covers: <plan revision and work order, criterion ID, or pending heading and Time
 User's words: "<verbatim>"
 ```
 
-Spawn an executor only when the latest `## Status` grants the plan revision and work order about to run. A new plan revision voids a grant made for an earlier one, except in `full` mode. Never ask for a grant the log already records. A grant covers only the work orders it names: after their verdict, append a `## Status` and stop. On Claude Code a PreToolUse hook refuses an executor spawn whose plan revision the latest `## Status` does not grant; on Codex this rule is prose, checked by reading the log.
+Spawn an executor only when the latest `## Status` grants the plan revision and work order about to run. A scoped `Grant: r<N> <G>, per Decision <T>` grants execution only when N is the governing plan revision, the same `## Status` reads `Plan: r<N>, work order <P>`, and the one `## Decision` with `Timestamp: <T>` comes before that Status and reads `Type: grant` and `Covers: r<N>, work order <D>`, where D is G or `all` and G is P or `all`. No other Decision type grants execution, and only the exact `Grant: all revisions, full-mode request` needs no Decision. A new plan revision voids a grant made for an earlier one, except in `full` mode. Never ask for a grant the log already records. A grant covers only the work orders it names: after their verdict, append a `## Status` and stop. On Claude Code a PreToolUse hook refuses an executor spawn whose plan revision the latest `## Status` does not grant; on Codex this rule is prose, checked by reading the log.
 
 ## Resume and handoff
 
