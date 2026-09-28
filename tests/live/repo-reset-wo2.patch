@@ -1,0 +1,57 @@
+diff --git a/src/server/auth/__tests__/reset.routes.test.js b/src/server/auth/__tests__/reset.routes.test.js
+index 910fc7e..416a23c 100644
+--- a/src/server/auth/__tests__/reset.routes.test.js
++++ b/src/server/auth/__tests__/reset.routes.test.js
+@@ -49,7 +49,7 @@ test('a known and an unknown address log the same event, with no address or toke
+   const { app, reset } = setup();
+   reset('ada@example.com');
+   reset('nobody@example.com');
+-  assert.deepEqual(app.log.events, [{ code: 'reset_requested' }, { code: 'reset_requested' }]);
++  assert.deepEqual(app.log.events, [{ code: 'reset_request_received' }, { code: 'reset_request_received' }]);
+   const logged = JSON.stringify(app.log.events);
+   assert.ok(!logged.includes('@'));
+   assert.ok(!logged.includes(app.outbox[0].token));
+@@ -86,3 +86,18 @@ test('a request 60 seconds after the last token creates a token and sends the em
+   assert.equal(app.outbox.length, 2);
+   assert.equal(app.store.listResetTokens(1).length, 2);
+ });
++
++test('a send, a refusal inside the cooldown, and an unknown address log the same single event', () => {
++  const { app, clock, reset } = setup();
++  const logged = (email) => {
++    const before = app.log.events.length;
++    reset(email);
++    return app.log.events.slice(before);
++  };
++  const event = [{ code: 'reset_request_received' }];
++  assert.deepEqual(logged('ada@example.com'), event);
++  clock.advance(1000);
++  assert.deepEqual(logged('ada@example.com'), event);
++  assert.deepEqual(logged('nobody@example.com'), event);
++  assert.equal(app.outbox.length, 1);
++});
+diff --git a/src/server/auth/reset.service.js b/src/server/auth/reset.service.js
+index 9a856b3..100d024 100644
+--- a/src/server/auth/reset.service.js
++++ b/src/server/auth/reset.service.js
+@@ -13,7 +13,7 @@ function hashToken(token) {
+ // Logs every request alike, then emails a known account a reset link.
+ // Unknown addresses get the same result and the same log event, no email.
+ function requestPasswordReset({ store, log, outbox, clock }, email) {
+-  log.event('reset_requested');
++  log.event('reset_request_received');
+   const account = store.findAccountByEmail(email);
+   if (!account) {
+     return GENERIC_RESULT;
+diff --git a/src/server/log.js b/src/server/log.js
+index a645f20..4976ad5 100644
+--- a/src/server/log.js
++++ b/src/server/log.js
+@@ -1,6 +1,6 @@
+ // Structured log events. An event is a known code plus ids, never an email
+ // address or a token; an unknown code throws so a typo cannot ship.
+-const EVENT_CODES = Object.freeze(['reset_requested']);
++const EVENT_CODES = Object.freeze(['reset_request_received']);
+
+ function createLogger() {
+   const events = [];

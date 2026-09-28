@@ -32,7 +32,10 @@
 #
 # Each scenario:
 #   1. copies its fixture repo into a temp dir: tests/fixtures/repo-reset/, the
-#      password-reset fixture that mirrors docs/example-log.md, or, for S5 and
+#      password-reset fixture that mirrors docs/example-log.md and honors its
+#      own CLAUDE.md (every reset request, known address or not, logs the same
+#      reset_requested event, so no log line reveals whether an account
+#      exists, as the <cooldown goal>'s criterion repeats), or, for S5 and
 #      S5b, tests/fixtures/repo-ui/, a pricing page whose unit tests pass and
 #      whose browser check (npm run check:overflow) reports a 624px table
 #      overflowing a 390px viewport; npm test passes in both;
@@ -48,8 +51,12 @@
 #      defects for its audit to find. S3a, S3b, S4, and S4b then apply their
 #      scenario's patches and commit them, so HEAD moves past the seed's Base:
 #      (commit B for S3, the external implementation C for S4), and a prompt's
-#      <C> becomes that commit's short SHA. S5b makes an empty browser
-#      directory and sets PLAYWRIGHT_BROWSERS_PATH to it for the claude call.
+#      <C> becomes that commit's short SHA. S5b runs check_live.py
+#      nobrowser, which puts a Playwright stand-in whose Chromium never starts
+#      in the repo's node_modules (git-excluded), so the fixture's browser
+#      check, which loads the project's Playwright first, cannot run whatever
+#      the environment says; the claude call also gets an empty
+#      PLAYWRIGHT_BROWSERS_PATH, an empty npm global prefix, and npm offline.
 #      S6b runs check_live.py collide, which writes a date that always reports
 #      one second and an earlier archive at the name the archive command gives
 #      the seeded log at that second, and puts that date first on the claude
@@ -59,12 +66,20 @@
 #   4. runs each turn's prompt (a second turn resumes the first turn's
 #      session) and checks subagent_stats.by_type, permission_denials, the
 #      usage ledger against modelUsage, the log's new entries, the product
-#      tree against A, and the archive files' sha256. Each claude call also
-#      gets, through --settings, a PreToolUse hook with no matcher that
+#      tree against A, and the archive files' sha256. Each claude call loads
+#      project settings only (--setting-sources project), so no user or local
+#      setting, and so no user-installed copy of the plugin, reaches it; this
+#      checkout loads through --plugin-dir. Each call also
+#      gets, through --settings, two PreToolUse hooks with no matcher: one
 #      appends every tool call, the main session's and each subagent's, to a
-#      hook log (check_live.py toollog; it prints nothing and always exits 0).
-#      S8 reads it for the Stage 0 bound and the spawn pointer, and S9 for
-#      its skeptic spawns. A
+#      hook log (check_live.py toollog; it prints nothing and always exits 0),
+#      and the candidate fence (check_live.py fence) blocks any call that
+#      names Compute Squad files outside this checkout. Every turn's check
+#      proves the candidate was the one used: the init message --verbose
+#      prints lists one compute-squad plugin, at this checkout; no call in the
+#      hook log names another copy; and a first turn loads the checkout's
+#      skill. S8 reads the hook log for the Stage 0 bound and the spawn
+#      pointer, and S9 for its skeptic spawns. A
 #      scenario stops at its first failing turn, so a broken run does not
 #      keep spending.
 # Results, one directory per scenario run, stay in --out: each turn's
@@ -88,6 +103,10 @@ RESUME='Resume the squad run.'
 # A second goal for the one-active-run scenario (finding 11).
 OTHER_GOAL='Add an X-Request-Id header to every API response. Acceptance criteria: every response carries an X-Request-Id header; npm test passes.'
 ACCEPT_C='The external implementation of WO-1 is commit <C>. Accept it.'
+# The plugin's command by its full name. Under -p the Claude CLI resolves a
+# prompt's leading slash command itself, and a plugin command answers only to
+# <plugin>:<command>; a bare /squad would end the call as an unknown command.
+SQUAD=/compute-squad:squad
 # Section 6's words for S5 and S6a.
 CONTINUE='Continue the squad run.'
 CONTINUE_SHORT='Continue.'
@@ -112,9 +131,9 @@ scenario() {
   PREFLIGHT=
   case $1 in
     s1)
-      DESC='S1: /squad plan, then "plan approved": mech, recon and pm only, no product edits, a plan-approved Decision, no grant'
+      DESC='S1: /compute-squad:squad plan, then "plan approved": mech, recon and pm only, no product edits, a plan-approved Decision, no grant'
       SEED=s1
-      PROMPTS=("/squad plan $GOAL" "$APPROVE")
+      PROMPTS=("$SQUAD plan $GOAL" "$APPROVE")
       CHECKS=(s1-plan s1-approve) ;;
     s1n)
       DESC='S1, natural-language variant (finding 1): the same run asked for in plain words'
@@ -138,9 +157,9 @@ scenario() {
       PROMPTS=("$RESUME")
       CHECKS=(s2c) ;;
     s2o)
-      DESC='Second run (finding 11): /squad with another goal over the open S2 run spawns nothing, archives nothing, and leaves the log as it was'
+      DESC='Second run (finding 11): /compute-squad:squad with another goal over the open S2 run spawns nothing, archives nothing, and leaves the log as it was'
       SEED=s2
-      PROMPTS=("/squad $OTHER_GOAL")
+      PROMPTS=("$SQUAD $OTHER_GOAL")
       CHECKS=(s2o) ;;
     s3a)
       DESC='S3a: commit B edits src/server/db/store.js, which the plan names; resuming re-maps it and writes plan r2, and no executor runs without a new grant'
@@ -193,11 +212,11 @@ scenario() {
       PROMPTS=("$CONTINUE_SHORT")
       CHECKS=(s6a) ;;
     s6b)
-      DESC='S6b: a date shim makes the Stage 1 archive name collide with an existing archive; /squad with a new goal over the parked log gets ARCHIVE FAILED, and the old archive and the log keep their sha256'
+      DESC='S6b: a date shim makes the Stage 1 archive name collide with an existing archive; /compute-squad:squad with a new goal over the parked log gets ARCHIVE FAILED, and the old archive and the log keep their sha256'
       SEED=run-parked
       SETUP=date-shim
       PREFLIGHT=1
-      PROMPTS=("/squad $OTHER_GOAL")
+      PROMPTS=("$SQUAD $OTHER_GOAL")
       CHECKS=(s6b) ;;
     s7b)
       DESC='S7b: three FAILs are logged; resuming spawns nothing, appends nothing, and names the three-FAIL stop'
@@ -205,9 +224,9 @@ scenario() {
       PROMPTS=("$RESUME")
       CHECKS=(s7b) ;;
     s8)
-      DESC='S8 (WO-3f): the reference run, /squad <goal> on an empty log, to a PASS: before its first squad-recon spawn the main session reads no product source and runs no test, every stage spawn prompt is the five-line pointer (hook log), and its billed input and output stay within 756,000 and 12,400 tokens'
+      DESC='S8 (WO-3f): the reference run, /compute-squad:squad <goal> on an empty log, to a PASS: before its first squad-recon spawn the main session reads no product source and runs no test, every stage spawn prompt is the five-line pointer (hook log), and its billed input and output stay within 756,000 and 12,400 tokens'
       SEED=s1
-      PROMPTS=("/squad $GOAL")
+      PROMPTS=("$SQUAD $GOAL")
       CHECKS=(s8) ;;
     s9)
       DESC='S9 (WO-3f): the WO-1 change carries about 30 planted defects and the log says run the audit, then stop before acceptance; resuming runs the finders, at most 10 skeptics, and one ## Audit Findings entry whose other findings read UNREVIEWED'
@@ -259,7 +278,7 @@ if [ "$MODE" = list ]; then
       setup="$setup as '$COMMIT_MSG'"
     fi
     case $SETUP in
-      no-browser) setup="$setup, with PLAYWRIGHT_BROWSERS_PATH set to an empty directory" ;;
+      no-browser) setup="$setup, with a Playwright stand-in whose Chromium never starts, an empty PLAYWRIGHT_BROWSERS_PATH, and an empty, offline npm prefix" ;;
       date-shim) setup="$setup, with a date shim fixing the clock and an archive already at the name it gives the log" ;;
     esac
     printf '%-4s %s\n     seed tests/fixtures/logs/%s.log.md%s; turns: %s\n' "$name" "$DESC" "$SEED" "$setup" "${CHECKS[*]}"
@@ -315,35 +334,44 @@ step() {
   fi
 }
 
-# settings_json <hook log>: the --settings value. It turns off an installed
-# copy of the plugin, so only this checkout loads (--plugin-dir), and adds the
-# hook log: a PreToolUse hook with no matcher that runs check_live.py toollog
-# on every tool call. The hook's output goes nowhere and a failure exits 0, so
-# it never blocks or changes a call.
+# settings_json <hook log>: the --settings value: two PreToolUse hooks with
+# no matcher, on every tool call. The hook log runs check_live.py toollog; its
+# output goes nowhere and a failure exits 0, so it never blocks or changes a
+# call. The candidate fence runs check_live.py fence on this checkout: it
+# blocks a call that names Compute Squad files outside the checkout (another
+# copy's skill, agents, command or manifest, or Claude Code's installed-plugin
+# store), so no installed copy can stand in for the candidate.
 settings_json() {
-  "$PYTHON" - "$CHECK" "$1" <<'PYEOF'
+  "$PYTHON" - "$CHECK" "$1" "$ROOT" <<'PYEOF'
 import json, shlex, sys
-check, log = sys.argv[1:3]
+check, log, root = sys.argv[1:4]
 hook = " ".join(shlex.quote(part) for part in (sys.executable, check, "toollog", log)) + " >/dev/null 2>&1 || true"
-print(json.dumps({"enabledPlugins": {"compute-squad@compute-squad": False},
-                  "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": hook}]}]}},
+fence = " ".join(shlex.quote(part) for part in (sys.executable, check, "fence", root))
+print(json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": hook},
+                                                      {"type": "command", "command": fence}]}]}},
                  separators=(",", ":")))
 PYEOF
 }
 
 # claude_cmd <prompt> <session or empty> <hook log>: the section 6
-# invocation, in CMD, with the hook log in its --settings.
+# invocation, in CMD, with the hook log and the candidate fence in its
+# --settings.
+# --setting-sources project loads no user or local settings file, so an
+# installed copy of the plugin, and the user's hooks and permissions, stay
+# out of the scenario; --plugin-dir loads this checkout. --verbose makes the
+# JSON every message the call printed, so verify can read the init message's
+# list of loaded plugins and the skills the transcript loads.
 # Task joins Agent in --allowedTools because Claude Code 2.1.282 names the
-# spawn tool Task. Skill must stay: under -p that CLI passes "/squad ..." to
-# the model as text, and the model loads the plugin command through the Skill
-# tool. --model and --max-budget-usd are added only when given.
+# spawn tool Task. Skill must stay: the model loads the compute-squad skill
+# through the Skill tool. --model and --max-budget-usd are added only when
+# given.
 claude_cmd() {
   local settings
   settings=$(settings_json "$3") || die "cannot build the --settings value with $PYTHON"
   CMD=()
   [ ${#RUN_ENV[@]} -eq 0 ] || CMD=(env "${RUN_ENV[@]}")
-  CMD+=("$CLAUDE_BIN" -p "$1" --output-format json --plugin-dir "$ROOT"
-    --settings "$settings"
+  CMD+=("$CLAUDE_BIN" -p "$1" --output-format json --verbose --plugin-dir "$ROOT"
+    --setting-sources project --settings "$settings"
     --permission-mode acceptEdits)
   [ -z "$MODEL" ] || CMD+=(--model "$MODEL")
   [ -z "$BUDGET" ] || CMD+=(--max-budget-usd "$BUDGET")
@@ -397,8 +425,10 @@ run_scenario() {
   fi
   case $SETUP in
     no-browser)
-      step mkdir -p "$dir/no-browsers" || return 2
-      RUN_ENV=("PLAYWRIGHT_BROWSERS_PATH=$dir/no-browsers") ;;
+      step "$PYTHON" "$CHECK" nobrowser "$repo" || return 2
+      step mkdir -p "$dir/no-browsers" "$dir/no-npm-global" || return 2
+      RUN_ENV=("PLAYWRIGHT_BROWSERS_PATH=$dir/no-browsers" "NPM_CONFIG_PREFIX=$dir/no-npm-global"
+        "NPM_CONFIG_OFFLINE=true") ;;
     date-shim)
       step "$PYTHON" "$CHECK" collide "$repo" "$dir/shim" || return 2
       RUN_ENV=("PATH=$dir/shim:$PATH") ;;
@@ -439,8 +469,7 @@ run_scenario() {
       | tee "$dir/turn$turn.check.txt" | sed 's/^/    /'
     rc=$?
     [ "$rc" -eq 0 ] || { printf '    stopping %s here; later turns skipped\n' "$name"; return "$rc"; }
-    session=$("$PYTHON" -c 'import json, sys; print(json.load(open(sys.argv[1])).get("session_id") or "")' \
-      "$dir/turn$turn.json" 2>/dev/null)
+    session=$("$PYTHON" "$CHECK" session "$dir/turn$turn.json" 2>/dev/null)
     if [ -z "$session" ] && [ "$turn" -lt ${#PROMPTS[@]} ]; then
       printf '    no session_id in turn %s; later turns skipped\n' "$turn"
       return 1

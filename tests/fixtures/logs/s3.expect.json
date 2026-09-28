@@ -24,6 +24,10 @@
     {
       "file": "skills/compute-squad/SKILL.md",
       "text": "A new plan revision voids a grant made for an earlier one, except in `full` mode."
+    },
+    {
+      "file": "agents/squad-recon.md",
+      "text": "For a moved-base rerun, re-read only the paths the latest Status names and the code that imports or calls what changed in them (find those callers with Grep). Copy every other map, caller, test, invariant, and goal-fact line from the prior entry into a complete updated map without re-reading its files."
     }
   ],
   "lint": {

@@ -24,6 +24,10 @@
     {
       "file": "skills/compute-squad/SKILL.md",
       "text": "A grant covers only the work orders it names: after their verdict, append a `## Status` and stop."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "When a criterion names a command, only that command, run as named, produces its evidence: another command, tool, or reading of the code never stands in for it."
     }
   ],
   "lint": {

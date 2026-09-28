@@ -8,7 +8,7 @@ Acceptance criteria:
 - AC1: A second reset request for the same account within 60 seconds of the first sends no new email and creates no new token row.
 - AC2: A reset request 60 seconds or more after the account's newest token creates a new token and sends the email as normal.
 - AC3: No response or log reveals whether an account exists (existing invariant preserved).
-- AC4: A request refused by the cooldown logs the event code reset_cooldown_hit with the account id and no address.
+- AC4: The reset_requested event is renamed reset_request_received: every well-formed reset request logs exactly one { code: "reset_request_received" } event, the same for a known account's send, a cooldown refusal, and an unknown address, with no account id, address, token, or outcome field.
 - AC5: npm test passes.
 Out of scope: per-IP throttling; admin-triggered resets (different service path).
 Assumptions: none
@@ -34,10 +34,10 @@ Checks:
 - `npm test` -> exit 0; tests 6, pass 6, fail 0; tree changed: no
 Map:
 - src/server/auth/auth.routes.js:6-13 registerAuthRoutes: POST /api/auth/reset-request answers 400 for a missing email, otherwise 200 with requestPasswordReset()'s result (line 11)
-- src/server/auth/reset.service.js:14-29 requestPasswordReset: "function requestPasswordReset({ store, log, outbox, clock }, email) {"; an unknown address gets GENERIC_RESULT (line 17); a known one gets a hashed token row (lines 21-25), an email through sendEmail() (line 26), and a reset_email_sent event with the account id (line 27)
+- src/server/auth/reset.service.js:14-29 requestPasswordReset: "function requestPasswordReset({ store, log, outbox, clock }, email) {"; every call first logs a reset_requested event with no fields (line 15); an unknown address then gets GENERIC_RESULT (line 18); a known one gets a hashed token row (lines 22-26) and an email through sendEmail() (line 27)
 - src/server/auth/reset.service.js:3-6 GENERIC_RESULT: "const GENERIC_RESULT = Object.freeze({", module-private, not exported
 - src/server/db/store.js:23-27 listResetTokens(accountId): an account's password_reset_tokens rows, oldest first; createdAt is epoch milliseconds from the injected clock
-- src/server/log.js:3 EVENT_CODES: "const EVENT_CODES = Object.freeze(['reset_email_sent']);"; event() throws on any other code (lines 11-13)
+- src/server/log.js:3 EVENT_CODES: "const EVENT_CODES = Object.freeze(['reset_requested']);"; event() throws on any other code (lines 11-13)
 - src/server/email/send.js:2-7 sendEmail: pushes the mail to the outbox
 - src/server/middleware/rateLimit.js:2 createRateLimiter: the global IP limiter, 300 requests per IP per 5 minutes; there is no per-account throttle
 Callers:
@@ -45,13 +45,13 @@ Callers:
 Tests:
 - src/server/auth/__tests__/reset.routes.test.js: 6 cases through setup() (lines 8-14), run by npm test ("node --test"); the suite's clock helper is createFakeClock() in src/server/clock.js:5-13
 Invariants:
-- CLAUDE.md:3 "Auth responses are generic: no status code, body, or log line may reveal whether an account exists.": at risk: a refused request must return GENERIC_RESULT so every response stays identical
-- CLAUDE.md:4 "Log events carry an event code and ids only, never an email address or a reset token.": at risk: a new event carries the account id only
+- CLAUDE.md:3 "Auth responses are generic: no status code, body, or log line may reveal whether an account exists.": at risk: a refused request must return GENERIC_RESULT and log the one event every request logs, so no response or log line differs
+- CLAUDE.md:4 "Log events carry an event code and ids only, never an email address or a reset token.": at risk: the renamed event carries its code alone
 - CLAUDE.md:5 "Tests never use real timers or sleep; use createFakeClock from src/server/clock.js.": holds
 - CLAUDE.md:6 "No new dependencies: Node's standard library only.": holds
 Open for the PM:
 - the newest row from listResetTokens() gives the cooldown without a schema change
-- a new event code needs an EVENT_CODES entry, or event() throws
+- renaming the event code means renaming its EVENT_CODES entry, or event() throws
 
 ## Status
 Timestamp: 2026-09-02T09:04:40Z
@@ -79,7 +79,7 @@ refused request returns GENERIC_RESULT, so no response changes.
 WO-1, the cooldown (AC1, AC2, AC3 and AC5):
 1. src/server/auth/reset.service.js: after GENERIC_RESULT (line 6) add
    `const RESEND_COOLDOWN_MS = 60 * 1000;`. In requestPasswordReset(), after
-   the unknown-account return (lines 16-18), add
+   the unknown-account return (lines 17-19), add
    `const tokens = store.listResetTokens(account.id);`,
    `const newest = tokens[tokens.length - 1];` and
    `if (newest && clock.now() - newest.createdAt < RESEND_COOLDOWN_MS) { return GENERIC_RESULT; }`.
@@ -91,19 +91,19 @@ WO-1, the cooldown (AC1, AC2, AC3 and AC5):
    grace then sends (outbox 2). (b) ada requests, the clock advances 60 s, ada
    requests again: outbox 2, listResetTokens(1) 2 rows.
 
-WO-2, the cooldown event (AC4):
-3. src/server/log.js: add 'reset_cooldown_hit' to EVENT_CODES (line 3).
-4. src/server/auth/reset.service.js: in the cooldown branch, call
-   `log.event('reset_cooldown_hit', { accountId: account.id });` before the
-   return.
-5. src/server/auth/__tests__/reset.routes.test.js, test (c): a request inside
-   the cooldown logs exactly one reset_cooldown_hit event, with accountId 1 and
-   no '@' in any event.
+WO-2, the event rename (AC4):
+3. src/server/log.js: rename 'reset_requested' to 'reset_request_received' in EVENT_CODES (line 3).
+4. src/server/auth/reset.service.js: change the event requestPasswordReset()
+   logs before its account lookup to `log.event('reset_request_received');`,
+   with no fields, and add no other log call.
+5. src/server/auth/__tests__/reset.routes.test.js: expect the new code at line
+   52, and add test (c): a known account's send, its refused request inside the
+   cooldown, and an unknown address each log exactly [{ code: 'reset_request_received' }].
 
 Must NOT change: the status or body of any response, auth.routes.js,
 store.js, send.js, rateLimit.js, package.json. Verification plan: npm test
 (8 pass after WO-1, 9 after WO-2), and every log.event call in the diff passes
-only a code and accountId. Non-goals: per-IP throttling, admin-triggered
+only the code reset_request_received. Non-goals: per-IP throttling, admin-triggered
 resets. Risks: none material; the tests use the fake clock only.
 
 ## Status
@@ -176,4 +176,4 @@ Findings: 12; skeptics run: 10 (cap 10)
 - CONFIRMED src/server/auth/auth.routes.js:4 (medium): the route's comment says every well-formed request gets a reset link, which the cooldown no longer does. Evidence: auth.routes.js:3-5 predates the change; the skeptic read both.
 - REFUTED src/server/auth/__tests__/reset.routes.test.js:74 (medium): test (a) waits on a real timer. Evidence: lines 74-86 call clock.advance(59000) on createFakeClock() and grep finds no setTimeout in the file.
 - REFUTED src/server/auth/reset.service.js:8 (low): the new constant has no comment naming its unit. Evidence: the unit is in the name; line 8 reads "const RESEND_COOLDOWN_MS = 60 * 1000;".
-- UNREVIEWED src/server/log.js:3 (medium): EVENT_CODES has no reset_cooldown_hit, so logging the cooldown would throw. Evidence: log.js:3 reads "const EVENT_CODES = Object.freeze(['reset_email_sent']);".
+- UNREVIEWED src/server/log.js:3 (medium): EVENT_CODES has no reset_request_received, so logging the renamed event would throw. Evidence: log.js:3 reads "const EVENT_CODES = Object.freeze(['reset_requested']);".

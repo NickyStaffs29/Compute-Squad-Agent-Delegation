@@ -32,6 +32,10 @@
     {
       "file": "agents/squad-pm.md",
       "text": "A change the plan assigns to a later work order is scope creep even when it is inert and no \"must NOT change\" item names it, whether an executor or an implementation made outside the run added it: FAIL with `Rerun: Executor`, name the file and that work order in your evidence, and leave the change to that work order."
+    },
+    {
+      "file": "agents/squad-pm.md",
+      "text": "Each entry opens with one of those four headings exactly as written (only `## PM — Plan` may add ` (cont.)`), and no other line of it starts with `## `: write evidence as plain lines or bullets."
     }
   ],
   "lint": {

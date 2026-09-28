@@ -1,5 +1,5 @@
 diff --git a/src/server/auth/__tests__/reset.routes.test.js b/src/server/auth/__tests__/reset.routes.test.js
-index b2817aa..c25f741 100644
+index a9b13e6..910fc7e 100644
 --- a/src/server/auth/__tests__/reset.routes.test.js
 +++ b/src/server/auth/__tests__/reset.routes.test.js
 @@ -65,3 +65,24 @@ test('the global IP limiter allows 300 requests per IP per 5 minutes', () => {
@@ -28,7 +28,7 @@ index b2817aa..c25f741 100644
 +  assert.equal(app.store.listResetTokens(1).length, 2);
 +});
 diff --git a/src/server/auth/reset.service.js b/src/server/auth/reset.service.js
-index 661e700..37e4afe 100644
+index 3060aa1..9a856b3 100644
 --- a/src/server/auth/reset.service.js
 +++ b/src/server/auth/reset.service.js
 @@ -4,6 +4,7 @@ const GENERIC_RESULT = Object.freeze({
@@ -39,7 +39,7 @@ index 661e700..37e4afe 100644
  
  function hashToken(token) {
    return crypto.createHash('sha256').update(token).digest('hex');
-@@ -17,6 +18,12 @@ function requestPasswordReset({ store, log, outbox, clock }, email) {
+@@ -18,6 +19,12 @@ function requestPasswordReset({ store, log, outbox, clock }, email) {
      return GENERIC_RESULT;
    }
  

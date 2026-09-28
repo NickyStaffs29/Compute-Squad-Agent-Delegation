@@ -1,6 +1,6 @@
 // Structured log events. An event is a known code plus ids, never an email
 // address or a token; an unknown code throws so a typo cannot ship.
-const EVENT_CODES = Object.freeze(['reset_email_sent']);
+const EVENT_CODES = Object.freeze(['reset_requested']);
 
 function createLogger() {
   const events = [];

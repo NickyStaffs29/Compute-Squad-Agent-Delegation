@@ -33,7 +33,7 @@ Checks:
 - `npm test` -> exit 0; tests 6, pass 6, fail 0; tree changed: no
 Map:
 - src/server/auth/auth.routes.js:6-13 registerAuthRoutes: POST /api/auth/reset-request answers 400 for a missing email, otherwise 200 with requestPasswordReset()'s result (line 11)
-- src/server/auth/reset.service.js:14-29 requestPasswordReset: "function requestPasswordReset({ store, log, outbox, clock }, email) {"; an unknown address gets GENERIC_RESULT (line 17); a known one gets a hashed token row (lines 21-25), an email through sendEmail() (line 26), and a reset_email_sent event with the account id (line 27)
+- src/server/auth/reset.service.js:14-29 requestPasswordReset: "function requestPasswordReset({ store, log, outbox, clock }, email) {"; every call first logs a reset_requested event with no fields (line 15); an unknown address then gets GENERIC_RESULT (line 18); a known one gets a hashed token row (lines 22-26) and an email through sendEmail() (line 27)
 - src/server/auth/reset.service.js:3-6 GENERIC_RESULT: "const GENERIC_RESULT = Object.freeze({", module-private, not exported
 - src/server/db/store.js:23-27 listResetTokens(accountId): an account's password_reset_tokens rows, oldest first; createdAt is epoch milliseconds from the injected clock
 - src/server/email/send.js:2-7 sendEmail: pushes the mail to the outbox
@@ -43,7 +43,7 @@ Callers:
 Tests:
 - src/server/auth/__tests__/reset.routes.test.js: 6 cases through setup() (lines 8-14), run by npm test ("node --test"); the suite's clock helper is createFakeClock() in src/server/clock.js:5-13
 Invariants:
-- CLAUDE.md:3 "Auth responses are generic: no status code, body, or log line may reveal whether an account exists.": at risk: a refused request must return GENERIC_RESULT so every response stays identical
+- CLAUDE.md:3 "Auth responses are generic: no status code, body, or log line may reveal whether an account exists.": at risk: a refused request must return GENERIC_RESULT and log the one event every request logs, so no response or log line differs
 - CLAUDE.md:4 "Log events carry an event code and ids only, never an email address or a reset token.": holds: the goal adds no log event
 - CLAUDE.md:5 "Tests never use real timers or sleep; use createFakeClock from src/server/clock.js.": holds
 - CLAUDE.md:6 "No new dependencies: Node's standard library only.": holds
@@ -76,7 +76,7 @@ sits on the password-reset auth path, so the run is high-stakes.
 
 1. src/server/auth/reset.service.js: after GENERIC_RESULT (line 6) add
    `const RESEND_COOLDOWN_MS = 60 * 1000;`. In requestPasswordReset(), after
-   the unknown-account return (lines 16-18), add
+   the unknown-account return (lines 17-19), add
    `const tokens = store.listResetTokens(account.id);`,
    `const newest = tokens[tokens.length - 1];` and
    `if (newest && clock.now() - newest.createdAt < RESEND_COOLDOWN_MS) { return GENERIC_RESULT; }`.

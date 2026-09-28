@@ -1,5 +1,5 @@
 {
-  "note": "Live seed for section 6, S5's no-browser variant (S5b), in tests/live/run.sh, on tests/fixtures/repo-ui/ with PLAYWRIGHT_BROWSERS_PATH set to an empty directory, so the browser check AC2 names cannot run. Resuming spawns squad-recon, whose Checks: block names the missing browser and whose entry ends with a needs-human: blocker; the run stops there, before any plan or execution.",
+  "note": "Live seed for section 6, S5's no-browser variant (S5b), in tests/live/run.sh, on tests/fixtures/repo-ui/ with a Playwright stand-in whose Chromium never starts in the repo's node_modules (tests/live/check_live.py nobrowser), so the browser check AC2 names cannot run whatever the environment says. Resuming spawns squad-recon, whose Checks: block names the missing browser and whose entry ends with a needs-human: blocker; the run stops there, before any plan or execution.",
   "cites": [
     {
       "file": "agents/squad-recon.md",
@@ -12,6 +12,10 @@
     {
       "file": "skills/compute-squad/SKILL.md",
       "text": "A `needs-human:` blocker stops the pipeline: spawn or continue no stage until it is resolved."
+    },
+    {
+      "file": "agents/squad-recon.md",
+      "text": "When a criterion names a command, only that command, run as named, produces its evidence: another command, tool, or reading of the code never stands in for it."
     }
   ],
   "lint": {

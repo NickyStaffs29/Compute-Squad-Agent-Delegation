@@ -9,9 +9,10 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-// Creates a reset token for the account and emails the link. Unknown
-// addresses get the same result and no email.
+// Logs every request alike, then emails a known account a reset link.
+// Unknown addresses get the same result and the same log event, no email.
 function requestPasswordReset({ store, log, outbox, clock }, email) {
+  log.event('reset_requested');
   const account = store.findAccountByEmail(email);
   if (!account) {
     return GENERIC_RESULT;
@@ -24,7 +25,6 @@ function requestPasswordReset({ store, log, outbox, clock }, email) {
     createdAt: clock.now(),
   });
   sendEmail(outbox, { to: account.email, template: 'password-reset', token });
-  log.event('reset_email_sent', { accountId: account.id });
   return GENERIC_RESULT;
 }
 

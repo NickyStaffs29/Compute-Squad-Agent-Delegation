@@ -45,12 +45,12 @@ test('a request without an email is a 400', () => {
   assert.equal(app.outbox.length, 0);
 });
 
-test('no log event carries an address or a token', () => {
+test('a known and an unknown address log the same event, with no address or token', () => {
   const { app, reset } = setup();
   reset('ada@example.com');
   reset('nobody@example.com');
+  assert.deepEqual(app.log.events, [{ code: 'reset_requested' }, { code: 'reset_requested' }]);
   const logged = JSON.stringify(app.log.events);
-  assert.deepEqual(app.log.events.map((e) => e.code), ['reset_email_sent']);
   assert.ok(!logged.includes('@'));
   assert.ok(!logged.includes(app.outbox[0].token));
 });

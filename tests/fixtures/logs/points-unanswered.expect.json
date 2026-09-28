@@ -7,7 +7,7 @@
     },
     {
       "file": "agents/squad-executor.md",
-      "text": "`For acceptance:` numbers each point you are least sure of as F1, F2, and so on, or reads `none`; the PM answers each one."
+      "text": "`For acceptance:` numbers each point you are least sure of as F1, F2, and so on, one per line under the label; with no point, it is the one line `For acceptance: none`; the PM answers each one."
     }
   ],
   "lint": {

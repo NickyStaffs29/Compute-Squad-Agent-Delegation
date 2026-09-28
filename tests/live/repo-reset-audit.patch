@@ -14,7 +14,7 @@ index 0327490..2d125ff 100644
    "scripts": {
      "test": "node --test"
 diff --git a/src/server/auth/__tests__/reset.routes.test.js b/src/server/auth/__tests__/reset.routes.test.js
-index b2817aa..c55597b 100644
+index a9b13e6..a79d7c8 100644
 --- a/src/server/auth/__tests__/reset.routes.test.js
 +++ b/src/server/auth/__tests__/reset.routes.test.js
 @@ -1,3 +1,4 @@
@@ -46,12 +46,12 @@ index b2817aa..c55597b 100644
 +  assert.equal(app.outbox.length, 2);
 +});
 +
-+test.skip('a cooldown hit logs reset_cooldown_hit', () => {});
++test.skip('a cooldown refusal logs reset_request_received', () => {});
 diff --git a/src/server/auth/reset.service.js b/src/server/auth/reset.service.js
-index 661e700..c8ecebd 100644
+index 3060aa1..ca14a6e 100644
 --- a/src/server/auth/reset.service.js
 +++ b/src/server/auth/reset.service.js
-@@ -1,22 +1,67 @@
+@@ -1,23 +1,68 @@
 +// Password reset. Refuses a second request from the same IP within 30
 +// seconds.
  const crypto = require('node:crypto');
@@ -93,12 +93,13 @@ index 661e700..c8ecebd 100644
 +  return accountId;
 +}
 +
- // Creates a reset token for the account and emails the link. Unknown
- // addresses get the same result and no email.
+ // Logs every request alike, then emails a known account a reset link.
+ // Unknown addresses get the same result and the same log event, no email.
 +// @param {string} email - an address already trimmed and lower-cased
 +// @returns {{ status: number }} the HTTP status for the route
 +// @throws {CooldownError} when the account is inside the cooldown
  function requestPasswordReset({ store, log, outbox, clock }, email) {
+   log.event('reset_requested');
 +  if (DEBUG_RESET) {
 +    console.log(`[reset] request for ${email}`);
 +  }

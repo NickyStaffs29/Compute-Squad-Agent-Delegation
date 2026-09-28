@@ -5,10 +5,13 @@ run.sh calls this script; it never calls a model itself.
 
     check_live.py seed <seed.log.md> <repo> <base>
     check_live.py collide <repo> <shim dir>
+    check_live.py nobrowser <repo>
     check_live.py preflight <check> <repo>
     check_live.py snapshot <repo> <base> <state.json>
     check_live.py verify <check> <repo> <base> <state.json> <result.json> [--tools FILE] [--summary FILE --label TEXT]
     check_live.py toollog <tools.jsonl>
+    check_live.py fence <root>
+    check_live.py session <result.json>
     check_live.py checks
 
 seed writes a seed log from tests/fixtures/logs/ into the scenario repo as
@@ -23,10 +26,20 @@ PATH), and writes an earlier archive of the seeded log's run at the name the
 archive command will give it under that clock: the log's Goal entry alone, so
 an overwrite by the full log would change its sha256.
 
+nobrowser sets up S5b: it writes a Playwright stand-in whose Chromium never
+starts into the repo's node_modules/playwright and git-excludes node_modules/.
+The fixture's browser check loads the project's Playwright before the global
+one, so it cannot run whatever PLAYWRIGHT_BROWSERS_PATH or the npm settings
+say. The s5b check requires the stand-in's package.json and index.js to be
+intact at the end of the call; a read after the call cannot show their state
+during it.
+
 preflight runs before a live scenario spends tokens, under the environment
 the claude call gets, and exits 1 if the scenario's premise does not hold:
 for S5 the browser check must run and report the fixture's overflow, for S5b
-it must find no browser, and for S6b date must name the existing archive.
+it must find no browser as set, with PLAYWRIGHT_BROWSERS_PATH cleared, with
+the npm prefix and offline settings cleared, and with both cleared, and for
+S6b date must name the existing archive.
 
 snapshot records what the next claude call must extend or leave alone: the
 base and HEAD commits, the active log, the sha256 of every archive file, every
@@ -37,13 +50,26 @@ verify reads the claude -p result JSON (subagent_stats.by_type,
 permission_denials, modelUsage), the log the call left (the active log, or the
 newest new archive when the call cleared it), the product tree, and the usage
 ledger, and applies one named check. Every check also requires: a successful
-result, a log that starts with the log the call found (append-only), a log that
+result; the candidate, this checkout, as the only Compute Squad the call used
+(the init message --verbose prints lists one compute-squad plugin, at this
+checkout; every compute-squad skill the transcript loads is this checkout's;
+no tool call in the hook log names another copy's files; and a first turn
+loads this checkout's skill); a log that starts with the log the call found
+(append-only), a log that
 lints clean with tests/check_logs.py, every earlier archive file unchanged, no
 needs-human: blocker in the new entries (finding 4: S1 and S2 log none, since
 the fixture's test script works; S5 and S5b, whose premise is a criterion that
 cannot be met as locked, assert their own), and ledger billed input within 1%
-of modelUsage with ledger output at or below it (WO-3c acceptance). It prints
+of modelUsage with ledger output at or below it (WO-3c acceptance), counting
+only what this call added to the ledger's running totals, since a resumed
+session's lines also hold its earlier turns. It prints
 one line per assertion and exits 1 when any fails, 2 when it cannot run.
+
+fence is the candidate fence, run.sh's second PreToolUse hook: it blocks a
+tool call that names Compute Squad files outside <root> (another copy's
+skill, agents, command, or manifest, or Claude Code's installed-plugin
+store), exit 2 with the candidate's SKILL.md on stderr, and passes the rest
+silently. session prints a result file's session_id for run.sh's --resume.
 
 toollog is the hook log: run.sh passes the claude call a PreToolUse hook
 (in --settings, with no matcher) that runs it, so every tool call the main
@@ -92,13 +118,16 @@ PLUGIN_PREFIX = "compute-squad:"
 LEDGER_TOLERANCE = 0.01
 
 # The S2 and S3 seed plans (tests/fixtures/logs/s2.log.md and s3.log.md, the
-# same plan r1) list these files for WO-1; WO-2 adds the reset_cooldown_hit
-# event and touches src/server/log.js.
+# same plan r1) list these files for WO-1; WO-2 renames the one event every
+# reset request logs to reset_request_received, which touches
+# src/server/log.js. tests/live/repo-reset-wo2.patch is WO-2 as the plan
+# specifies it, after WO-1; no scenario applies it, and the fixture regression
+# tests prove WO-1 and WO-2 together log every request alike.
 S2_WO1_FILES = (
     "src/server/auth/reset.service.js",
     "src/server/auth/__tests__/reset.routes.test.js",
 )
-S2_WO2_MARK = "reset_cooldown_hit"
+S2_WO2_MARK = "reset_request_received"
 # S5 (tests/fixtures/logs/s5.log.md, on tests/fixtures/repo-ui/): the
 # criterion the browser check covers, and that check. The fixture's check
 # exits 0 with no overflow, 1 with one, and 2 when it cannot run.
@@ -107,6 +136,25 @@ BROWSER_CHECK = ("node", "scripts/check-overflow.js")
 BROWSER_WORDS = re.compile(r"chromium|playwright|browser|check[:-]overflow", re.IGNORECASE)
 MISSING_WORDS = re.compile(r"missing|not installed|not found|no chromium|no browser|doesn't exist|does not exist|"
                            r"cannot run|can't run", re.IGNORECASE)
+# S5b: the settings a session could clear to reach a browser, and the
+# Playwright stand-in nobrowser installs, which no setting can route around.
+S5B_BROWSER_SETTINGS = ("PLAYWRIGHT_BROWSERS_PATH",)
+S5B_NPM_SETTINGS = ("NPM_CONFIG_PREFIX", "npm_config_prefix", "NPM_CONFIG_OFFLINE", "npm_config_offline")
+NOBROWSER_DIR = os.path.join("node_modules", "playwright")
+NOBROWSER_PACKAGE = '{"name": "playwright", "version": "0.0.0-s5b", "main": "index.js"}\n'
+NOBROWSER_STUB = (
+    "// S5b's Playwright stand-in (tests/live/check_live.py nobrowser): it loads,\n"
+    "// and its Chromium never starts, whatever PLAYWRIGHT_BROWSERS_PATH says.\n"
+    "'use strict';\n"
+    "async function launch() {\n"
+    "  throw new Error(\"browserType.launch: Executable doesn't exist: this project's Playwright has no Chromium\");\n"
+    "}\n"
+    "module.exports = { chromium: { launch } };\n"
+)
+NOBROWSER_FILES = {"package.json": NOBROWSER_PACKAGE, "index.js": NOBROWSER_STUB}
+# Preflights that need something beyond sh: S5's needs a Chromium that
+# starts, and S5b's only node, since the stand-in fails the same everywhere.
+PREFLIGHT_NEEDS = {"s5": "chromium", "s5b": "node"}
 # S6b's clock: the second every date call reports, 2026-09-20T08:30:00Z.
 S6B_EPOCH = 1789893000
 # Checks whose scenario may end in a needs-human: blocker; each asserts its own.
@@ -114,8 +162,26 @@ BLOCKER_CHECKS = ("s5", "s5b")
 # The hook log (toollog): the spawn tool's two names, the tool inputs kept,
 # and how much of each string input is kept.
 SPAWN_TOOLS = ("Agent", "Task")
-TOOL_INPUT_KEYS = ("file_path", "path", "pattern", "glob", "command", "subagent_type", "model", "description", "prompt")
+TOOL_INPUT_KEYS = ("file_path", "path", "pattern", "glob", "command", "subagent_type", "model", "description", "prompt",
+                   "skill")
 TOOL_TEXT_LIMIT = 4000
+# The candidate: this checkout, which run.sh loads with --plugin-dir. The
+# plugin's name, its skill as the Skill tool names it, and every path a call
+# could read another copy of the protocol from: a skill, agent, command, or
+# manifest of Compute Squad, its packaged plugin, or anything in Claude Code's
+# installed-plugin store. The fence blocks a call that names one outside the
+# candidate, and verify fails a turn whose hook log holds one.
+PLUGIN_NAME = "compute-squad"
+CANDIDATE_SKILL = PLUGIN_NAME + ":compute-squad"
+CANDIDATE_SKILL_MD = os.path.join("skills", "compute-squad", "SKILL.md")
+PROTOCOL_PATH = re.compile(r"skills/compute-squad(?:/|\b)|agents/squad-[A-Za-z0-9-]+\.(?:md|toml)\b|commands/squad\.md\b"
+                           r"|\.claude-plugin/|\.codex-plugin/|compute-squad\.plugin\b|\.claude/plugins(?:/|\b)")
+PATH_INPUT_KEYS = ("file_path", "path", "notebook_path", "pattern", "glob", "command")
+PATH_WORD_END = re.compile(r"""[\s'"`=(;|&<>]""")
+SKILL_BASE = re.compile(r"Base directory for this skill: ([^\n]+)")
+# Checks that run after the first turn of their scenario, whose resumed
+# session already holds the skill it loaded then.
+LATER_TURN_CHECKS = ("s1-approve",)
 # S8 (WO-3f): the main-session budget on the reference run, the after model's
 # estimate for the orchestrating session in the 3.9.2 analysis (section 5),
 # against 877,638 billed input and 14,408 output measured on 3.9.2.
@@ -272,8 +338,24 @@ def cmd_collide(repo, shim):
     return 0
 
 
-def browser_check(repo):
-    run = subprocess.run(list(BROWSER_CHECK), cwd=repo, capture_output=True, text=True, timeout=120)
+def cmd_nobrowser(repo):
+    """S5b: install the Playwright stand-in and keep node_modules/ out of git
+    status, as a project's .gitignore would."""
+    target = os.path.join(repo, NOBROWSER_DIR)
+    os.makedirs(target, exist_ok=True)
+    for name, text in NOBROWSER_FILES.items():
+        with open(os.path.join(target, name), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    exclude = os.path.join(repo, ".git", "info", "exclude")
+    os.makedirs(os.path.dirname(exclude), exist_ok=True)
+    with open(exclude, "a", encoding="utf-8") as handle:
+        handle.write("/node_modules/\n")
+    print(f"wrote {os.path.join(target, 'index.js')}, a Playwright whose Chromium never starts")
+    return 0
+
+
+def browser_check(repo, env=None):
+    run = subprocess.run(list(BROWSER_CHECK), cwd=repo, capture_output=True, text=True, timeout=120, env=env)
     return run.returncode, (run.stdout + run.stderr).strip()
 
 
@@ -285,9 +367,19 @@ def cmd_preflight(check, repo):
         ok = code == 1 and "overflow" in output and "table.plans" in output
         want = "exit 1 with the plans table's overflow"
     elif check == "s5b":
-        code, output = browser_check(repo)
-        ok = code == 2 and "cannot run" in output
-        want = "exit 2: no browser for the check"
+        # The premise must not rest on settings a session can clear: the check
+        # must find no browser with the browser path, the npm settings, or
+        # both cleared.
+        def cleared(names):
+            return {k: v for k, v in os.environ.items() if k not in names}
+        runs = [("as set", browser_check(repo)),
+                ("browser path cleared", browser_check(repo, cleared(S5B_BROWSER_SETTINGS))),
+                ("npm settings cleared", browser_check(repo, cleared(S5B_NPM_SETTINGS))),
+                ("both cleared", browser_check(repo, cleared(S5B_BROWSER_SETTINGS + S5B_NPM_SETTINGS)))]
+        ok = all(code == 2 and "cannot run" in out for _, (code, out) in runs)
+        label, (code, output) = next(((n, r) for n, r in runs if not (r[0] == 2 and "cannot run" in r[1])), runs[0])
+        want = ("exit 2: no browser for the check as set, with the browser path cleared, with the npm settings "
+                f"cleared, and with both cleared (shown: {label})")
     elif check == "s6b":
         stamp = subprocess.run(["sh", "-c", "date -u +%Y-%m-%d_%H%M%S"], cwd=repo, capture_output=True, text=True)
         run_id = log_run(read_text(os.path.join(repo, LOG)) or "")
@@ -349,6 +441,23 @@ def ledger(repo):
     return records
 
 
+LEDGER_FIELDS = ("input", "cache_write", "cache_read", "output")
+
+
+def ledger_key(record):
+    """A ledger line's running total: the main session's, per session, or
+    one subagent's."""
+    if record.get("agent") == "main":
+        return f"main:{record.get('session')}"
+    return f"agent:{record.get('agent_id')}"
+
+
+def ledger_totals(records):
+    """{key: [input, cache_write, cache_read, output]} from each key's last
+    line; every line is a running total, so the last one holds the rest."""
+    return {ledger_key(r): [int(r.get(f, 0)) for f in LEDGER_FIELDS] for r in records}
+
+
 def snapshot(repo, base):
     return {
         "base": git(repo, "rev-parse", base).strip(),
@@ -357,6 +466,7 @@ def snapshot(repo, base):
         "archives": archives(repo),
         "product": product(repo, base),
         "ledger_ids": sorted(set(str(r.get("agent_id")) for r in ledger(repo) if r.get("agent") != "main")),
+        "ledger_totals": ledger_totals(ledger(repo)),
     }
 
 
@@ -420,6 +530,65 @@ def spawned_agent(record):
 def main_calls(records):
     """The main session's calls: a subagent's call carries an agent_id."""
     return [r for r in records if not r.get("agent_id")]
+
+
+# ---- the candidate fence --------------------------------------------------------
+
+def under(path, root):
+    """path is root or inside it, as written or with symlinks resolved."""
+    for p, r in ((os.path.normpath(path), os.path.normpath(root)), (os.path.realpath(path), os.path.realpath(root))):
+        if p == r or p.startswith(r.rstrip(os.sep) + os.sep):
+            return True
+    return False
+
+
+def foreign_protocol_paths(tool_input, cwd, root=REPO_ROOT):
+    """The Compute Squad files a tool call names outside root, the candidate:
+    each path word that PROTOCOL_PATH matches in a path input or a shell
+    command, resolved against the call's cwd (a Glob or Grep pattern against
+    its path) and with ~ expanded. A word that starts with root, spaces in it
+    included, is the candidate's own."""
+    found = []
+    for key in PATH_INPUT_KEYS:
+        text = tool_input.get(key)
+        if not isinstance(text, str):
+            continue
+        base = cwd
+        if key in ("pattern", "glob") and isinstance(tool_input.get("path"), str):
+            base = os.path.join(cwd, tool_input["path"])
+        for match in PROTOCOL_PATH.finditer(text):
+            head = text[:match.start()]
+            if any(head.endswith(r.rstrip(os.sep) + os.sep) for r in (root, os.path.realpath(root))):
+                continue
+            starts = [m.end() for m in PATH_WORD_END.finditer(head)]
+            end = PATH_WORD_END.search(text, match.end())
+            word = text[starts[-1] if starts else 0:end.start() if end else len(text)]
+            path = os.path.join(base, os.path.expanduser(word))
+            if not under(path, root) and word not in found:
+                found.append(word)
+    return found
+
+
+def cmd_fence(root):
+    """The candidate fence: run.sh passes it to each claude call as a second
+    PreToolUse hook beside the hook log. A call that names Compute Squad files
+    outside root is blocked (exit 2, the reason on stderr, which Claude Code
+    shows the model), so no installed or other copy can stand in for the
+    checkout under test; every other call, and input it cannot read, passes
+    silently."""
+    try:
+        event = json.loads(sys.stdin.read())
+        given = event.get("tool_input") if isinstance(event.get("tool_input"), dict) else {}
+        cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else os.getcwd()
+        foreign = foreign_protocol_paths(given, cwd, root)
+    except Exception:  # noqa: BLE001  (the fence must never break a call it cannot read)
+        return 0
+    if not foreign:
+        return 0
+    print(f"Blocked by the live test harness: the Compute Squad under test is {root}, and "
+          f"{', '.join(sorted(set(foreign)))} is another copy. Read its files under {root}; its skill is "
+          f"{os.path.join(root, CANDIDATE_SKILL_MD)}.", file=sys.stderr)
+    return 2
 
 
 def repo_path(path, cwd, repo):
@@ -840,12 +1009,14 @@ def executor_routes():
 
 
 class Context(object):
-    def __init__(self, repo, base, before, result, events=None):
+    def __init__(self, repo, base, before, result, events=None, messages=None):
         self.repo = os.path.abspath(repo)
         self.base = base
         self.before = before
         self.result = result
         self.events = events   # the hook log's records, or None without one
+        self.messages = messages   # every message the call printed (--verbose), or None
+        self.init = next((m for m in messages or () if m.get("type") == "system" and m.get("subtype") == "init"), None)
         stats = result.get("subagent_stats") or {}
         self.by_type = {
             (k[len(PLUGIN_PREFIX):] if k.startswith(PLUGIN_PREFIX) else k): v
@@ -984,8 +1155,69 @@ def expect_recon_baseline(ctx, report):
               f"got {baseline!r}")
 
 
+def strings_in(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from strings_in(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from strings_in(item)
+
+
+def expect_candidate(ctx, report, check, root=REPO_ROOT):
+    """Every turn: the Compute Squad this call loaded and read is the
+    candidate at root and no other copy. The init message --verbose prints
+    lists the one compute-squad plugin, at root; every skill the transcript
+    loads from a compute-squad directory loads from root's; and no tool call
+    in the hook log names Compute Squad files outside root (the fence blocked
+    any that did). A first turn must also show the main session loading the
+    candidate's skill: a Skill call for compute-squad:compute-squad, which
+    only the candidate can answer, or a read of root's SKILL.md."""
+    if ctx.init is None:
+        report.ok(False, "the call's init message lists the plugins it loaded (claude -p --verbose)",
+                  "no init message in the result file")
+    else:
+        plugins = [p for p in ctx.init.get("plugins") or () if isinstance(p, dict)]
+        report.note("plugins loaded: " + (", ".join(f"{p.get('name')} at {p.get('path')}" for p in plugins) or "none"))
+        ours = [p for p in plugins if p.get("name") == PLUGIN_NAME]
+        report.ok(len(ours) == 1 and isinstance(ours[0].get("path"), str) and under(ours[0]["path"], root)
+                  and under(root, ours[0]["path"]),
+                  f"the call loaded one {PLUGIN_NAME} plugin, the candidate at {root}",
+                  f"got {[p.get('path') for p in ours]}")
+    bases = [b.strip() for text in strings_in(ctx.messages or []) for b in SKILL_BASE.findall(text)]
+    skill_dir = os.path.dirname(os.path.join(root, CANDIDATE_SKILL_MD))
+    stray = sorted({b for b in bases if "compute-squad" in b and not (under(b, skill_dir) and under(skill_dir, b))})
+    report.ok(not stray, f"every compute-squad skill the transcript loads comes from {skill_dir}", ", ".join(stray))
+    if ctx.events is None:
+        report.ok(False, "a hook log to check which Compute Squad files the call read", "no hook log")
+        return
+    foreign = [(r.get("agent_type") or "main", r.get("tool_name"), word) for r in ctx.events
+               for word in foreign_protocol_paths(r.get("tool_input") or {}, r.get("cwd") or ctx.repo, root)]
+    report.ok(not foreign, f"no tool call names Compute Squad files outside the candidate {root}",
+              "; ".join(f"{who} {tool} {word}" for who, tool, word in foreign[:5]))
+    if check in LATER_TURN_CHECKS:
+        return
+    skill_md = os.path.join(root, CANDIDATE_SKILL_MD)
+
+    def loads_skill(record):
+        given = record.get("tool_input") or {}
+        if record.get("tool_name") == "Skill":
+            return given.get("skill") in (CANDIDATE_SKILL, PLUGIN_NAME)
+        if isinstance(given.get("file_path"), str):
+            path = os.path.join(record.get("cwd") or ctx.repo, given["file_path"])
+            return under(path, skill_md) and under(skill_md, path)
+        command = given.get("command")
+        return isinstance(command, str) and any(os.path.join(r, CANDIDATE_SKILL_MD) in command
+                                                for r in (root, os.path.realpath(root)))
+    loaded = [r for r in main_calls(ctx.events) if loads_skill(r)]
+    report.ok(bool(loaded), f"the main session loaded the candidate's skill (Skill {CANDIDATE_SKILL}, or a read of "
+              f"{skill_md})", "no such call in the hook log")
+
+
 def check_s1_plan(ctx, report, protocol):
-    """S1 turn 1: /squad plan <goal> from an empty log."""
+    """S1 turn 1: /compute-squad:squad plan <goal> from an empty log."""
     expect_by_type(ctx, report, {"squad-mech": 1, "squad-recon": 1, "squad-pm": 1}, "mech 1, recon 1, pm 1")
     expect_product_unchanged(ctx, report)
     expect_log_kept(ctx, report)
@@ -1292,6 +1524,16 @@ def recon_tool_line(entry):
     return None
 
 
+def expect_nobrowser_intact(ctx, report):
+    """S5b: the stand-in's files are as nobrowser wrote them. A read after the
+    call shows them at its end only; it cannot show their state during it."""
+    changed = [name for name, text in NOBROWSER_FILES.items()
+               if read_text(os.path.join(ctx.repo, NOBROWSER_DIR, name)) != text]
+    report.ok(not changed, f"the Playwright stand-in's {' and '.join(NOBROWSER_FILES)} in {NOBROWSER_DIR}/ are intact "
+              "at the end of the call (a read after the call cannot show their state during it)",
+              "changed or removed: " + ", ".join(changed))
+
+
 def check_s5b(ctx, report, protocol):
     """S5b: no browser for the check AC2 names; "Continue the squad run." at Recon."""
     expect_by_type(ctx, report, {"squad-recon": 1}, "recon 1: no plan and no executor")
@@ -1311,6 +1553,7 @@ def check_s5b(ctx, report, protocol):
     report.ok(reason is not None and check_logs.NEEDS_HUMAN_DENIAL in reason,
               "the grant hook holds an executor spawn on the open needs-human: blocker", str(reason))
     expect_product_unchanged(ctx, report)
+    expect_nobrowser_intact(ctx, report)
     expect_log_kept(ctx, report)
     expect_no_new_archive(ctx, report, "the run stopped at Recon")
 
@@ -1375,7 +1618,7 @@ def expect_tool_log(ctx, report):
 
 
 def check_s8(ctx, report, protocol):
-    """S8: the reference run, "/squad <goal>" on an empty log (WO-3f)."""
+    """S8: the reference run, "/compute-squad:squad <goal>" on an empty log (WO-3f)."""
     report.ok("squad-recon" in ctx.by_type, "a squad-recon spawn (Stage 2)", f"got {ctx.by_type}")
     verdicts = [e["heading"] for e in ctx.new_entries if e["heading"] in check_logs.VERDICT_HEADINGS]
     report.ok("## PM — PASS" in verdicts, "the run reaches a PM PASS, so its usage is a whole reference run's",
@@ -1454,10 +1697,14 @@ CHECKS = collections.OrderedDict([
 
 
 def check_ledger(ctx, report):
-    """WO-3c acceptance: the usage ledger's lines for this session total the
-    host's billed input within 1% and never exceed its output, and this call's
-    new lines name one agent per spawn (an agent continued with SendMessage
-    writes a line at each stop, and its last one counts)."""
+    """WO-3c acceptance: what this call added to the usage ledger's running
+    totals for this session matches the host's billed input within 1% and never
+    exceeds its output, and this call's new lines name one agent per spawn (an
+    agent continued with SendMessage writes a line at each stop, and its last
+    one counts). modelUsage covers this call only, while a resumed session's
+    main-session line and its earlier agents' lines also hold earlier turns, so
+    each key counts its last line less the running total the snapshot recorded
+    before the call."""
     session = ctx.result.get("session_id")
     records = [r for r in ledger(ctx.repo) if r.get("session") == session]
     if not records:
@@ -1474,9 +1721,12 @@ def check_ledger(ctx, report):
             agents[str(record.get("agent_id"))] = record
     if not report.ok(main is not None, f"{LEDGER} has a main-session line for session {session}"):
         return
-    rows = list(agents.values()) + [main]
-    billed = sum(int(r.get("input", 0)) + int(r.get("cache_write", 0)) + int(r.get("cache_read", 0)) for r in rows)
-    output = sum(int(r.get("output", 0)) for r in rows)
+    before = ctx.before.get("ledger_totals", {})
+    added_totals = [0] * len(LEDGER_FIELDS)
+    for key, now in ledger_totals(records).items():
+        earlier = before.get(key, [0] * len(LEDGER_FIELDS))
+        added_totals = [total + n - e for total, n, e in zip(added_totals, now, earlier)]
+    billed, output = sum(added_totals[:3]), added_totals[3]
     usage = (ctx.result.get("modelUsage") or {}).values()
     host_billed = sum(int(m.get("inputTokens", 0)) + int(m.get("cacheCreationInputTokens", 0))
                       + int(m.get("cacheReadInputTokens", 0)) for m in usage)
@@ -1495,6 +1745,32 @@ def check_ledger(ctx, report):
     report.ok(dict(added) == ctx.by_type, "the ledger gained lines for one agent per spawn", f"ledger {dict(added)}, spawned {ctx.by_type}")
 
 
+def load_call(path):
+    """(result, messages) from a claude -p --output-format json file: with
+    --verbose it holds every message the call printed, the init message
+    first and the result last; without, the result object alone."""
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    if isinstance(data, dict):
+        return data, None
+    if isinstance(data, list):
+        messages = [m for m in data if isinstance(m, dict)]
+        results = [m for m in messages if m.get("type") == "result"]
+        if results:
+            return results[-1], messages
+    raise ValueError("neither a result object nor a message list with a result")
+
+
+def cmd_session(result_path):
+    """Print the session_id of a claude -p JSON file, for run.sh's --resume."""
+    try:
+        result, _ = load_call(result_path)
+    except (OSError, ValueError):
+        return 1
+    print(result.get("session_id") or "")
+    return 0
+
+
 def cmd_verify(check, repo, base, state_path, result_path, summary, label, tools=None):
     with open(state_path, encoding="utf-8") as handle:
         before = json.load(handle)
@@ -1502,16 +1778,13 @@ def cmd_verify(check, repo, base, state_path, result_path, summary, label, tools
     report = Report()
     print(f"{label or check}: check {check}")
     try:
-        with open(result_path, encoding="utf-8") as handle:
-            result = json.load(handle)
-        if not isinstance(result, dict):
-            raise ValueError("not a JSON object")
+        result, messages = load_call(result_path)
     except (OSError, ValueError) as error:
         report.ok(False, f"{result_path} holds the claude -p JSON result", str(error))
         return finish(report, summary, label, check, None)
 
     protocol = check_logs.load_protocol(SKILL_PATH)
-    ctx = Context(repo, base, before, result, events)
+    ctx = Context(repo, base, before, result, events, messages)
     report.note(f"cost ${float(result.get('total_cost_usd') or 0):.2f}, {result.get('num_turns')} turns, "
                 f"by_type {ctx.by_type or '{}'}, {len(ctx.denials)} permission denials")
     if events is not None:
@@ -1520,6 +1793,7 @@ def cmd_verify(check, repo, base, state_path, result_path, summary, label, tools
         report.note("denied: " + json.dumps(denial)[:300])
     report.ok(result.get("is_error") is False and result.get("subtype") == "success",
               "claude -p finished without error", f"subtype {result.get('subtype')}, is_error {result.get('is_error')}")
+    expect_candidate(ctx, report, check)
     report.ok(ctx.log_path is not None, "the call left a log (the active log, or a new archive when it cleared it)")
     if ctx.log_path:
         report.note(f"log: {os.path.relpath(ctx.log_path, ctx.repo)}" + (" (the active log was cleared)" if ctx.cleared else ""))
@@ -1559,6 +1833,8 @@ def main(argv=None):
     collide = sub.add_parser("collide")
     collide.add_argument("repo")
     collide.add_argument("shim")
+    nobrowser = sub.add_parser("nobrowser")
+    nobrowser.add_argument("repo")
     preflight = sub.add_parser("preflight")
     preflight.add_argument("check", choices=list(CHECKS))
     preflight.add_argument("repo")
@@ -1577,6 +1853,10 @@ def main(argv=None):
     verify.add_argument("--label")
     toollog = sub.add_parser("toollog")
     toollog.add_argument("path")
+    fence = sub.add_parser("fence")
+    fence.add_argument("root")
+    session = sub.add_parser("session")
+    session.add_argument("result")
     sub.add_parser("checks")
     args = parser.parse_args(argv)
     try:
@@ -1584,6 +1864,8 @@ def main(argv=None):
             return cmd_seed(args.seed, args.repo, args.base)
         if args.command == "collide":
             return cmd_collide(args.repo, args.shim)
+        if args.command == "nobrowser":
+            return cmd_nobrowser(args.repo)
         if args.command == "preflight":
             return cmd_preflight(args.check, args.repo)
         if args.command == "snapshot":
@@ -1593,6 +1875,10 @@ def main(argv=None):
                               args.tools)
         if args.command == "toollog":
             return cmd_toollog(args.path)
+        if args.command == "fence":
+            return cmd_fence(args.root)
+        if args.command == "session":
+            return cmd_session(args.result)
         if args.command == "checks":
             for name, function in CHECKS.items():
                 print(f"{name}\t{function.__doc__}")

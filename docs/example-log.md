@@ -58,7 +58,7 @@ Tests:
 - src/server/auth/__tests__/reset.routes.test.ts: 14 cases on the reset route
 - Test files under src/server/auth/__tests__/: reset 14, login 22, session 11, mfa 19 (grep -c "it(" per file)
 Invariants:
-- CLAUDE.md:3 "Auth responses are generic: no response may reveal whether an account exists.": at risk: a cooldown hit must return the same body as a normal request
+- CLAUDE.md:3 "Auth responses are generic: no response may reveal whether an account exists.": at risk: a cooldown hit must return the same body, and log the same event, as a normal request
 - CLAUDE.md:4 "Logs carry codes only, never addresses.": at risk: any new log event carries a code only
 Open for the PM:
 - where the cooldown state lives: the newest password_reset_tokens row avoids a schema change
@@ -84,11 +84,11 @@ Tasks, in order:
    the existing generic-success result WITHOUT creating a token or sending mail
    (preserves the no-account-existence-leak invariant; no 429). Otherwise insert
    the token in that transaction and send mail after it commits. No schema change.
-2. Add structured log event reset_cooldown_hit { code only } per the log-hygiene
-   invariant.
+2. Log reset_request_received { code only } once per well-formed request, before
+   the account lookup, so sends, cooldown hits and unknown addresses log alike (AC3).
 3. Tests (reset.routes.test.ts): (a) second request within 60s returns the generic
    200 and creates no second token row; (b) second request after 60s (fake timers)
-   creates a token; (c) cooldown hit emits reset_cooldown_hit and never an address;
+   creates a token; (c) a send, a cooldown hit and an unknown address each log exactly one reset_request_received and no address;
    (d) two concurrent first requests create exactly one token row and one email.
 
 Must NOT change: response envelope shape, the global IP limiter, schema,
@@ -144,7 +144,7 @@ Tested: 4f2c9a1d07e3, working tree 2 changed files
 |---|---|---|---|
 | AC1 | met | reproduced | test (a) counts password_reset_tokens rows: one; refutation, two concurrent first requests (test (d), plus 20 in a scratch run): one row, one email |
 | AC2 | met | reproduced | test (b): a request at 61s creates a token and sends mail; refutation, clock skew: both sides of the comparison use DB UTC |
-| AC3 | met | reproduced | cooldown-hit and normal bodies byte-identical; no address in any new log call; refutation, enumeration timing: the cooldown path still runs the token query |
+| AC3 | met | reproduced | cooldown-hit, normal and unknown-address requests return byte-identical bodies and log the same one reset_request_received event; refutation, enumeration timing: the cooldown path still runs the token query |
 - `npm test` -> exit 0; 2,755 passed / 12 skipped
 - `npm run ci:verify` -> exit 0; 2,755 passed / 12 skipped, matching the Executor
 Regressions: none
@@ -182,7 +182,7 @@ Checked:
 - `git diff | grep -nE 'email|address'` -> exit 1; no match
 Risks:
 - a caller learns whether an account exists | cooldown and normal paths return the same generic body (reset.service.ts:31-42); the reset.routes check
-- an address reaches a log | reset_cooldown_hit carries a code only; the diff grep check
+- a log line reveals an account or an address | every request logs one reset_request_received { code only } before the lookup; test (c) and the diff grep check
 - one account's cooldown blocks another | the newest-token query filters on the account id (reset.service.ts:33)
 Decisions after lock:
 - none
