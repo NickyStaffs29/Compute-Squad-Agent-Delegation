@@ -2,7 +2,7 @@
   "note": "Finding 3's 8a rule: after a high-stakes PASS the next entry other than a Status or Decision is a ## High-stakes review. Here WO-1's high-stakes PASS goes straight on to WO-2 with no review.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/audit-prompts.md",
       "text": "Run this in the main session on every high-stakes PASS; never delegate it."
     },
     {

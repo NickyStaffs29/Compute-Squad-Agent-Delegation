@@ -2,7 +2,7 @@
   "note": "A BLOCKING delegation: the Delegated entry names the requesting stage, the re-spawned Executor continues under (cont.), and an ordinary PASS ends with the line the archive command appends.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "If the requesting stage marked the block `BLOCKING`, continue that stage's agent with SendMessage (load it through ToolSearch if it is listed only by name) and point it at the new `## Delegated — <stage>` entry, in the pointer form of Spawn prompts and routing; re-spawn the stage only when the host cannot message a finished agent or the message fails. A continued or re-spawned `BLOCKING` requester appends a `## <Stage> (cont.)` entry covering only the remainder of its work (Hard rules)"
     },
     {

@@ -262,8 +262,8 @@ Compute-Squad-Agent-Delegation/
 │   │   ├── grant-gate.sh     # Claude Code only: refuses an executor spawn without a logged grant, and any recon, PM, helper, or executor spawn while a needs-human blocker is open
 │   │   └── usage-ledger.sh   # Claude Code only: appends each stage's model, time, and tokens to compute-squad-archive/usage.jsonl
 │   └── references/
-│       ├── audit-prompts.md  # audit procedure, finder and skeptic briefs
-│       └── resume.md         # next-action table, read only on resume or over a non-empty log
+│       ├── audit-prompts.md  # audit procedure, finder/skeptic briefs and high-stakes review
+│       └── resume.md         # resume table and triggered decision, verdict, delegation and escalation sections
 ├── agents/
 │   ├── squad-recon.md        # mid rung · read-only mapping
 │   ├── squad-pm.md           # top rung · PLAN + ACCEPT modes

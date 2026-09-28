@@ -6,7 +6,7 @@
       "text": "A re-lock needs the user: in one Bash command, append a `## Decision` entry of Type re-lock quoting their words, then a new `## Goal — Locked` entry"
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "Type: <grant | plan-approved | waiver | resolution | re-lock | park | abandon>"
     }
   ],

@@ -2,7 +2,7 @@
   "note": "Finding 3's 8a rule: an upheld review has no open row. This one upholds with a risk it could not rule out.",
   "cites": [
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/audit-prompts.md",
       "text": "`upheld` needs every risk ruled out and every decision approved."
     }
   ],

@@ -10,7 +10,7 @@
       "text": "Then, if the block is `BLOCKING`, continue or re-spawn that stage to finish (a `(cont.)` entry, or the verdict after a pending entry), as DELEGATE step 2 says; only the session that spawned the stage's agent can continue it, so any other session re-spawns it."
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "re-spawn the stage only when the host cannot message a finished agent or the message fails."
     }
   ],

@@ -6,7 +6,7 @@
       "text": "Use `waived` only when a `## Decision` of Type waiver names the ID; cite its timestamp."
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "Type: <grant | plan-approved | waiver | resolution | re-lock | park | abandon>"
     }
   ],

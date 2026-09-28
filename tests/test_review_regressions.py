@@ -263,7 +263,78 @@ class HookRegressionTests(unittest.TestCase):
         self.assertEqual(("", ""), self.hook("usage-ledger.sh", self.payload(), timeout=2))
 
 
+class ReferenceRegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.skill = Path(self.temp.name) / "compute-squad" / "SKILL.md"
+        shutil.copytree(ROOT / "skills/compute-squad", self.skill.parent)
+        self.resume = self.skill.parent / "references/resume.md"
+
+    def test_moved_templates_are_read_from_sibling_reference(self):
+        core = self.skill.read_text()
+        ref = self.resume.read_text()
+        for name, pattern in (("decisions", r"```markdown\n## Decision\n.*?\n```"),
+                              ("verdict", r"```\nTested: <commit SHA>.*?\n```")):
+            match = re.search(pattern, core, re.S)
+            if match:
+                core = core[:match.start()] + core[match.end():]
+                ref += f"\n<!-- {name}:begin -->\n{match.group()}\n<!-- {name}:end -->\n"
+        self.skill.write_text(core)
+        self.resume.write_text(ref)
+        try:
+            protocol = check_logs.load_protocol(str(self.skill))
+        except check_logs.ProtocolError as error:
+            self.fail(f"moved canonical forms must remain readable: {error}")
+        self.assertEqual({"grant", "plan-approved", "waiver", "resolution", "re-lock", "park", "abandon"},
+                         protocol.relock["decision_types"])
+        self.assertEqual("AC", protocol.criteria["prefix"])
+
+    def test_missing_reference_marker_cannot_use_a_stale_core_copy(self):
+        stale = check_logs.read_section(str(self.skill), "resume.md", "decisions")
+        self.skill.write_text(self.skill.read_text() + stale)
+        self.resume.write_text(self.resume.read_text().replace("<!-- decisions:begin -->", ""))
+        with self.assertRaises(check_logs.ProtocolError):
+            check_logs.load_protocol(str(self.skill))
+
+    def test_duplicate_or_empty_sections_fail_closed(self):
+        original = self.resume.read_text()
+        for broken in (original + "\n<!-- decisions:begin -->\nx\n<!-- decisions:end -->\n",
+                       re.sub(r"<!-- decisions:begin -->.*?<!-- decisions:end -->",
+                              "<!-- decisions:begin -->\n \n<!-- decisions:end -->", original, flags=re.S)):
+            with self.subTest(broken=broken[-70:]):
+                self.resume.write_text(broken)
+                with self.assertRaises(check_logs.ProtocolError):
+                    check_logs.load_protocol(str(self.skill))
+
+    def test_premature_end_marker_cannot_leave_instructions_outside_section(self):
+        for reference, name in (("resume.md", "decisions"), ("audit-prompts.md", "high-stakes")):
+            with self.subTest(section=name):
+                path = self.skill.parent / "references" / reference
+                original = path.read_text()
+                end = f"<!-- {name}:end -->"
+                broken = original.replace(end, "")
+                begin = broken.index(f"<!-- {name}:begin -->")
+                heading_end = broken.index("\n", broken.index("\n", begin) + 1)
+                path.write_text(broken[:heading_end] + "\n" + end + broken[heading_end:])
+                with self.assertRaises(check_logs.ProtocolError):
+                    check_logs.read_section(str(self.skill), reference, name)
+                path.write_text(original)
+
+
 class BudgetRegressionTests(unittest.TestCase):
+    def test_distinct_new_agents_certify_main_output(self):
+        import inspect
+        self.assertIn("before_totals", inspect.signature(check_live.budget_judgment).parameters)
+        records = [
+            {"session": "s", "agent": "main", "agent_id": "main", "input": 100, "output": 12000, "calls": 1},
+            {"session": "s", "agent": "squad-pm", "agent_id": "a", "output": 10000, "calls": 2, "run": ""},
+        ]
+        ok, detail = check_live.budget_judgment(records, "s", 22300, before_totals={},
+                                               expected_spawns={"squad-pm": 1})
+        self.assertTrue(ok, detail)
+        self.assertIn("12300", detail.replace(",", ""))
+
     def test_output_lower_bound_cannot_certify_budget(self):
         records = [{"session": "s", "agent": "main", "input": 100, "output": 12000, "calls": 1}]
         ok, detail = check_live.budget_judgment(records, "s")
@@ -272,8 +343,93 @@ class BudgetRegressionTests(unittest.TestCase):
         ok, detail = check_live.budget_judgment(records, "s", 20000)
         self.assertFalse(ok)
         self.assertIn("unverified", detail)
-        self.assertTrue(check_live.budget_judgment(records, "s", 12300)[0])
-        self.assertFalse(check_live.budget_judgment(records, "s", 100)[0])
+        self.assertTrue(check_live.budget_judgment(records, "s", 12300, before_totals={})[0])
+        self.assertFalse(check_live.budget_judgment(records, "s", 100, before_totals={})[0])
+
+    def test_certificate_requires_consistent_fresh_evidence(self):
+        main = {"session": "s", "agent": "main", "input": 100, "output": 12000, "calls": 1}
+        agent = {"session": "s", "agent": "squad-pm", "agent_id": "a", "output": 10000, "calls": 2}
+        cases = [
+            ("over ceiling", [main, dict(agent, output=9000)], {}, 22300, {"squad-pm": 1}),
+            ("missing baseline", [main, agent], None, 22300, {"squad-pm": 1}),
+            ("resumed main", [main, agent], {"main:s": [0, 0, 0, 0]}, 22300, {"squad-pm": 1}),
+            ("missing host", [main, agent], {}, None, {"squad-pm": 1}),
+            ("missing inventory", [main, agent], {}, 22300, None),
+            ("missing agent", [main], {}, 12300, {"squad-pm": 1}),
+            ("unexpected agent", [main, agent], {}, 12300, {}),
+            ("conflicting type", [main, agent, dict(agent, agent="squad-recon")], {}, 22300, {"squad-pm": 1}),
+            ("conflicting earlier type", [main, dict(agent, agent="squad-recon", calls=1), agent], {}, 22300, {"squad-pm": 1}),
+            ("conflicting same-call output", [main, agent, dict(agent, output=11000)], {}, 22300, {"squad-pm": 1}),
+            ("regressing output", [main, agent, dict(agent, calls=3, output=9000)], {}, 22300, {"squad-pm": 1}),
+            ("main above upper", [main, agent], {}, 21900, {"squad-pm": 1}),
+            ("negative upper", [main, agent], {}, 9000, {"squad-pm": 1}),
+        ]
+        for field in ("calls", "output", "agent_id"):
+            missing = dict(agent)
+            del missing[field]
+            cases.append(("missing " + field, [main, missing], {}, 22300, {"squad-pm": 1}))
+        for invalid in (-1, True, "22300", 22300.0):
+            cases.append(("invalid host " + repr(invalid), [main, agent], {}, invalid, {"squad-pm": 1}))
+            for field in ("calls", "output"):
+                cases.append(("invalid agent " + field + repr(invalid), [main, dict(agent, **{field: invalid})],
+                              {}, 22300, {"squad-pm": 1}))
+                cases.append(("invalid main " + field + repr(invalid), [dict(main, **{field: invalid}), agent],
+                              {}, 22300, {"squad-pm": 1}))
+        for name, records, before, host, counts in cases:
+            with self.subTest(case=name):
+                ok, detail = check_live.budget_judgment(records, "s", host, before_totals=before, expected_spawns=counts)
+                self.assertFalse(ok, detail)
+
+    def test_agent_identity_filters_and_most_complete_stop(self):
+        main = {"session": "s", "agent": "main", "input": 100, "output": 12000, "calls": 1, "models": "fable"}
+        agent = {"session": "s", "agent": "squad-pm", "agent_id": "a", "output": 10000, "calls": 2,
+                 "run": "", "models": "fable"}
+        old = dict(agent, agent_id="old", calls=3, output=200)
+        foreign = dict(agent, session="other", agent_id="foreign", output=999999)
+        before = {"agent:old": [0, 0, 0, 50]}
+        for records in ([main, agent, agent, old, foreign],
+                        [main, agent, dict(agent, calls=1, output=100), old, foreign],
+                        [main, dict(agent, calls=1, output=100), agent, old, foreign]):
+            ok, detail = check_live.budget_judgment(records, "s", 22300, before_totals=before,
+                                                   expected_spawns={"squad-pm": 1})
+            self.assertTrue(ok, detail)
+            self.assertIn("main upper bound 12,300", detail)
+        # The old lower bound can catch up by 150 while this turn generated
+        # only 100. Subtracting that difference would falsely certify 12,350.
+        main["output"] = 12000
+        ok, detail = check_live.budget_judgment([main, old], "s", 12500, before_totals=before, expected_spawns={})
+        self.assertFalse(ok, detail)
+        self.assertIn("main upper bound 12,500", detail)
+        zero = dict(main, output=0)
+        self.assertTrue(check_live.budget_judgment([zero], "s", 0, before_totals={}, expected_spawns={})[0])
+
+    def test_saved_s8_stays_over_both_token_limits(self):
+        records = [{"session": "s", "agent": "main", "input": 1140726, "output": 14153, "calls": 20}]
+        records += [{"session": "s", "agent": "squad-pm", "agent_id": str(i), "output": value, "calls": 1}
+                    for i, value in enumerate((541, 10910, 6428, 9385, 13594, 2052))]
+        self.assertEqual(42910, sum(row["output"] for row in records[1:]))
+        ok, detail = check_live.budget_judgment(records, "s", 57063, before_totals={}, expected_spawns={"squad-pm": 6})
+        self.assertFalse(ok, detail)
+        self.assertIn("main upper bound 14,153", detail)
+        records[0]["input"] = 100
+        self.assertFalse(check_live.budget_judgment(records, "s", 57063, before_totals={},
+                                                  expected_spawns={"squad-pm": 6})[0])
+        records[0]["input"], records[0]["output"] = 1140726, 12000
+        self.assertFalse(check_live.budget_judgment(records, "s", 55300, before_totals={},
+                                                  expected_spawns={"squad-pm": 6})[0])
+
+    def test_counter_history_conflicts_do_not_depend_on_append_order(self):
+        from itertools import permutations
+        main = {"session": "s", "agent": "main", "input": 100, "output": 12000, "calls": 1}
+        for counters, valid in ((((3, 10000), (1, 9500), (2, 9000)), False),
+                                (((3, 10000), (1, 9000), (2, 9500)), True)):
+            for order in permutations(counters):
+                with self.subTest(order=order, valid=valid):
+                    rows = [main] + [{"session": "s", "agent": "squad-pm", "agent_id": "a", "calls": n, "output": tokens}
+                                     for n, tokens in order]
+                    ok, detail = check_live.budget_judgment(rows, "s", 22300, before_totals={},
+                                                           expected_spawns={"squad-pm": 1})
+                    self.assertEqual(valid, ok, detail)
 
 
 class LedgerRegressionTests(unittest.TestCase):

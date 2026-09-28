@@ -57,3 +57,31 @@ You are given one finding from a finder agent. Your job is to refute it, not to 
 For concurrency findings (races, unserialized concurrent writes) and accessibility findings (keyboard operability, ARIA, focus order): failure to reproduce is not refutation. A race needs the right interleaving and an accessibility gap needs the right assistive-tech path, so refute only by demonstrating the guard, the serialization point, or the compliant attribute that makes the claim false. Absent that demonstration, CONFIRM.
 
 For security and privacy findings whose reproduction needs credentials, production configuration, or an external service this run does not have: trace any such configuration the repository holds first. If neither that trace nor a demonstrated guard or check settles the claim, return `NEEDS-HUMAN` with what reproduction would need, never `REFUTED`. The default-REFUTED-when-uncertain rule above still stands for every other finding.
+
+<!-- high-stakes:begin -->
+### High-stakes review procedure
+
+Run this in the main session on every high-stakes PASS; never delegate it.
+
+1. Before reading the PASS entry, list from the latest `## Goal — Locked` entry what could go wrong in each class the change touches: auth (who reaches the changed path; what another account or an anonymous caller sees), payments (amount, currency, rounding, retry idempotency), migrations (forward and backward run, locks, existing rows), privacy (personal data newly reaching logs, errors, analytics, third parties), production config (defaults, secrets, blast radius).
+2. Read the full diff against the run's base commit and re-run the plan's verification commands yourself, recording each as a check line. Fill `Tested:` as ACCEPT does: `git rev-parse --short=12 HEAD`, and `clean` or the number of paths `git status --porcelain` lists outside the log and archive.
+3. For each risk, record what rules it out (a diff line, or a check line), or write `open`.
+4. List every decision after the first `## Goal — Locked` entry that changed a criterion, a verification command, or the scope. Only a `## Decision` entry quoting the user approves one; your own earlier agreement does not. Put unapproved ones to the user if present and record each answer as a `## Decision`; in an unattended run they stay unapproved.
+5. Append the entry below with the Bash heredoc form. `upheld` needs every risk ruled out and every decision approved. `overturned` means a defect; only then write `Rerun:`, naming the earliest stage that must fix it. `held` means an open risk or an unapproved decision, and no defect.
+6. Append a `## Status` after the entry, as after every entry. On `upheld`, spawn `squad-mech` to close the run: its archive command copies the log, now ending with your review and that Status, verifies the copy with `cmp`, and clears the active log. If the governing plan revision has a work order after the one this PASS accepted, spawn nothing: that Status names the next work order instead. On `overturned`, the entry counts as a FAIL: re-run the named stage and every later stage with the log intact; the next high-stakes PASS gets a new review. On `held`, leave the log intact and hand the open items to the user. Then report the result and its evidence to the user.
+
+```markdown
+## High-stakes review
+Timestamp: <output of date -u +%Y-%m-%dT%H:%M:%SZ>
+Agent: main session (<model ID as your context states it>)
+Result: <upheld | overturned | held>
+Rerun: <Recon|Plan|Executor>
+Tested: <commit SHA>, working tree <clean | N changed files>
+Checked:
+- `<command>` -> exit <code>; <summary line>
+Risks:
+- <risk> | <diff line or check line; or open>
+Decisions after lock:
+- <none, or: decision | approving `## Decision` timestamp, or unapproved>
+```
+<!-- high-stakes:end -->

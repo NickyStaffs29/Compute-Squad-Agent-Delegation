@@ -14,8 +14,9 @@ be read from the skill.
 
 The heading list, the opening entry, the timestamp form, the blocker
 grammar, the Goal template's Attended: field and criterion IDs, the re-lock
-rule, the criteria block's shape, and the top-rung executor are read from
-skills/compute-squad/SKILL.md, so the linter follows the protocol text. The
+rule, and the top-rung executor are read from skills/compute-squad/SKILL.md;
+Decision and criteria forms come from its marked sibling resume reference.
+The linter follows those canonical protocol sources. The
 Result values of the criteria block and the Recon and Executor labels are
 tables below; scripts/verify.sh checks 7g and 7w hold the PM body and the
 templates to them (--labels prints the labels).
@@ -259,9 +260,45 @@ class Protocol(object):
         self.audit = audit            # dict: cap, verdicts, the unreviewed verdict, the verdicts the PM rules on, severities
 
 
+def read_section(skill_path, reference, name):
+    """Read one canonical sibling section; malformed markers are a setup gap."""
+    path = os.path.join(os.path.dirname(os.path.abspath(skill_path)), "references", reference)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError as error:
+        raise ProtocolError(f"{path}: cannot load {name}: {error}") from error
+    begin, end = f"<!-- {name}:begin -->", f"<!-- {name}:end -->"
+    starts = [i for i, line in enumerate(lines) if line == begin]
+    ends = [i for i, line in enumerate(lines) if line == end]
+    if len(starts) != 1 or len(ends) != 1 or starts[0] >= ends[0]:
+        raise ProtocolError(f"{path}: {name} needs one ordered begin/end pair")
+    # A misplaced end marker must not strand a complete-looking template
+    # outside what the runtime loads. Resume consists solely of its marked
+    # sections; the audit's original briefs precede its final review section.
+    if reference == "resume.md":
+        remainder = "\n".join(lines)
+        for section in ("resume", "decisions", "verdict", "delegation", "escalation"):
+            remainder = re.sub(r"(?ms)^<!-- " + section + r":begin -->\n.*?^<!-- " + section + r":end -->$", "", remainder)
+        if remainder.strip():
+            raise ProtocolError(f"{path}: instructions outside their marked sections")
+    elif reference == "audit-prompts.md" and "\n".join(lines[ends[0] + 1:]).strip():
+        raise ProtocolError(f"{path}: instructions after the high-stakes end marker")
+    text = "\n".join(lines[starts[0] + 1:ends[0]]) + "\n"
+    if not text.strip():
+        raise ProtocolError(f"{path}: {name} section is empty")
+    return text
+
+
 def load_protocol(skill_path):
     with open(skill_path, encoding="utf-8") as handle:
         text = handle.read()
+    core = text
+    text += "\n" + "\n".join(read_section(skill_path, "resume.md", name)
+                                   for name in ("decisions", "verdict", "delegation", "escalation"))
+    for opening in ("```markdown\n## Decision\n", "```\nTested: <commit SHA>"):
+        if text.count(opening) != 1:
+            raise ProtocolError(f"{skill_path}: duplicate or missing canonical form {opening!r}")
     lines = text.splitlines()
 
     bullets = [line for line in lines if line.startswith(HEADING_BULLET)]
@@ -395,7 +432,7 @@ def load_protocol(skill_path):
 
     if AUDIT_HEADING not in fixed:
         raise ProtocolError(f"{skill_path}: {AUDIT_HEADING!r} is not on the heading list")
-    audit = load_audit(skill_path, text)
+    audit = load_audit(skill_path, core)
 
     return Protocol(fixed, cont, delegated, goal.group(1), stamp.group(1), first.group(1).split("|"), gate, relock,
                     criteria, audit)

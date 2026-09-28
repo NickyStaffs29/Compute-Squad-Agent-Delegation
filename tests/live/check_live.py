@@ -855,25 +855,63 @@ def main_usage(records, session):
             "models": last.get("models") or "model unknown"}
 
 
-def budget_judgment(records, session, host_output=None):
-    """S8's budget rule (WO-3f acceptance): the main session's billed input and
-    output stay at or below MAIN_BUDGET_INPUT and MAIN_BUDGET_OUTPUT.
-    Returns (ok, what it found)."""
-    usage = main_usage(records, session)
-    if usage is None:
+def budget_judgment(records, session, host_output=None, *, before_totals=None, expected_spawns=None):
+    """Certify fresh-session main output with host total minus distinct new
+    agents' cumulative lower bounds. Continued counters cannot prove a delta."""
+    def counter(value):
+        return type(value) is int and value >= 0
+
+    mains = [r for r in records if r.get("agent") == "main" and r.get("session") == session]
+    if not mains:
         return False, f"{LEDGER} has no main-session line for session {session}"
+    if any(not counter(r.get(key)) for r in mains for key in ("calls", "output")) or any(
+            not counter(r.get(key, 0)) for r in mains for key in ("input", "cache_write", "cache_read")):
+        return False, "output budget unverified: invalid main ledger counters"
+    usage = main_usage(records, session)
     detail = (f"main session ({usage['models']}, {usage['calls']} calls): billed input {usage['billed']:,} against "
               f"{MAIN_BUDGET_INPUT:,}, transcript output lower bound {usage['output']:,} against {MAIN_BUDGET_OUTPUT:,}")
+    if not isinstance(before_totals, dict) or f"main:{session}" in before_totals:
+        return False, detail + "; output budget unverified: no fresh-session baseline"
+    if not counter(host_output):
+        return False, detail + "; output budget unverified: missing or invalid host output total"
+
+    agents = {}
+    if expected_spawns is not None:
+        if not isinstance(expected_spawns, dict) or any(
+                not isinstance(kind, str) or not kind or kind == "main" or not counter(count)
+                for kind, count in expected_spawns.items()):
+            return False, detail + "; output budget unverified: invalid spawn inventory"
+        for row in records:
+            if row.get("session") != session or row.get("agent") == "main":
+                continue
+            ident, kind = row.get("agent_id"), row.get("agent")
+            if not isinstance(ident, str) or not ident or not isinstance(kind, str) or not kind:
+                return False, detail + "; output budget unverified: missing agent identity"
+            if f"agent:{ident}" in before_totals:
+                continue
+            if any(not counter(row.get(key)) for key in ("calls", "output")):
+                return False, detail + "; output budget unverified: invalid agent counters"
+            agents.setdefault(ident, []).append(row)
+        for ident, history in agents.items():
+            history = sorted(history, key=lambda row: row["calls"])
+            if len({row["agent"] for row in history}) != 1 or any(
+                    (earlier["calls"] == later["calls"] and earlier["output"] != later["output"]) or
+                    earlier["output"] > later["output"] for earlier, later in zip(history, history[1:])):
+                return False, detail + "; output budget unverified: conflicting agent identity or counters"
+            agents[ident] = history[-1]
+        inventory = dict(collections.Counter(row["agent"] for row in agents.values()))
+        if inventory != {kind: count for kind, count in expected_spawns.items() if count}:
+            return False, detail + f"; output budget unverified: agent inventory {inventory} differs from spawns {expected_spawns}"
+    subtraction = sum(row["output"] for row in agents.values())
+    upper = host_output - subtraction
+    detail += f"; host total {host_output:,}, proven new-agent lower bounds {subtraction:,}, main upper bound {upper:,}"
+    if upper < usage["output"]:
+        return False, detail + "; inconsistent host output total or agent lower bounds"
     if usage["billed"] > MAIN_BUDGET_INPUT or usage["output"] > MAIN_BUDGET_OUTPUT:
         return False, detail + "; budget exceeded"
-    # modelUsage covers the entire call, subagents included. It is an upper
-    # bound on main output, never a main-only measurement. A small total can
-    # prove the ceiling; a larger/missing total leaves it unverified.
-    if host_output is None or host_output > MAIN_BUDGET_OUTPUT:
-        return False, detail + "; output budget unverified: no host upper bound within the ceiling"
-    if host_output < usage["output"]:
-        return False, detail + "; inconsistent host output total"
-    return True, detail + f"; host total output upper bound {host_output:,} proves the output ceiling"
+    if upper > MAIN_BUDGET_OUTPUT:
+        return False, detail + "; output budget unverified: main upper bound exceeds the ceiling"
+    return True, detail + "; proves the output ceiling"
 
 
 def audit_spawns(records):
@@ -949,7 +987,9 @@ def judge_case(check, fixture, case):
         product = product_source([os.path.relpath(p, folder) for p in tracked])
         ok_reads, reads = stage0_judgment(events, SEED_WORKTREE, product)
         ok_pointer, pointers = pointer_judgment(events)
-        ok_budget, budget = budget_judgment(case.get("ledger") or [], case.get("session"), case.get("host_output"))
+        ok_budget, budget = budget_judgment(case.get("ledger") or [], case.get("session"), case.get("host_output"),
+                                           before_totals=case.get("before_totals", {}),
+                                           expected_spawns=case.get("expected_spawns"))
         return ok_reads and ok_pointer and ok_budget, f"{reads}; {pointers}; {budget}"
     if check == "s9":
         start = len(seed_text(fixture).rstrip("\n").splitlines()) + 2
@@ -1636,11 +1676,12 @@ def check_s8(ctx, report, protocol):
         if ok:
             report.note(found)
     host_usage = list((ctx.result.get("modelUsage") or {}).values())
-    host_output = sum(int(m["outputTokens"]) for m in host_usage) if host_usage and all(
-        "outputTokens" in m for m in host_usage) else None
-    ok, found = budget_judgment(ledger(ctx.repo), ctx.result.get("session_id"), host_output)
+    host_output = sum(m["outputTokens"] for m in host_usage) if host_usage and all(
+        type(m.get("outputTokens")) is int and m["outputTokens"] >= 0 for m in host_usage) else None
+    ok, found = budget_judgment(ledger(ctx.repo), ctx.result.get("session_id"), host_output,
+                               before_totals=ctx.before.get("ledger_totals"), expected_spawns=ctx.by_type)
     report.ok(ok, f"the main session stays within {MAIN_BUDGET_INPUT:,} billed input and {MAIN_BUDGET_OUTPUT:,} output "
-                  f"tokens (input from ledger; output requires a host upper bound)", found)
+                  f"tokens (input from ledger; fresh main output bounded by host total minus proven new-agent output)", found)
     if ok:
         report.note(found)
 

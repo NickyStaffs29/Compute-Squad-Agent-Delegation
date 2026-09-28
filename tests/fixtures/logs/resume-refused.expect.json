@@ -6,11 +6,11 @@
       "text": "If it is not, but a result reports a step `REFUSED:` or `not run:`, re-spawn that stage for a new, complete entry (DELEGATE steps 2 and 4)."
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "If a helper refused a step or reports one that did not run as the procedure says, append that report the same way and re-spawn the requesting stage even if its request was not `BLOCKING`"
     },
     {
-      "file": "skills/compute-squad/SKILL.md",
+      "file": "skills/compute-squad/references/resume.md",
       "text": "A stage whose request was not `BLOCKING` appends a new, complete entry under its plain heading, never `(cont.)`."
     },
     {
