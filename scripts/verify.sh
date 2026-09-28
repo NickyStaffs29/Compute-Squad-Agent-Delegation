@@ -1518,6 +1518,14 @@ WORK_ORDER_STOP = (
     "`No archive.` followed by which: the log awaits the main session's high-stakes review, the run stays open for "
     "the next work order, or both."
 )
+# A live S4 PASS carried a `Next:` line, which only `## Status` may hold:
+# squad-mech's open-run guard reads the latest one in the log (8a's
+# next-line rule). Both PM modes and the Codex agent carry the reservation.
+PM_NEXT_LINE = (
+    "No line of it starts with `Next:` either: that field belongs to `## Status`, which only the main session writes, "
+    "and squad-mech's open-run guard reads the latest `Next:` line in the log to decide whether a run is open. "
+    "Describe follow-up work, such as another work order or the high-stakes review, in prose or a bullet instead."
+)
 PLAN_ATTEMPT = (
     "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n "
     "is plan revision r<n>."
@@ -1654,6 +1662,8 @@ SHARED_SPANS = [
     span_row("verdict scope", PM_FILES, text=VERDICT_SCOPE),
     span_row("work-order stop", PM_FILES, text=WORK_ORDER_STOP),
     span_row("plan attempt", ["agents/squad-pm.md", "codex/03-pm-plan.md"], text=PLAN_ATTEMPT),
+    span_row("PM Next: line", ["agents/squad-pm.md", "codex/03-pm-plan.md", "codex/05-pm-accept.md",
+                               "codex/agents/squad-pm.toml"], text=PM_NEXT_LINE),
     span_row("verdict attempt", PM_FILES, text=VERDICT_ATTEMPT),
     span_row("classification route", [SKILL], text=CLASSIFICATION_ROUTE),
     span_row("FAIL count", [SKILL], text=FAIL_COUNT),
