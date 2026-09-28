@@ -43,7 +43,7 @@ Callers:
 Tests:
 - src/server/auth/__tests__/reset.routes.test.js: 6 cases through setup() (lines 8-14), run by npm test ("node --test"); the suite's clock helper is createFakeClock() in src/server/clock.js:5-13
 Invariants:
-- CLAUDE.md:3 "Auth responses are generic: no status code, body, or log line may reveal whether an account exists.": at risk: a refused request must return GENERIC_RESULT so every response stays identical
+- CLAUDE.md:3 "Auth responses are generic: no status code, body, or log line may reveal whether an account exists.": at risk: a refused request must return GENERIC_RESULT and log the one event every request logs, so no response or log line differs
 - CLAUDE.md:4 "Log events carry an event code and ids only, never an email address or a reset token.": holds: the goal adds no log event
 - CLAUDE.md:5 "Tests never use real timers or sleep; use createFakeClock from src/server/clock.js.": holds
 - CLAUDE.md:6 "No new dependencies: Node's standard library only.": holds

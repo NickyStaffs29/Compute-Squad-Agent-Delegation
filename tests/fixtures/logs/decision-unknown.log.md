@@ -8,7 +8,7 @@ Acceptance criteria:
 - AC1: A second reset request for the same account within 60 seconds of the first sends no new email and creates no new token row.
 - AC2: A reset request 60 seconds or more after the account's newest token creates a new token and sends the email as normal.
 - AC3: No response or log reveals whether an account exists (existing invariant preserved).
-- AC4: A request refused by the cooldown logs the event code reset_cooldown_hit with the account id and no address.
+- AC4: The reset_requested event is renamed reset_request_received: every well-formed reset request logs exactly one { code: "reset_request_received" } event, the same for a known account's send, a cooldown refusal, and an unknown address, with no account id, address, token, or outcome field.
 - AC5: npm test passes.
 Out of scope: per-IP throttling; admin-triggered resets (different service path).
 Assumptions: none

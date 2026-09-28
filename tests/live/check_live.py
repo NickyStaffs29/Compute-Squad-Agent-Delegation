@@ -118,13 +118,16 @@ PLUGIN_PREFIX = "compute-squad:"
 LEDGER_TOLERANCE = 0.01
 
 # The S2 and S3 seed plans (tests/fixtures/logs/s2.log.md and s3.log.md, the
-# same plan r1) list these files for WO-1; WO-2 adds the reset_cooldown_hit
-# event and touches src/server/log.js.
+# same plan r1) list these files for WO-1; WO-2 renames the one event every
+# reset request logs to reset_request_received, which touches
+# src/server/log.js. tests/live/repo-reset-wo2.patch is WO-2 as the plan
+# specifies it, after WO-1; no scenario applies it, and the fixture regression
+# tests prove WO-1 and WO-2 together log every request alike.
 S2_WO1_FILES = (
     "src/server/auth/reset.service.js",
     "src/server/auth/__tests__/reset.routes.test.js",
 )
-S2_WO2_MARK = "reset_cooldown_hit"
+S2_WO2_MARK = "reset_request_received"
 # S5 (tests/fixtures/logs/s5.log.md, on tests/fixtures/repo-ui/): the
 # criterion the browser check covers, and that check. The fixture's check
 # exits 0 with no overflow, 1 with one, and 2 when it cannot run.

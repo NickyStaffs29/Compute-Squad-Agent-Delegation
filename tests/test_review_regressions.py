@@ -451,44 +451,102 @@ class ResetFixtureRegressionTests(unittest.TestCase):
     cooldown goal's privacy criterion repeats: no response or log line
     reveals whether an account exists."""
     FIXTURE = ROOT / "tests/fixtures/repo-reset"
-    # Two requests a second apart for a known and for an unknown address;
-    # once the cooldown exists, the known address's second one is refused.
+    SERVICE = "src/server/auth/reset.service.js"
+    CODES = "const EVENT_CODES = Object.freeze(['reset_request_received']);"
+    # One app, requests a second apart: a known address's send, its second
+    # request (refused once WO-1's cooldown exists), and an unknown address.
     PROBE = """
 const { createApp } = require('./src/server/app');
 const { createFakeClock } = require('./src/server/clock');
-function requests(email) {
-  const clock = createFakeClock();
-  const app = createApp({ clock, accounts: [{ email: 'ada@example.com' }] });
-  const seen = [];
-  for (let i = 0; i < 2; i += 1) {
-    const logged = app.log.events.length;
-    const res = app.handle({ method: 'POST', path: '/api/auth/reset-request', body: { email } });
-    seen.push({ res, events: app.log.events.slice(logged) });
-    clock.advance(1000);
-  }
-  return { seen, emails: app.outbox.length };
+const clock = createFakeClock();
+const app = createApp({ clock, accounts: [{ email: 'ada@example.com' }] });
+const seen = {};
+for (const [name, email] of [['send', 'ada@example.com'], ['cooldown', 'ada@example.com'], ['unknown', 'nobody@example.com']]) {
+  const logged = app.log.events.length;
+  const mailed = app.outbox.length;
+  const res = app.handle({ method: 'POST', path: '/api/auth/reset-request', body: { email } });
+  seen[name] = { res, events: app.log.events.slice(logged), emails: app.outbox.length - mailed };
+  clock.advance(1000);
 }
-console.log(JSON.stringify({ known: requests('ada@example.com'), unknown: requests('nobody@example.com') }));
+console.log(JSON.stringify(seen));
 """
+    # Each tree the scenarios build, with the one event each request must log:
+    # the base, WO-1 as S2c, S4, and S6a apply it, S4b's commit C, and WO-1
+    # plus the completed WO-2.
+    TREES = (((), "reset_requested"), (("wo1",), "reset_requested"), (("wo1", "wo2-event"), "reset_requested"),
+             (("wo1", "wo2"), "reset_request_received"))
+
+    @contextlib.contextmanager
+    def tree(self, patches):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            shutil.copytree(self.FIXTURE, repo)
+            subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True, capture_output=True)
+            for name in patches:
+                subprocess.run(["git", "-C", str(repo), "apply", str(ROOT / f"tests/live/repo-reset-{name}.patch")],
+                               check=True, capture_output=True)
+            yield repo
+
+    def privacy_problems(self, repo, code):
+        """What breaks the privacy rule: responses that differ, or a request
+        whose log is anything but the one { code } event. It also confirms
+        the probe reached each case: the send mails, the unknown address does
+        not, and the second request is refused once the cooldown exists."""
+        run = subprocess.run(["node", "-e", self.PROBE], cwd=repo, capture_output=True, text=True, timeout=60)
+        self.assertEqual(0, run.returncode, run.stderr)
+        seen = json.loads(run.stdout)
+        problems = []
+        if len({json.dumps(v["res"], sort_keys=True) for v in seen.values()}) != 1:
+            problems.append(f"responses differ: {[v['res'] for v in seen.values()]}")
+        problems += [f"{name} logged {v['events']}, not exactly [{{'code': {code!r}}}]"
+                     for name, v in seen.items() if v["events"] != [{"code": code}]]
+        cooldown = "RESEND_COOLDOWN_MS" in (repo / self.SERVICE).read_text()
+        self.assertEqual({"send": 1, "cooldown": 0 if cooldown else 1, "unknown": 0},
+                         {name: v["emails"] for name, v in seen.items()}, "the probe must reach every case")
+        return problems
 
     @unittest.skipUnless(shutil.which("node") and shutil.which("git"), "needs node and git")
     def test_reset_responses_and_log_never_tell_known_from_unknown(self):
-        # The base tree, WO-1 as S2c, S4, and S6a apply it, and S4b's commit C.
-        for patches in ((), ("wo1",), ("wo1", "wo2-event")):
-            with self.subTest(patches=patches), tempfile.TemporaryDirectory() as temp:
-                repo = Path(temp) / "repo"
-                shutil.copytree(self.FIXTURE, repo)
-                subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True, capture_output=True)
-                for name in patches:
-                    subprocess.run(["git", "-C", str(repo), "apply", str(ROOT / f"tests/live/repo-reset-{name}.patch")],
-                                   check=True, capture_output=True)
-                run = subprocess.run(["node", "-e", self.PROBE], cwd=repo, capture_output=True, text=True, timeout=60)
-                self.assertEqual(0, run.returncode, run.stderr)
-                seen = json.loads(run.stdout)
-                self.assertGreater(seen["known"]["emails"], 0, "the known address must get its email")
-                self.assertEqual(0, seen["unknown"]["emails"])
-                self.assertEqual(seen["known"]["seen"], seen["unknown"]["seen"],
-                                 "each response and each request's log events must match for both addresses")
+        for patches, code in self.TREES:
+            with self.subTest(patches=patches), self.tree(patches) as repo:
+                self.assertEqual([], self.privacy_problems(repo, code))
+
+    @unittest.skipUnless(shutil.which("node") and shutil.which("git"), "needs node and git")
+    def test_a_cooldown_only_event_or_an_account_id_fails_the_privacy_check(self):
+        branch = "  if (newest && clock.now() - newest.createdAt < RESEND_COOLDOWN_MS) {\n"
+        shared = "  log.event('reset_request_received');\n  const account = store.findAccountByEmail(email);\n"
+        cooldown_event = {self.CODES: self.CODES.replace("]", ", 'reset_cooldown_hit']")}
+        mutations = {
+            # The requirement WO-7 replaced: a cooldown-only event with the account id.
+            "the old WO-2 event": dict(cooldown_event, **{
+                branch: branch + "    log.event('reset_cooldown_hit', { accountId: account.id });\n"}),
+            "a cooldown-only event": dict(cooldown_event, **{branch: branch + "    log.event('reset_cooldown_hit');\n"}),
+            "an accountId field": {shared: "  const account = store.findAccountByEmail(email);\n"
+                                           "  log.event('reset_request_received', account ? { accountId: account.id } : {});\n"},
+        }
+        flagged = {"the old WO-2 event": ["cooldown"], "a cooldown-only event": ["cooldown"],
+                   "an accountId field": ["send", "cooldown"]}
+        for name, edits in mutations.items():
+            with self.subTest(mutation=name), self.tree(("wo1", "wo2")) as repo:
+                for old, new in edits.items():
+                    path = repo / ("src/server/log.js" if old == self.CODES else self.SERVICE)
+                    text = path.read_text()
+                    self.assertEqual(1, text.count(old), f"{name}: {old!r}")
+                    path.write_text(text.replace(old, new))
+                problems = self.privacy_problems(repo, "reset_request_received")
+                self.assertEqual(flagged[name], [p.split()[0] for p in problems], problems)
+
+    def test_no_fixture_or_example_asks_for_a_cooldown_only_or_account_linked_event(self):
+        # The reset scenario's texts: fixture logs, the worked example, the
+        # patches, the fixture repo, and the harness's goals.
+        forbidden = re.compile(r"cooldown_hit|log\.event\([^)\n]*account|logs? [^.\n]*event[^.\n]*with (?:the )?account ?id",
+                               re.IGNORECASE)
+        paths = [*FIXTURES.glob("*.log.md"), ROOT / "docs/example-log.md", *(ROOT / "tests/live").glob("repo-reset-*.patch"),
+                 *(p for p in self.FIXTURE.rglob("*") if p.is_file()), ROOT / "tests/live/run.sh"]
+        found = [f"{p.relative_to(ROOT)}:{n}: {m.group(0)}" for p in paths
+                 for n, line in enumerate(p.read_text().splitlines(), 1) for m in forbidden.finditer(line)]
+        self.assertEqual([], found)
+        self.assertEqual("reset_request_received", check_live.S2_WO2_MARK)
 
     def test_live_seed_map_quotes_match_the_fixture_lines_they_cite(self):
         # The seeds run.sh's scenarios put on this fixture (REPO defaults to it).

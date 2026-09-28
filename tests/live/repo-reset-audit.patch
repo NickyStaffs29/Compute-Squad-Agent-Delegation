@@ -14,7 +14,7 @@ index 0327490..2d125ff 100644
    "scripts": {
      "test": "node --test"
 diff --git a/src/server/auth/__tests__/reset.routes.test.js b/src/server/auth/__tests__/reset.routes.test.js
-index a9b13e6..ecd323b 100644
+index a9b13e6..a79d7c8 100644
 --- a/src/server/auth/__tests__/reset.routes.test.js
 +++ b/src/server/auth/__tests__/reset.routes.test.js
 @@ -1,3 +1,4 @@
@@ -46,7 +46,7 @@ index a9b13e6..ecd323b 100644
 +  assert.equal(app.outbox.length, 2);
 +});
 +
-+test.skip('a cooldown hit logs reset_cooldown_hit', () => {});
++test.skip('a cooldown refusal logs reset_request_received', () => {});
 diff --git a/src/server/auth/reset.service.js b/src/server/auth/reset.service.js
 index 3060aa1..ca14a6e 100644
 --- a/src/server/auth/reset.service.js
