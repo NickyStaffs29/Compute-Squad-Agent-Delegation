@@ -111,6 +111,14 @@ grep -n -E '^(## |DELEGATE:|BLOCKER:|Attempt: |Answers: |Plan: |Classification: 
 
 If a `DELEGATE:` or `BLOCKER:` line follows the newest heading, read that block before doing anything else. Route on those field lines, not on the entry's prose. The grep and any signaled BLOCKER/DELEGATE block are enough after Recon or Executor; do not read their whole map or implementation narrative just to route. After PLAN, read only enough of the governing attempt to establish the work-order identity/order as well as its fixed fields; expand any ambiguous read instead of inferring absence from truncated text. Acceptance and high-stakes review still read every applicable criterion and exact verification command, and the review reads the full diff. Inspect routing, append Status, then spawn sequentially; never parallelize these dependent actions. Read a final message only for what the log cannot hold: the reports of `squad-mech` and `squad-helper`, which write no log entries (Stage 1, DELEGATE step 2), an `ARCHIVE FAILED:` line (Hard rules), and the archive path of a PM that archived and cleared the log, where you read its PASS entry (Stage 5).
 
+## Main-session efficiency
+
+A child completion is a routing event, not a separate reporting turn. After each spawn returns, run the required compact route command once, retain its output while appending Status and preparing the next pointer, and do not repeat the grep or reread unchanged log sections. Batch independent read-only checks into one tool call where the host permits it. A new log entry or a required acceptance/high-stakes check is the reason to refresh; those checks still read every applicable criterion, exact command, and full diff.
+
+Named stage roles already pin their model and effort. Do not spend a separate model-discovery turn or reread the routing block before each spawn; use the generated role pin and stop if the spawn reports that its model is unavailable. For an ad hoc finder or skeptic, pass the configured model and effort in the spawn itself.
+
+On native Codex, `wait` is an event subscription, not a polling loop. While routing or other local work remains, do not wait: process that work and let completion arrive in the next turn. When genuinely idle with children outstanding, issue one event wait using the host's interactive timeout cap (at most `timeout_ms: 60000`); do not short-poll. If it times out, inspect the agent inventory once for stuck children, then return to available local work before waiting again; do not reread unchanged state.
+
 ## Modes, grants, and the Status entry
 
 Every invocation has one mode: the first word of a `/squad` request, or what the user's own words ask for. The default is `full`.

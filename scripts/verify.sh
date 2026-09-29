@@ -3603,6 +3603,12 @@ if not close:
 close_guard, close_line = close.group(1), close.group(2)
 if close_line != "Result: upheld":
     fail(f"{MECH}: the close guard must wait for 'Result: upheld', not {close_line!r}")
+CLOSE_ARCHIVE_BRANCH = (
+    "For `Mode: close`, skip the open-run check after the required `Result: upheld` guard and proceed to the archive command below."
+)
+for path in ("agents/squad-mech.md", "codex/01-archive.md", "codex/agents/squad-mech.toml"):
+    if CLOSE_ARCHIVE_BRANCH not in " ".join(read(path).split()):
+        fail(f"{path}: close mode must skip the new-run open-log guard after the upheld-result check")
 ARCHIVED = re.compile(r"archived and cleared: (compute-squad-archive/COMPUTE_SQUAD_LOG_\d{4}-\d{2}-\d{2}_\d{6}_(\S+)\.md)")
 FIXED_STAMP = "2026-01-02_030405"
 archive_shells = [sh for sh in ("sh", "dash", "bash") if shutil.which(sh)]

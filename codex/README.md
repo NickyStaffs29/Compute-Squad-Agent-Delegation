@@ -72,6 +72,12 @@ an unverified, possibly session-specific restriction:
 
 If the Codex version does not support the native plugin manifest, run the manually sequenced sessions below. Each stage reads and appends to the same `COMPUTE_SQUAD_LOG.md` in the repo root.
 
+**Main-session efficiency.** A child completion is a routing event, not a separate reporting turn. After each stage returns, run the required compact route command once, retain its output while appending `Status` and preparing the next prompt, and do not repeat the grep or reread unchanged log sections. Batch independent read-only checks into one tool call where the host permits it. A new log entry or a required acceptance/high-stakes check is the reason to refresh; those checks still read every applicable criterion, exact command, and full diff.
+
+Named stage roles already pin their model and effort. Do not spend a separate model-discovery turn or reread the routing table before each stage; use the generated role pin and stop if a spawn reports that its model is unavailable. For an ad hoc finder or skeptic, pass the configured model and effort in the spawn itself.
+
+On native Codex, `wait` is an event subscription, not a polling loop. While routing or other local work remains, do not wait: process that work and let completion arrive in the next turn. When genuinely idle with children outstanding, issue one event wait using the host's interactive timeout cap (at most `timeout_ms: 60000`); do not short-poll. If it times out, inspect the agent inventory once for stuck children, then return to available local work before waiting again; do not reread unchanged state.
+
 ## How to run it
 
 **Stage 0 — Strategy (you, before any session).** Interrogate your own goal: what does done look
