@@ -76,7 +76,7 @@ If the Codex version does not support the native plugin manifest, run the manual
 
 Named stage roles already pin their model and effort. Do not spend a separate model-discovery turn or reread the routing table before each stage; use the generated role pin and stop if a spawn reports that its model is unavailable. For an ad hoc finder or skeptic, pass the configured model and effort in the spawn itself.
 
-On native Codex, `wait` is an event subscription, not a polling loop. While routing or other local work remains, do not wait: process that work and let completion arrive in the next turn. When genuinely idle with children outstanding, issue one event wait using the host's interactive timeout cap (at most `timeout_ms: 60000`); do not short-poll. If it times out, inspect the agent inventory once for stuck children, then return to available local work before waiting again; do not reread unchanged state.
+On native Codex, `wait_agent` is an event subscription, not a polling loop. Do local routing work before waiting. In a non-interactive `codex exec` run, wait once for the stage with `timeout_ms: 600000`; if the host rejects that value, use its largest supported timeout. In an interactive session, wait at most 60 seconds so the user can steer. After a routine timeout, wait again without listing agents or rereading unchanged state; inspect the agent inventory only when the wait reports an error or there is concrete evidence of a stuck child.
 
 ## How to run it
 

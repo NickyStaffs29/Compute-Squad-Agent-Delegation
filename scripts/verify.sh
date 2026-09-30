@@ -1604,6 +1604,13 @@ SCOPED_GRANT_RULE = (
     "and G is P or `all`. No other Decision type grants execution, and only the exact "
     "`Grant: all revisions, full-mode request` needs no Decision."
 )
+NATIVE_WAIT = (
+    "On native Codex, `wait_agent` is an event subscription, not a polling loop. Do local routing work before waiting. "
+    "In a non-interactive `codex exec` run, wait once for the stage with `timeout_ms: 600000`; if the host rejects "
+    "that value, use its largest supported timeout. In an interactive session, wait at most 60 seconds so the user "
+    "can steer. After a routine timeout, wait again without listing agents or rereading unchanged state; inspect "
+    "the agent inventory only when the wait reports an error or there is concrete evidence of a stuck child."
+)
 PLAN_ATTEMPT = (
     "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n "
     "is plan revision r<n>."
@@ -1741,6 +1748,7 @@ SHARED_SPANS = [
     span_row("work-order stop", PM_FILES, text=WORK_ORDER_STOP),
     span_row("plan attempt", ["agents/squad-pm.md", "codex/03-pm-plan.md"], text=PLAN_ATTEMPT),
     span_row("scoped grant rule", [SKILL, "codex/README.md"], text=SCOPED_GRANT_RULE),
+    span_row("native event wait", [SKILL, "codex/README.md"], text=NATIVE_WAIT),
     span_row("PM Next: line", ["agents/squad-pm.md", "codex/03-pm-plan.md", "codex/05-pm-accept.md",
                                "codex/agents/squad-pm.toml"], text=PM_NEXT_LINE),
     span_row("verdict attempt", PM_FILES, text=VERDICT_ATTEMPT),
