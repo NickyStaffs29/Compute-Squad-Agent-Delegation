@@ -1091,7 +1091,11 @@ for path, block in review_blocks.items():
 for phrase in ("cat >> COMPUTE_SQUAD_LOG.md <<'EOF'` (quoted delimiter required)",
                "never use bare `<<EOF` to interpolate `$ts`",
                "Read back the review you just appended.",
-               "do not append a second review"):
+               "do not append a second review",
+               "Run the required compact route command and load this section, `verdict`, the latest `## Goal — Locked` entry, and governing Plan in one tool round trip.",
+               "In the next tool round trip, batch the PASS criteria, full diff against the run's base commit",
+               "If the host can sequence tool calls inside one round trip",
+               "Trust its verified archive report without a separate archive reread."):
     if phrase not in sections["high-stakes"]:
         fail(f"{AUDIT_PROMPTS}: high-stakes append safeguard missing: {phrase!r}")
 for path in CRITERIA_PM:
@@ -1755,8 +1759,17 @@ SHARED_SPANS = [
     span_row("skip Recon reread", [SKILL, "codex/README.md"],
              text="Do not reread Recon's body after an unblocked route."),
     span_row("batch high-stakes reads", [SKILL, "codex/README.md"],
-             text="At a high-stakes PASS, load the required reference sections and derive risks from the latest Goal first; "
-                  "then batch independent reads of the PASS criteria, full base diff, touched source, status, and Decisions."),
+             text="When a high-stakes PASS is expected, combine that compact route command with loading the required "
+                  "reference sections, latest Goal, and governing Plan in one tool round trip; route only on the "
+                  "command's output, then derive risks from the Goal before opening PASS evidence. In the next tool round trip, "
+                  "batch the PASS criteria, full base diff, changed source and plan-named callers or stores, status, "
+                  "Decisions, and the plan's exact verification commands."),
+    span_row("one review round trip", [SKILL, "codex/README.md"],
+             text="Get the timestamp, append the review with a quoted heredoc, and read it back in one sequential tool "
+                  "round trip when the host supports that; inspect the read-back before appending Status."),
+    span_row("PM exact Tested", PM_FILES,
+             text="Do not append comments to the `Tested:` line: it contains only the commit SHA and `working tree "
+                  "clean` or `working tree N changed files`. Put exclusions and scope explanations below the criteria block."),
     span_row("skip empty archive route", [SKILL, "codex/README.md"],
              text="Stage 1 and closing `squad-mech` archive spawns write no stage entry: use their final archive report "
                   "and guard, and do not route the empty active log."),
