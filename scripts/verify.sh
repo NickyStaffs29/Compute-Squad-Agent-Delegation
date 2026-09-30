@@ -1749,6 +1749,17 @@ SHARED_SPANS = [
     span_row("plan attempt", ["agents/squad-pm.md", "codex/03-pm-plan.md"], text=PLAN_ATTEMPT),
     span_row("scoped grant rule", [SKILL, "codex/README.md"], text=SCOPED_GRANT_RULE),
     span_row("native event wait", [SKILL, "codex/README.md"], text=NATIVE_WAIT),
+    span_row("Recon baseline second", ["agents/squad-recon.md", "codex/02-recon.md",
+                                       "codex/agents/squad-recon.toml"],
+             text="Put criterion evidence under the relevant later label, never between the goal-facts and baseline lines."),
+    span_row("skip Recon reread", [SKILL, "codex/README.md"],
+             text="Do not reread Recon's body after an unblocked route."),
+    span_row("batch high-stakes reads", [SKILL, "codex/README.md"],
+             text="At a high-stakes PASS, load the required reference sections and derive risks from the latest Goal first; "
+                  "then batch independent reads of the PASS criteria, full base diff, touched source, status, and Decisions."),
+    span_row("skip empty archive route", [SKILL, "codex/README.md"],
+             text="Stage 1 and closing `squad-mech` archive spawns write no stage entry: use their final archive report "
+                  "and guard, and do not route the empty active log."),
     span_row("PM Next: line", ["agents/squad-pm.md", "codex/03-pm-plan.md", "codex/05-pm-accept.md",
                                "codex/agents/squad-pm.toml"], text=PM_NEXT_LINE),
     span_row("verdict attempt", PM_FILES, text=VERDICT_ATTEMPT),
