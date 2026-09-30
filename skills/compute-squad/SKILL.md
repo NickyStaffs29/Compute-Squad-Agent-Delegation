@@ -28,6 +28,7 @@ Coordinate exclusively through `COMPUTE_SQUAD_LOG.md` in the repo root.
 <!-- routing:begin -->
 Generated from `models.conf` (reviewed 2026-09-24); edit that file, never this block.
 Rungs (Claude alias, Codex ID): top `fable`, `gpt-5.6-sol`; mid `opus`, `gpt-5.6-terra`; bottom `sonnet`, `gpt-5.6-luna`.
+Codex main session: `gpt-5.6-sol` (chosen separately from the tier models).
 - Top: main session, `squad-pm`, `squad-executor-complex`, audit skeptic.
 - Mid: `squad-recon`, `squad-executor`, audit finders; in Codex also `squad-helper`.
 - Bottom: `squad-executor-mechanical`, `squad-mech`; in Claude Code also `squad-helper`.

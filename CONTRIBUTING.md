@@ -57,7 +57,7 @@ Routing names models in one file, `models.conf`. Protocol text names rungs (top,
 Codex models change in two places, and only one is in this repository:
 
 - **Release defaults.** The Codex column of `models.conf` is what a release ships and what the chooser shows on a Codex home's first setup. Change it with the steps below.
-- **Account choices.** Each Codex home picks its own model and reasoning effort per tier with `bash codex/update.sh --review-models`, saved in `$CODEX_HOME/compute-squad/choices.conf`. A choice never touches the repository, and a release that changes `models.conf` changes no one's saved choices. It replaces each rung's Codex model and effort, never which rung a role sits on, so check 6's rung policy still holds, and the chooser keeps the three tiers on three different models.
+- **Account choices.** Each Codex home picks its own model and reasoning effort per tier and for the main session with `bash codex/update.sh --review-models`, saved in `$CODEX_HOME/compute-squad/choices.conf`. A choice never touches the repository, and a release that changes `models.conf` changes no one's saved choices. It replaces each rung's Codex model and effort, never which rung a role sits on, so check 6's release rung policy still holds. Repeating a model across tiers is allowed, but escalation between those tiers does not increase model strength.
 
 To change the release defaults:
 
