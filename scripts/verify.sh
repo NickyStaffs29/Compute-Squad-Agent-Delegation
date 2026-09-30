@@ -1088,6 +1088,12 @@ review_blocks = {path: extract_fenced_block(sections["high-stakes"] if path == A
 for path, block in review_blocks.items():
     if block != review_blocks[REVIEW_PATHS[0]]:
         fail(f"{path}: the {REVIEW_HEADING} template differs from {REVIEW_PATHS[0]}'s: {block!r}")
+for phrase in ("cat >> COMPUTE_SQUAD_LOG.md <<'EOF'` (quoted delimiter required)",
+               "never use bare `<<EOF` to interpolate `$ts`",
+               "Read back the review you just appended.",
+               "do not append a second review"):
+    if phrase not in sections["high-stakes"]:
+        fail(f"{AUDIT_PROMPTS}: high-stakes append safeguard missing: {phrase!r}")
 for path in CRITERIA_PM:
     if "archive nothing and clear nothing" not in " ".join(read(path).split()):
         fail(f"{path}: a high-stakes PASS must 'archive nothing and clear nothing' (finding 3)")
