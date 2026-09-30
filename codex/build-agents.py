@@ -26,9 +26,10 @@ validated, never as a pass, and exits 0 (1 with --strict).
 The account's Codex model choices live outside the repository, in
 $CODEX_HOME/compute-squad/choices.conf, which codex/update.sh passes as
 CHOICES. models.conf stays the release default; a choice replaces each Codex
-rung's model and effort, never which rung a role sits on.
+rung's model and effort and the main session's model and effort, never which
+rung a role sits on.
 --choose CATALOG CHOICES asks, on a terminal, which listed model and effort
-fills each tier, shows the result, and saves it only on a literal `yes`.
+fills each tier and the main session, shows the result, and saves it only on a literal `yes`.
 --catalog-status CATALOG CHOICES prints current, changed, or unsaved.
 --render-codex OUTDIR CHOICES writes the effective Codex build into a new
 directory: a local marketplace holding the plugin payload, the agents, and the
@@ -70,6 +71,7 @@ HEADER_FORMS = {
     "date": ("YYYY-MM-DD", r"[0-9]{4}-[0-9]{2}-[0-9]{2}"),
     "sha256": ("<64 lowercase hex digits>", r"[0-9a-f]{64}"),
     "effort": ("<effort>", r"[a-z][a-z0-9_-]*"),
+    "model": ("<model>", r"\S+"),
 }
 MANIFEST_GRAMMAR = {
     "headers": {"reviewed": "date"},
@@ -78,6 +80,7 @@ MANIFEST_GRAMMAR = {
 }
 CHOICES_GRAMMAR = {
     "headers": {"chosen": "date", "catalog": "sha256", "main_effort": "effort"},
+    "optional_headers": {"main_model": "model"},
     "sections": {"tier": ("codex", "codex_effort")},
     "rung_keyed": ("tier",),
 }
@@ -180,7 +183,7 @@ SUPERSEDED = (
 )
 SUPERSEDED_CHOICE = (
     "{model} is superseded by {target}; to choose again, run codex/update.sh --review-models. "
-    "Do not apply the upgrade target as is: it can put two tiers on one model."
+    "Review the target and its supported efforts before saving."
 )
 
 
@@ -226,14 +229,15 @@ def parse_grammar(text: str, source: str, grammar: dict) -> tuple[dict, dict]:
             continue
         if current is None:
             key = fields[0]
-            if key not in grammar["headers"]:
+            header_forms = {**grammar["headers"], **grammar.get("optional_headers", {})}
+            if key not in header_forms:
                 raise ManifestError(f"{where}: {line!r} is outside a section")
             if key in headers:
                 raise ManifestError(f"{where}: a second '{key}' line")
-            shown, pattern = HEADER_FORMS[grammar["headers"][key]]
+            shown, pattern = HEADER_FORMS[header_forms[key]]
             if len(fields) != 2 or not re.fullmatch(pattern, fields[1]):
                 raise ManifestError(f"{where}: expected '{key} {shown}'; found {line!r}")
-            if grammar["headers"][key] == "date":
+            if header_forms[key] == "date":
                 try:
                     datetime.date.fromisoformat(fields[1])
                 except ValueError:
@@ -284,15 +288,11 @@ def parse_manifest(text: str, source: str = "models.conf") -> dict:
 
 
 def parse_choices(text: str, source: str) -> dict:
-    """Parse choices.conf, one Codex home's model and effort per tier. Each
-    tier needs its own model, so no two rungs collapse onto one."""
+    """Parse choices.conf. Older files without main_model keep their top-tier
+    model for the main session until the next review."""
     headers, sections = parse_grammar(text, source, CHOICES_GRAMMAR)
     tiers = {rung: sections["tier"][rung] for rung in RUNGS}
-    models = [tiers[rung]["codex"] for rung in RUNGS]
-    if len(set(models)) != len(models):
-        raise ManifestError(
-            f"{source}: each tier needs its own model; bottom, mid, top are {', '.join(models)}"
-        )
+    headers.setdefault("main_model", tiers["top"]["codex"])
     return {**headers, "tiers": tiers}
 
 
@@ -307,8 +307,8 @@ def load_choices(path: str) -> dict:
 def effective_manifest(release: dict, choices: dict) -> dict:
     """The release manifest with each Codex rung's model, and each role's Codex
     effort, taken from the choices: a role gets its Codex rung's tier effort,
-    and the main session (strategy) gets main_effort. Rungs, roles, and every
-    Claude column stay the release's."""
+    and the main session (strategy) gets its independently chosen model and
+    main_effort. Rungs, roles, and every Claude column stay the release's."""
     rungs = {rung: dict(row) for rung, row in release["rungs"].items()}
     roles = {role: dict(row) for role, row in release["roles"].items()}
     for rung in RUNGS:
@@ -317,7 +317,8 @@ def effective_manifest(release: dict, choices: dict) -> dict:
         row["codex_effort"] = (
             choices["main_effort"] if role == "strategy" else choices["tiers"][row["codex_rung"]]["codex_effort"]
         )
-    return {**release, "rungs": rungs, "roles": roles, "chosen": choices["chosen"]}
+    return {**release, "rungs": rungs, "roles": roles, "chosen": choices["chosen"],
+            "main_codex_model": choices["main_model"]}
 
 
 def load_manifest() -> dict:
@@ -327,6 +328,8 @@ def load_manifest() -> dict:
 
 
 def model_of(manifest: dict, role: str, host: str) -> str:
+    if role == "strategy" and host == "codex" and "main_codex_model" in manifest:
+        return manifest["main_codex_model"]
     return manifest["rungs"][manifest["roles"][role][f"{host}_rung"]][host]
 
 
@@ -433,6 +436,7 @@ def render_skill_block(manifest: dict) -> str:
         "Rungs (Claude alias, Codex ID): "
         + "; ".join(f"{rung} `{rungs[rung]['claude']}`, `{rungs[rung]['codex']}`" for rung in top_down)
         + ".",
+        f"Codex main session: `{model_of(manifest, 'strategy', 'codex')}` (chosen separately from the tier models).",
     ]
     for rung in top_down:
         on = {host: [label for label in LABELS if roles[label.role][f"{host}_rung"] == rung] for host in ("claude", "codex")}
@@ -487,7 +491,7 @@ def render_readme_table(manifest: dict) -> str:
             claude = f"your session model; {claude_rung} recommended"
         else:
             claude = f"`{rungs[claude_rung]['claude']}` ({claude_rung})"
-        codex = f"`{rungs[row['codex_rung']]['codex']}` {row['codex_effort']}"
+        codex = f"`{model_of(manifest, label.role, 'codex')}` {row['codex_effort']}"
         owns = label.owns.format(rung=claude_rung)
         lines.append(f"| {label.readme_role} | {label.agent} | {claude} | {codex} | {owns} |")
     return "\n".join(lines)
@@ -862,7 +866,7 @@ def catalog_fingerprint(catalog: dict) -> str:
 def release_choices(release: dict) -> dict:
     """The release pins in choices form, shown as the defaults on first setup:
     each tier's Codex model and the effort of the first role on that Codex
-    rung, and the main session's effort."""
+    rung, plus the main session's model and effort."""
     tiers = {}
     for rung in RUNGS:
         efforts = [
@@ -872,7 +876,8 @@ def release_choices(release: dict) -> dict:
         if not efforts:
             raise ManifestError(f"models.conf: no role besides strategy is on the Codex {rung} rung")
         tiers[rung] = {"codex": release["rungs"][rung]["codex"], "codex_effort": efforts[0]}
-    return {"main_effort": release["roles"]["strategy"]["codex_effort"], "tiers": tiers}
+    return {"main_model": model_of(release, "strategy", "codex"),
+            "main_effort": release["roles"]["strategy"]["codex_effort"], "tiers": tiers}
 
 
 def render_choices(choices: dict) -> str:
@@ -887,6 +892,7 @@ def render_choices(choices: dict) -> str:
         "# Written by `bash codex/update.sh --review-models`; rerun it to change them.\n"
         f"chosen {choices['chosen']}\n"
         f"catalog {choices['catalog']}\n"
+        f"main_model {choices['main_model']}\n"
         f"main_effort {choices['main_effort']}\n"
         "\n" + "\n".join(rows) + "\n"
     )
@@ -925,9 +931,8 @@ def ask(prompt: str) -> str:
 
 
 def choose(catalog_path: str, choices_path: str) -> int:
-    """Ask which listed model and effort fills each Codex tier, then the main
-    session's effort; save only on a literal `yes`. It never picks, ranks, or
-    substitutes a model."""
+    """Ask for each tier's model and effort, then the main session's model
+    and effort; save only on a literal `yes`."""
     prefix = "--choose:"
     if not os.isatty(0):
         print(f"{prefix} needs a terminal; run `bash codex/update.sh --review-models` in one", file=sys.stderr)
@@ -949,8 +954,6 @@ def choose(catalog_path: str, choices_path: str) -> int:
     current = saved or defaults
     source = "saved" if saved else "release default"
     now = datetime.datetime.now(datetime.timezone.utc)
-    main_rung = release["roles"]["strategy"]["codex_rung"]
-
     def retired_at(entry: dict):
         at = upgrade_of(entry).get("retirement_at")
         try:
@@ -973,26 +976,26 @@ def choose(catalog_path: str, choices_path: str) -> int:
     def reject(reason: str) -> None:
         print(f"  rejected: {reason}; choose again")
 
+    def choose_model(label: str, shown: str):
+        while True:
+            model = ask(f"{label} model [{shown}, {source}]: ") or shown
+            entry = catalog.get(model)
+            if entry is None:
+                reject(f"{model} is not in this account's model catalog")
+            elif entry["visibility"] != "list":
+                reject(f"{model} is hidden in the catalog (visibility {entry['visibility']})")
+            elif retired_at(entry):
+                reject(f"{model} was retired at {retired_at(entry)}")
+            elif not efforts_of(entry):
+                reject(f"the catalog lists no reasoning efforts for {model}")
+            else:
+                return model, entry
+
     try:
         tiers: dict = {}
         for rung in RUNGS[::-1]:
             shown = current["tiers"][rung]
-            while True:
-                model = ask(f"{rung} tier model [{shown['codex']}, {source}]: ") or shown["codex"]
-                entry = catalog.get(model)
-                taken = [other for other, row in tiers.items() if row["codex"] == model]
-                if entry is None:
-                    reject(f"{model} is not in this account's model catalog")
-                elif entry["visibility"] != "list":
-                    reject(f"{model} is hidden in the catalog (visibility {entry['visibility']})")
-                elif retired_at(entry):
-                    reject(f"{model} was retired at {retired_at(entry)}")
-                elif not efforts_of(entry):
-                    reject(f"the catalog lists no reasoning efforts for {model}")
-                elif taken:
-                    reject(f"{model} is already the {taken[0]} tier's model; each tier needs its own model")
-                else:
-                    break
+            model, entry = choose_model(f"{rung} tier", shown["codex"])
             supported = efforts_of(entry)
             while True:
                 effort = ask(
@@ -1003,8 +1006,8 @@ def choose(catalog_path: str, choices_path: str) -> int:
                     break
                 reject(f"{model} does not support reasoning effort {effort!r}")
             tiers[rung] = {"codex": model, "codex_effort": effort}
-        main_model = tiers[main_rung]["codex"]
-        supported = efforts_of(catalog[main_model])
+        main_model, main_entry = choose_model("main session", current["main_model"])
+        supported = efforts_of(main_entry)
         while True:
             main_effort = ask(
                 f"main session reasoning effort on {main_model} (it supports {', '.join(supported)}) "
@@ -1017,6 +1020,7 @@ def choose(catalog_path: str, choices_path: str) -> int:
         chosen = {
             "chosen": now.date().isoformat(),
             "catalog": catalog_fingerprint(catalog),
+            "main_model": main_model,
             "main_effort": main_effort,
             "tiers": tiers,
         }
@@ -1025,7 +1029,7 @@ def choose(catalog_path: str, choices_path: str) -> int:
         for label in LABELS:
             rung = manifest["roles"][label.role]["codex_rung"]
             print(
-                f"  {label.role:<27}{rung:<8}{manifest['rungs'][rung]['codex']:<24}"
+                f"  {label.role:<27}{rung:<8}{model_of(manifest, label.role, 'codex'):<24}"
                 f"{manifest['roles'][label.role]['codex_effort']}"
             )
         print("Profiles:")
@@ -1038,6 +1042,10 @@ def choose(catalog_path: str, choices_path: str) -> int:
             before = f"{current['tiers'][rung]['codex']} {current['tiers'][rung]['codex_effort']}"
             after = f"{tiers[rung]['codex']} {tiers[rung]['codex_effort']}"
             print(f"  {rung}: {'unchanged (' + after + ')' if before == after else before + ' -> ' + after}")
+        if current["main_model"] == main_model:
+            print(f"  main session model: unchanged ({main_model})")
+        else:
+            print(f"  main session model: {current['main_model']} -> {main_model}")
         if current["main_effort"] == main_effort:
             print(f"  main session effort: unchanged ({main_effort})")
         else:
@@ -1138,15 +1146,17 @@ def render_codex(outdir: str, choices_path: str) -> int:
             (out / "agents" / pathlib.PurePosixPath(relpath).name).write_text(content, encoding="utf-8")
     (out / "profiles").mkdir()
     for profile, role in PROFILES:
-        (out / "profiles" / f"{profile}.config.toml").write_text(
-            f"model = {toml_string(model_of(manifest, role, 'codex'))}\n"
-            f"model_reasoning_effort = {toml_string(manifest['roles'][role]['codex_effort'])}\n",
-            encoding="utf-8",
-        )
+        profile_text = (f"model = {toml_string(model_of(manifest, role, 'codex'))}\n"
+                        f"model_reasoning_effort = {toml_string(manifest['roles'][role]['codex_effort'])}\n")
+        if profile == "compute-squad":
+            for path in sorted((out / "agents").glob("*.toml")):
+                name = path.stem
+                profile_text += f"\n[agents.{name}]\nconfig_file = {toml_string('agents/' + path.name)}\n"
+        (out / "profiles" / f"{profile}.config.toml").write_text(profile_text, encoding="utf-8")
     tiers = "; ".join(
         f"{rung} {choices['tiers'][rung]['codex']} {choices['tiers'][rung]['codex_effort']}" for rung in RUNGS[::-1]
     )
-    print(f"{tiers}; main session effort {choices['main_effort']}")
+    print(f"{tiers}; main session {choices['main_model']} {choices['main_effort']}")
     return 0
 
 

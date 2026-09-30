@@ -1088,6 +1088,12 @@ review_blocks = {path: extract_fenced_block(sections["high-stakes"] if path == A
 for path, block in review_blocks.items():
     if block != review_blocks[REVIEW_PATHS[0]]:
         fail(f"{path}: the {REVIEW_HEADING} template differs from {REVIEW_PATHS[0]}'s: {block!r}")
+for phrase in ("cat >> COMPUTE_SQUAD_LOG.md <<'EOF'` (quoted delimiter required)",
+               "never use bare `<<EOF` to interpolate `$ts`",
+               "Read back the review you just appended.",
+               "do not append a second review"):
+    if phrase not in sections["high-stakes"]:
+        fail(f"{AUDIT_PROMPTS}: high-stakes append safeguard missing: {phrase!r}")
 for path in CRITERIA_PM:
     if "archive nothing and clear nothing" not in " ".join(read(path).split()):
         fail(f"{path}: a high-stakes PASS must 'archive nothing and clear nothing' (finding 3)")
@@ -1598,6 +1604,13 @@ SCOPED_GRANT_RULE = (
     "and G is P or `all`. No other Decision type grants execution, and only the exact "
     "`Grant: all revisions, full-mode request` needs no Decision."
 )
+NATIVE_WAIT = (
+    "On native Codex, `wait_agent` is an event subscription, not a polling loop. Do local routing work before waiting. "
+    "In a non-interactive `codex exec` run, wait once for the stage with `timeout_ms: 600000`; if the host rejects "
+    "that value, use its largest supported timeout. In an interactive session, wait at most 60 seconds so the user "
+    "can steer. After a routine timeout, wait again without listing agents or rereading unchanged state; inspect "
+    "the agent inventory only when the wait reports an error or there is concrete evidence of a stuck child."
+)
 PLAN_ATTEMPT = (
     "`Attempt: <n>`: n counts the `## PM — Plan` entries without `(cont.)` in the log, this one included; attempt n "
     "is plan revision r<n>."
@@ -1735,6 +1748,18 @@ SHARED_SPANS = [
     span_row("work-order stop", PM_FILES, text=WORK_ORDER_STOP),
     span_row("plan attempt", ["agents/squad-pm.md", "codex/03-pm-plan.md"], text=PLAN_ATTEMPT),
     span_row("scoped grant rule", [SKILL, "codex/README.md"], text=SCOPED_GRANT_RULE),
+    span_row("native event wait", [SKILL, "codex/README.md"], text=NATIVE_WAIT),
+    span_row("Recon baseline second", ["agents/squad-recon.md", "codex/02-recon.md",
+                                       "codex/agents/squad-recon.toml"],
+             text="Put criterion evidence under the relevant later label, never between the goal-facts and baseline lines."),
+    span_row("skip Recon reread", [SKILL, "codex/README.md"],
+             text="Do not reread Recon's body after an unblocked route."),
+    span_row("batch high-stakes reads", [SKILL, "codex/README.md"],
+             text="At a high-stakes PASS, load the required reference sections and derive risks from the latest Goal first; "
+                  "then batch independent reads of the PASS criteria, full base diff, touched source, status, and Decisions."),
+    span_row("skip empty archive route", [SKILL, "codex/README.md"],
+             text="Stage 1 and closing `squad-mech` archive spawns write no stage entry: use their final archive report "
+                  "and guard, and do not route the empty active log."),
     span_row("PM Next: line", ["agents/squad-pm.md", "codex/03-pm-plan.md", "codex/05-pm-accept.md",
                                "codex/agents/squad-pm.toml"], text=PM_NEXT_LINE),
     span_row("verdict attempt", PM_FILES, text=VERDICT_ATTEMPT),
@@ -3603,6 +3628,12 @@ if not close:
 close_guard, close_line = close.group(1), close.group(2)
 if close_line != "Result: upheld":
     fail(f"{MECH}: the close guard must wait for 'Result: upheld', not {close_line!r}")
+CLOSE_ARCHIVE_BRANCH = (
+    "For `Mode: close`, skip the open-run check after the required `Result: upheld` guard and proceed to the archive command below."
+)
+for path in ("agents/squad-mech.md", "codex/01-archive.md", "codex/agents/squad-mech.toml"):
+    if CLOSE_ARCHIVE_BRANCH not in " ".join(read(path).split()):
+        fail(f"{path}: close mode must skip the new-run open-log guard after the upheld-result check")
 ARCHIVED = re.compile(r"archived and cleared: (compute-squad-archive/COMPUTE_SQUAD_LOG_\d{4}-\d{2}-\d{2}_\d{6}_(\S+)\.md)")
 FIXED_STAMP = "2026-01-02_030405"
 archive_shells = [sh for sh in ("sh", "dash", "bash") if shutil.which(sh)]
@@ -4010,6 +4041,7 @@ HIDDEN = stub_entry("stub-hidden", STUB_EFFORTS, visibility="hide")
 RETIRING = stub_entry("stub-retired", STUB_EFFORTS, upgrade={"model": None, "retirement_at": PAST})
 BASE_ENTRIES = [stub_entry(m) for m in sorted(pinned)] + CHOOSE + [HIDDEN, RETIRING]
 CHOSEN = {"top": ("stub-top", "max"), "mid": ("stub-mid", "xhigh"), "bottom": ("stub-low", "max")}
+MAIN_MODEL = "stub-top"
 MAIN_EFFORT = "high"
 REPO = os.getcwd()
 real_git = shutil.which("git")
@@ -4243,9 +4275,10 @@ with tempfile.TemporaryDirectory() as tmp:
         text = read(choices_path)
         tiers = dict((m.group(1), (m.group(2), m.group(3))) for m in re.finditer(
             r"^(top|mid|bottom)\s+(\S+)\s+(\S+)$", text, re.MULTILINE))
-        main = re.search(r"^main_effort (\S+)$", text, re.MULTILINE)
+        main_model = re.search(r"^main_model (\S+)$", text, re.MULTILINE)
+        main_effort = re.search(r"^main_effort (\S+)$", text, re.MULTILINE)
         fingerprint = re.search(r"^catalog ([0-9a-f]{64})$", text, re.MULTILINE)
-        return text, tiers, main and main.group(1), fingerprint and fingerprint.group(1)
+        return text, tiers, main_model and main_model.group(1), main_effort and main_effort.group(1), fingerprint and fingerprint.group(1)
 
     def catalog_status():
         run = subprocess.run([sys.executable, "codex/build-agents.py", "--catalog-status", catalog_path, choices_path],
@@ -4257,7 +4290,7 @@ with tempfile.TemporaryDirectory() as tmp:
     def expect_installed(label, rc, out, err, calls):
         """The plugin, agents, and profiles all come from the one build, which
         carries the saved choices, and the remote plugin is gone."""
-        _text, tiers, main, _fp = saved_choices()
+        _text, tiers, main_model, main_effort, _fp = saved_choices()
         version = json.loads(read(".codex-plugin/plugin.json"))["version"]
         cache = os.path.join(codex_home, "plugins", "cache", "compute-squad-local", "compute-squad", version)
         built = os.path.join(build_dir, "plugins", "compute-squad")
@@ -4299,9 +4332,12 @@ with tempfile.TemporaryDirectory() as tmp:
             role = {"compute-squad": "strategy", "compute-squad-pm": "squad-pm",
                     "compute-squad-execution": "squad-executor",
                     "compute-squad-mechanical": "squad-executor-mechanical"}[name]
-            model = tiers[roles[role]["codex_rung"]][0]
-            effort = main if role == "strategy" else tiers[roles[role]["codex_rung"]][1]
+            model = main_model if role == "strategy" else tiers[roles[role]["codex_rung"]][0]
+            effort = main_effort if role == "strategy" else tiers[roles[role]["codex_rung"]][1]
             want = f'model = "{model}"\nmodel_reasoning_effort = "{effort}"\n'
+            if name == "compute-squad":
+                want += "".join(f'\n[agents.{os.path.basename(agent)[:-5]}]\nconfig_file = "agents/{os.path.basename(agent)}"\n'
+                                for agent in agent_tomls)
             path = os.path.join(codex_home, f"{name}.config.toml")
             expect(label, os.path.exists(path) and read(path) == want, f"CODEX_HOME/{name}.config.toml should hold {want!r}",
                    rc, out, err, calls)
@@ -4324,7 +4360,7 @@ with tempfile.TemporaryDirectory() as tmp:
         expect(label, "check: OK" in out and out.index("check: OK") < out.index("Start a new Codex session."),
                "it should check the install against the source before it reports success", rc, out, err, calls)
 
-    typed_choices = "stub-top\nmax\nstub-mid\nxhigh\nstub-low\nmax\nhigh\n"
+    typed_choices = "stub-top\nmax\nstub-mid\nxhigh\nstub-low\nmax\nstub-top\nhigh\n"
     write_catalog(catalog_path, BASE_ENTRIES)
     ran = []
     release = json.loads(subprocess.run([sys.executable, "codex/build-agents.py", "--parse-manifest", "models.conf"],
@@ -4398,14 +4434,15 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # Enter on every prompt keeps the release pins, labelled as such; nothing
     # is picked for the user. `no` cancels.
-    rc, out, err, calls = run_update("Enter keeps the release defaults", answers="\n" * 7 + "no\n")
+    rc, out, err, calls = run_update("Enter keeps the release defaults", answers="\n" * 8 + "no\n")
     for rung, (model, effort) in release_tiers.items():
         expect("Enter keeps the release defaults", f"{rung} tier model [{model}, release default]" in out
                and f"  {rung}: unchanged ({model} {effort})" in out,
                f"the {rung} tier should offer and keep the release pin {model} {effort}", rc, out, err, calls)
-    expect("Enter keeps the release defaults", f"main session effort: unchanged ({release_main})" in out
+    expect("Enter keeps the release defaults", f"main session model: unchanged ({release['rungs']['top']['codex']})" in out
+           and f"main session effort: unchanged ({release_main})" in out
            and rc == 1 and "cancelled; nothing changed" in out and not os.path.exists(choices_path),
-           "the main session should keep the release effort, and `no` should cancel", rc, out, err, calls)
+           "the main session should keep the release model and effort, and `no` should cancel", rc, out, err, calls)
     expect_untouched("Enter keeps the release defaults", before, rc, out, err, calls)
     ran.append("Enter keeps the release defaults")
 
@@ -4415,11 +4452,10 @@ with tempfile.TemporaryDirectory() as tmp:
         ("stub-hidden\n", "stub-hidden is hidden in the catalog"),
         ("stub-retired\n", f"stub-retired was retired at {PAST}"),
     )
-    answers = "".join(a for a, _ in rejections) + "stub-top\nultra\nmax\nstub-top\nstub-mid\nxhigh\nstub-low\nmax\nhigh\nno\n"
+    answers = "".join(a for a, _ in rejections) + "stub-top\nultra\nmax\nstub-mid\nxhigh\nstub-low\nmax\nstub-top\nhigh\nno\n"
     rc, out, err, calls = run_update("rejections, then no", answers=answers)
     for _answer, reason in rejections + (
         ("", "stub-top does not support reasoning effort 'ultra'"),
-        ("", "stub-top is already the top tier's model"),
     ):
         expect("rejections, then no", f"rejected: {reason}" in out, f"it should reject with {reason!r}",
                rc, out, err, calls)
@@ -4428,7 +4464,7 @@ with tempfile.TemporaryDirectory() as tmp:
     expect("rejections, then no", rc == 1 and "cancelled; nothing changed" in out and not os.path.exists(choices_path),
            "`no` should cancel with nothing saved", rc, out, err, calls)
     expect_untouched("rejections, then no", before, rc, out, err, calls)
-    ran.append("unknown, hidden, and retired models, an unsupported effort, and a taken model are rejected")
+    ran.append("unknown, hidden, and retired models, and an unsupported effort are rejected")
 
     # End of input at the final prompt.
     rc, out, err, calls = run_update("end of input", answers=typed_choices + "\x04")
@@ -4451,8 +4487,9 @@ with tempfile.TemporaryDirectory() as tmp:
     ]
     expect("first setup", [c for c in calls if c.startswith("codex")] == want_calls,
            f"its codex calls should be {want_calls!r}", rc, out, err, calls)
-    first_text, tiers, main, fingerprint = saved_choices()
-    expect("first setup", tiers == CHOSEN and main == MAIN_EFFORT, f"it saved {tiers!r} and {main!r}",
+    first_text, tiers, main_model, main_effort, fingerprint = saved_choices()
+    expect("first setup", tiers == CHOSEN and main_model == MAIN_MODEL and main_effort == MAIN_EFFORT,
+           f"it saved {tiers!r}, {main_model!r}, and {main_effort!r}",
            rc, out, err, calls)
     expect("first setup", catalog_status() == "current", "the saved fingerprint should match the catalog",
            rc, out, err, calls)
@@ -4462,6 +4499,19 @@ with tempfile.TemporaryDirectory() as tmp:
     expect("first setup", sync.returncode == 0, f"build-agents.py --check should still pass:\n{sync.stdout}",
            rc, out, err, calls)
     ran.append("first setup saves the choices and installs one build")
+
+    # A choices file written by the earlier updater had no main_model. It
+    # keeps the top-tier model for the main session until the next review.
+    with open(choices_path, "w", encoding="utf-8") as f:
+        f.write(first_text.replace(f"main_model {MAIN_MODEL}\n", ""))
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("older choices without main_model", ["--check"])
+    expect("older choices without main_model", rc == 0 and "check: OK" in out,
+           "the old choices should still render the installed main model", rc, out, err, calls)
+    expect_untouched("older choices without main_model", before, rc, out, err, calls)
+    with open(choices_path, "w", encoding="utf-8") as f:
+        f.write(first_text)
+    ran.append("older choices keep their top-tier main model")
 
     # A routine update with the same catalog asks and warns nothing, even on a
     # terminal, and clears a build.new an interrupted run left.
@@ -4788,10 +4838,11 @@ with tempfile.TemporaryDirectory() as tmp:
            "it should read HEAD and the status, never pull, and install", rc, out, err, calls)
     expect_installed("an approved local source", rc, out, err, calls)
     rc, out, err, calls = run_update("a review of an approved local source", ["--review-models", "--source-sha", stub_head],
-                                     answers="\n" * 7 + "yes\n", extra_env=approved)
-    _text, tiers, main, _fp = saved_choices()
+                                     answers="\n" * 8 + "yes\n", extra_env=approved)
+    _text, tiers, main_model, main_effort, _fp = saved_choices()
     expect("a review of an approved local source", rc == 0 and "listing is availability" in out and tiers == CHOSEN
-           and main == MAIN_EFFORT, "it should ask, keep the entered values, and install", rc, out, err, calls)
+           and main_model == MAIN_MODEL and main_effort == MAIN_EFFORT,
+           "it should ask, keep the entered values, and install", rc, out, err, calls)
     expect_installed("a review of an approved local source", rc, out, err, calls)
     with open(choices_path, "w", encoding="utf-8") as f:
         f.write(first_text)
@@ -4869,7 +4920,7 @@ with tempfile.TemporaryDirectory() as tmp:
     pause = os.path.join(tmp, "pause")
     os.makedirs(pause)
     other_log = os.path.join(tmp, "stub-calls-other.txt")
-    new_mid = "stub-top\nmax\nstub-mid\nmax\nstub-low\nmax\nhigh\nyes\n"
+    new_mid = "stub-top\nmax\nstub-mid\nmax\nstub-low\nmax\nstub-top\nhigh\nyes\n"
     scheduled = start_update("a scheduled update installing", extra_env={"STUB_PAUSE_DIR": pause}, log=other_log)
     wait_for("the stub to pause it inside codex plugin add", lambda: os.path.exists(os.path.join(pause, "paused")),
              scheduled)
@@ -4903,9 +4954,9 @@ with tempfile.TemporaryDirectory() as tmp:
            "it should stop at the lock", rc, out, err, calls)
     expect_untouched("a scheduled update during a review", before, rc, out, err, calls)
     rc, out, err, calls = finish_update(review, new_mid)
-    _text, tiers, main, _fp = saved_choices()
+    _text, tiers, main_model, main_effort, _fp = saved_choices()
     expect("a review waiting for answers", rc == 0 and tiers == dict(CHOSEN, mid=("stub-mid", "max"))
-           and main == MAIN_EFFORT and not os.path.exists(lock),
+           and main_model == MAIN_MODEL and main_effort == MAIN_EFFORT and not os.path.exists(lock),
            "it should save and install its new choices and release the lock", rc, out, err, calls)
     expect_installed("a review waiting for answers", rc, out, err, calls)
     with open(choices_path, "w", encoding="utf-8") as f:
@@ -4942,10 +4993,11 @@ with tempfile.TemporaryDirectory() as tmp:
     rc, out, err, calls = run_update("a changed catalog, N", answers="N\n")
     expect("a changed catalog, N", rc == 0 and "Review them now? [y/N]" in out and "listing is availability" not in out
            and read(choices_path) == first_text, "N should keep the choices", rc, out, err, calls)
-    rc, out, err, calls = run_update("a changed catalog, y", answers="y\n" + "\n" * 7 + "yes\n")
-    _text, tiers, main, new_fingerprint = saved_choices()
+    rc, out, err, calls = run_update("a changed catalog, y", answers="y\n" + "\n" * 8 + "yes\n")
+    _text, tiers, main_model, main_effort, new_fingerprint = saved_choices()
     expect("a changed catalog, y", rc == 0 and "listing is availability" in out and "[stub-top, saved]" in out
-           and tiers == CHOSEN and main == MAIN_EFFORT and new_fingerprint != fingerprint
+           and tiers == CHOSEN and main_model == MAIN_MODEL and main_effort == MAIN_EFFORT
+           and new_fingerprint != fingerprint
            and catalog_status() == "current", "y should run the chooser, keep the entered values, and save the new "
            "fingerprint", rc, out, err, calls)
     expect_installed("a changed catalog, y", rc, out, err, calls)
@@ -4955,13 +5007,13 @@ with tempfile.TemporaryDirectory() as tmp:
     # --review-models shows the release defaults in their place.
     good_text = read(choices_path)
     with open(choices_path, "w", encoding="utf-8") as f:
-        f.write(good_text.replace("stub-mid", "stub-top"))
+        f.write(good_text.replace(f"main_model {MAIN_MODEL}\n", f"main_model {MAIN_MODEL}\nmain_model {MAIN_MODEL}\n"))
     before = snapshot(codex_home)
     rc, out, err, calls = run_update("unreadable choices")
-    expect("unreadable choices", rc == 1 and "each tier needs its own model" in err and "--review-models" in err,
+    expect("unreadable choices", rc == 1 and "a second 'main_model' line" in err and "--review-models" in err,
            "it should stop and give the review command", rc, out, err, calls)
     expect_untouched("unreadable choices", before, rc, out, err, calls)
-    rc, out, err, calls = run_update("unreadable choices, review", ["--review-models"], answers="\n" * 7 + "no\n")
+    rc, out, err, calls = run_update("unreadable choices, review", ["--review-models"], answers="\n" * 8 + "no\n")
     expect("unreadable choices, review", rc == 1 and "cannot be read" in out and "release default" in out,
            "the review should show the release defaults in place of the unreadable file", rc, out, err, calls)
     expect_untouched("unreadable choices, review", before, rc, out, err, calls)
@@ -4982,6 +5034,29 @@ with tempfile.TemporaryDirectory() as tmp:
                "it should stop, name stub-mid, and give the review command", rc, out, err, calls)
         expect_untouched(label, before, rc, out, err, calls)
     ran.append("a saved model the catalog retires or drops stops")
+
+    # One model may fill all stage tiers while the main session keeps a
+    # different model. The orchestrator profile must register every agent so
+    # native spawns read their own model and effort pins.
+    write_catalog(catalog_path, BASE_ENTRIES)
+    repeated = "stub-low\nmax\n" * 3 + "stub-top\nxhigh\nyes\n"
+    rc, out, err, calls = run_update("one stage model, separate main", ["--review-models"], answers=repeated)
+    _text, tiers, main_model, main_effort, _fp = saved_choices()
+    expect("one stage model, separate main", rc == 0
+           and tiers == {rung: ("stub-low", "max") for rung in ("top", "mid", "bottom")}
+           and main_model == "stub-top" and main_effort == "xhigh",
+           "it should save one model for all stages and a separate main model", rc, out, err, calls)
+    expect_installed("one stage model, separate main", rc, out, err, calls)
+    rc, out, err, calls = run_update("one stage model, separate main --check", ["--check"])
+    expect("one stage model, separate main --check", rc == 0 and "check: OK" in out,
+           "the installed routing should match a fresh build", rc, out, err, calls)
+    write_catalog(catalog_path, [entry for entry in BASE_ENTRIES if entry["slug"] != "stub-top"])
+    before = snapshot(codex_home)
+    rc, out, err, calls = run_update("main-only model missing from catalog")
+    expect("main-only model missing from catalog", rc == 1 and "stub-top" in err and "--review-models" in err,
+           "the main session's separate model must be validated too", rc, out, err, calls)
+    expect_untouched("main-only model missing from catalog", before, rc, out, err, calls)
+    ran.append("one model fills all seven agents, a separate main model is checked against the catalog")
 
 
 # The validator's other rules, run directly on a stub catalog that lists
