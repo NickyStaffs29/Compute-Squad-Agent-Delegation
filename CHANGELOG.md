@@ -1,5 +1,49 @@
 # Changelog
 
+## 4.7.0 — 2026-09-30
+
+### Model choice and installation
+
+- Every Compute Squad invocation, including a resume, requires the human to
+  confirm exact top-, mid-, and bottom-tier model IDs. The same model may fill
+  several tiers. The main session must use the confirmed top model. Claude
+  checks each agent's actual model after it runs; Codex checks the installed
+  agent pins before spawning. Release and saved defaults do not count as a
+  run's confirmation. The release model defaults remain unchanged.
+- The Codex updater installs only a clean `origin/main` or an explicitly
+  selected commit, exporting its real Git objects. It rejects committed
+  symlinks and ignores replace refs. `codex/update.sh --check` reports source,
+  plugin, agent, and profile drift without changing the installation, and an
+  update verifies the installed result before reporting success.
+
+### Protocol and validation
+
+- Scoped executor grants now require one earlier, matching `Type: grant`
+  Decision. The PM rejects changes assigned to a later work order, even when
+  those changes are inert. Output rules now pin the Executor's `Commit:` line,
+  the PM's high-stakes review line and headings, and Recon's baseline line.
+- The Claude command loads the candidate skill from its plugin root. The live
+  harness checks that source, accounts for each call's usage delta, and keeps
+  the no-browser and password-reset privacy fixtures deterministic.
+- Removed the unused Codex skill reading copy. Shortened the entry protocol,
+  loaded detailed references at their required stages, and reduced redundant
+  orchestration reads and tool round trips without changing acceptance gates.
+
+### Upgrade and verification
+
+- The plugin and marketplace descriptions now explain per-run human model
+  confirmation.
+- Refresh the Claude marketplace and plugin, or run `codex/update.sh` from a
+  clean `main` checkout; then start a fresh session. Codex's saved model
+  choices survive the update, but their installed pins must match the three
+  models confirmed for each run.
+- The offline verifier, generated Codex files, and Claude package passed the
+  release checks. A pre-release Claude S8 run with Opus 5.5 for top and mid
+  and Sonnet 5.5 for bottom completed all six stages and passed protocol
+  checks. Its main session used 1,004,092 input tokens against the historical
+  756,000-token ceiling; that sole live-check failure was explicitly waived.
+  A like-for-like token-cost comparison remains to be done.
+
 ## 4.6.0 — 2026-09-25
 
 ### Added
