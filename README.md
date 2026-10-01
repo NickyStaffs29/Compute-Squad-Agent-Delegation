@@ -1,12 +1,12 @@
 # Compute Squad
 
-A staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the strongest tier plans and adversarially accepts the work, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier, and the cheapest tier handles zero-judgment busywork — all through a shared, auditable log.
+A staged agent delegation pipeline for Claude Code and Codex: your top-tier session runs strategy, the top rung plans and adversarially accepts the work, execution routes to a MECHANICAL, STANDARD, or COMPLEX model tier, and the bottom rung handles zero-judgment busywork — all through a shared, auditable log.
 
 Three steps to a working setup: **install**, **run**, **auto-update**. Each step shows Claude Code first, Codex right after — use whichever matches your setup. Everything else on this page is reference.
 
 ## 1. Install
 
-**Claude Code.** Requires access to every model the routing table below names; the PM runs on the top rung with no fallback, and a stage whose model is unavailable stops the run. Paste these two lines in your terminal:
+**Claude Code.** Requires access to the three models you confirm for a run; the PM runs on the top rung, and a stage whose confirmed model is unavailable stops the run. Paste these two lines in your terminal:
 
 ```bash
 claude plugin marketplace add NickyStaffs29/Compute-Squad-Agent-Delegation
@@ -30,7 +30,7 @@ git clone https://github.com/NickyStaffs29/Compute-Squad-Agent-Delegation "$HOME
 bash "$HOME/src/compute-squad/codex/update.sh"
 ```
 
-On its first run the updater shows the models your account's catalog (`codex debug models`) lists, then asks which model and reasoning effort fills each tier (top, mid, bottom) and which effort the main session uses. Enter keeps the value shown, which on first setup is the release default from the routing table below. It saves nothing until you type `yes`, and it rejects a model the catalog hides or retires, an effort the model lacks, and one model on two tiers. Your choices live in `$CODEX_HOME/compute-squad/choices.conf`, outside the checkout, so no update overwrites them. The updater then renders one build of this checkout with your models, installs the plugin from it (`compute-squad@compute-squad-local`), and copies the seven agents and four profiles from the same build. Change the models later with `bash "$HOME/src/compute-squad/codex/update.sh" --review-models`.
+On its first run the updater shows the models your account's catalog (`codex debug models`) lists, then asks which model and reasoning effort fills each tier (top, mid, bottom) and which model and effort the main session uses. Enter keeps the value shown, which on first setup is the release default from the routing table below. It saves nothing until you type `yes`, and it rejects a model the catalog hides or retires or an effort the model lacks. One model may fill several tiers. Your choices live in `$CODEX_HOME/compute-squad/choices.conf`, outside the checkout, so no update overwrites them. The updater then renders one build of this checkout with your models, installs the plugin from it (`compute-squad@compute-squad-local`), and copies the seven agents and four profiles from the same build. Change the models later with `bash "$HOME/src/compute-squad/codex/update.sh" --review-models`.
 
 If `$HOME/src/compute-squad` already exists, do not run `git clone` into it again. Use a clean checkout of this repository on `main` tracking `origin/main`, or choose another empty directory. The updater installs only that: it stops before installing anything if the checkout is on another branch, tracks another upstream, or has uncommitted changes, fast-forwards it, and stops unless it is then exactly `origin/main` with no uncommitted changes. It renders what it installs from that commit's own files, read from git's objects, so nothing untracked or hidden in the checkout can reach Codex. To install an approved commit instead, check it out and run `codex/update.sh --source-sha <commit>`: it never pulls, and it stops unless the checkout is exactly that commit. `codex/update.sh --check` changes nothing: it compares the installed plugin (its skill, references, and hooks), the seven agents, and the four profiles with the selected commit and your saved choices, down to symlinks and executable bits, names every difference, and exits 1 if there is one.
 
@@ -47,6 +47,8 @@ If an earlier release installed `compute-squad@compute-squad` from the GitHub ma
 Or say any of: `run the squad: <goal>`, `run compute squad`, `compute squad this`, `full pipeline on this`.
 
 Modes: `/compute-squad:squad plan <goal>` stops after the plan with no product edits. `/compute-squad:squad execute WO-1` runs one work order of the plan in the log, records your command as its grant, and accepts it. `/compute-squad:squad accept` reviews an implementation made elsewhere against that plan. Plain `/compute-squad:squad <goal>` runs the full pipeline, and the request itself is the execution grant.
+
+Every invocation, including a resume, first asks you to confirm the exact model ID for top, mid, and bottom. You may choose the same model for several tiers. The main session must use the top choice. On Codex, the installed agent models must match your choices; if they do not, review the choices with the updater and start a fresh session. A headless run without current human choices stops.
 
 **Codex:**
 
@@ -130,7 +132,7 @@ Everything below is background on how the pipeline works. You don't need any of 
 
 Most multi-agent setups have an org chart problem. The strongest model does the typing and the supervision. The cheap models sit idle. Every task gets the same treatment whether it needs judgment or just execution.
 
-What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once, one per git worktree. It gets there by routing by decision density — stages that decide run strong models, stages that execute against a tight spec run cheap ones, and the review layer is never below the work it checks, and a tier above by default, so mistakes get caught by something stronger than what made them. The ladder is placed where a wrong call is expensive, not where tokens are cheap: the top rung plans and accepts, every stage that exercises judgment runs on the mid rung or above, and the bottom rung takes only transcription-grade and zero-judgment work. What it buys is capacity and review that is independent of the work, not a smaller bill. Prices are not a routing input; one measured run's cost is a dated snapshot in the FAQ.
+What Compute Squad actually sells is verification and auditability that don't depend on operator discipline, plus capacity: a run works in its own agents instead of occupying your session, so you can have several going at once, one per git worktree. It routes by decision density: planning and acceptance occupy the top rung, other judgment the mid rung or above, and the bottom rung takes only transcription-grade and zero-judgment work. You choose the model for each rung; assigning the same model to several rungs preserves separate roles but removes the model-strength gap between them. What it buys is capacity and review independent of the work, not necessarily a smaller bill. Prices are not a routing input; one measured run's cost is a dated snapshot in the FAQ.
 
 One skill. Seven agents. A shared log. A role hierarchy that mirrors how a functional team actually operates:
 
@@ -139,7 +141,7 @@ Snapshot of `models.conf`, reviewed 2026-09-24. Routing reads `models.conf`; thi
 
 | Role | Agent | Claude Code | Codex | Owns |
 |---|---|---|---|---|
-| Strategy | main session | your session model; top recommended | `gpt-5.6-sol` high | Goal, gaps, acceptance criteria, final judgment |
+| Strategy | main session | your session model; top required | `gpt-5.6-sol` high | Goal, gaps, acceptance criteria, final judgment |
 | PM | `squad-pm` | `fable` (top) | `gpt-5.6-sol` max | The plan and the acceptance decision |
 | Recon | `squad-recon` | `opus` (mid) | `gpt-5.6-terra` max | Mapping the codebase |
 | Execution | `squad-executor` | `opus` (mid) | `gpt-5.6-terra` max | Implementing the plan |
@@ -302,10 +304,10 @@ Compute-Squad-Agent-Delegation/
 Subagents run headless. They cannot ask you anything, and clarifying gaps with the human is the entire point of Stage 0. So strategy lives in the skill and executes in your top-tier main session.
 
 **Do the models auto-upgrade?**
-Within a family, on Claude Code: each agent carries the alias `models.conf` assigns, and an alias resolves to its family's newest model; changing that is one edit to `models.conf`, under Changing models in CONTRIBUTING.md. On Codex, never: agents pin exact model IDs, and you choose them per tier with `codex/update.sh --review-models`. An update keeps your choices, warns when your account's catalog changes, and stops before installing a saved model the catalog retires or drops.
+Claude Code's release aliases can resolve to newer models, but each run asks you to confirm exact IDs and checks the actual model after each agent runs, stopping if an alias resolved differently. Codex agents pin exact IDs, chosen per tier with `codex/update.sh --review-models`; an update keeps your choices, warns when your account's catalog changes, and stops before installing a saved model the catalog retires or drops.
 
 **Why is bottom-rung execution safe?**
-Only MECHANICAL, transcription-grade work runs there, and the plan carries the intelligence. Acceptance runs on the top rung, never below the work and a rung above it by default. When execution reaches the top rung (COMPLEX work, or escalation), execution and acceptance share it, and Stage 5 of the skill names the controls that replace the missing rung.
+Only MECHANICAL, transcription-grade work runs there, and the plan carries the intelligence. Acceptance runs separately on the top rung. If you assign the same model to bottom and top, that check remains separate but no longer has a model-strength advantage. When execution reaches the top rung (COMPLEX work, or escalation), Stage 5 of the skill names the controls that replace a higher review rung.
 
 **Why a shared log instead of passing context directly?**
 Durability and auditability. FAILs re-run stages against full history. Failed runs archive instead of vanishing. The append-only file protocol is portable across the Claude and Codex plugin implementations. Your session's spawn prompts only point at the log (stage, mode, repo root, run), and it routes from the log's fixed lines, never from a stage's closing message, so no stage acts on an instruction the log does not record.

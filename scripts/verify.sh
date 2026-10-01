@@ -17,7 +17,7 @@
 #      byte-diff, since zip embeds mtimes and a fresh rebuild would always differ).
 #   6. models.conf holds routing policy: it parses (and a malformed copy does
 #      not), its roles are the agents plus strategy, finder, and skeptic, each
-#      host's three rungs name three different models, the PM is on the top
+#      host's three rungs may share models, the PM is on the top
 #      rung, the executors climb one rung per classification under the PM,
 #      the skeptic sits above the finders, only the MECHANICAL executor, the
 #      helper, and the intern may sit on the Claude bottom rung, and every
@@ -474,8 +474,8 @@ echo "PASS: check 5: $plugin_zip matches its Claude source set and excludes code
 # prompts are generated from the agent bodies; and codex/build-agents.py
 # --check holds every file it writes to models.conf and the agent bodies.
 # The policy is tested here, not the model names, so a re-point that keeps
-# the rungs distinct and ordered passes, and one that collapses or inverts
-# them fails. This uses only stdlib-compatible text checks so the gate also
+# the role rungs ordered passes even when models repeat, while an inverted
+# role mapping fails. This uses only stdlib-compatible text checks so the gate also
 # runs on Python 3.9, which predates tomllib.
 # ---------------------------------------------------------------------------
 python3 <<'PYEOF'
@@ -547,17 +547,10 @@ def level(role, host):
 
 problems = []
 for host in HOSTS:
-    # (iv) each host's three rungs name three different models, so no two
-    # rungs collapse onto one model.
-    models = [rungs[rung][host] for rung in RUNG_ORDER]
-    if len(set(models)) != len(models):
-        problems.append(
-            f"{host}: the rungs must name three different models; bottom, mid, top are {', '.join(models)}"
-        )
-    # (v) the PM plans and accepts on the top rung.
+    # (iv) the PM plans and accepts on the top rung.
     if roles["squad-pm"][f"{host}_rung"] != "top":
         problems.append(f"{host}: squad-pm is on the {roles['squad-pm'][host + '_rung']} rung, not top")
-    # (vi) execution climbs one rung per classification, the PM sits above
+    # (v) execution climbs one rung per classification, the PM sits above
     # STANDARD execution and at or above every executor, and the skeptic
     # sits above the finders it checks.
     ladder = [level(role, host) for role in (MECHANICAL, STANDARD, COMPLEX)]
@@ -570,19 +563,19 @@ for host in HOSTS:
         problems.append(f"{host}: squad-pm must sit above {STANDARD} and at or above every executor")
     if not level("skeptic", host) > level("finder", host):
         problems.append(f"{host}: the skeptic must sit above the finders")
-# (vii) in Claude Code, only work that needs no judgment runs on the bottom
+# (vi) in Claude Code, only work that needs no judgment runs on the bottom
 # rung.
 for role, row in roles.items():
     if row["claude_rung"] == "bottom" and role not in BOTTOM_ALLOWED:
         problems.append(f"claude: {role} is on the bottom rung; only {', '.join(BOTTOM_ALLOWED)} may be")
-# (viii) every Codex effort is a level Codex names.
+# (vii) every Codex effort is a level Codex names.
 for role, row in roles.items():
     if row["codex_effort"] not in EFFORTS:
         problems.append(f"codex: {role} has effort {row['codex_effort']!r}, not one of {', '.join(EFFORTS)}")
 if problems:
     fail("models.conf breaks the routing policy: " + "; ".join(problems))
 
-# (ix) the parser fails on a malformed manifest rather than defaulting: a
+# (viii) the parser fails on a malformed manifest rather than defaulting: a
 # role row missing a column, a role on an unknown rung, a duplicated row,
 # and a missing section each exit nonzero with no parsed output.
 source_lines = pathlib.Path("models.conf").read_text(encoding="utf-8").split("\n")
@@ -604,6 +597,16 @@ malformed = {
     "no [rung] section": source_lines[:rung_header] + source_lines[rung_end:],
 }
 with tempfile.TemporaryDirectory() as tmp:
+    duplicate = source_lines.copy()
+    mid_at = next(i for i in range(rung_header + 1, rung_end) if source_lines[i].startswith("mid "))
+    top = next(source_lines[i].split() for i in range(rung_header + 1, rung_end) if source_lines[i].startswith("top "))
+    duplicate[mid_at] = " ".join(["mid", *top[1:]])
+    path = os.path.join(tmp, "models.conf")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(duplicate))
+    repeated = parse_manifest(path)
+    if repeated.returncode != 0 or json.loads(repeated.stdout)["rungs"]["mid"] != rungs["top"]:
+        fail("models.conf must allow the same model on multiple rungs")
     for what, lines in malformed.items():
         path = os.path.join(tmp, "models.conf")
         with open(path, "w", encoding="utf-8") as handle:
@@ -1600,6 +1603,27 @@ PM_NEXT_LINE = (
     "and squad-mech's open-run guard reads the latest `Next:` line in the log to decide whether a run is open. "
     "Describe follow-up work, such as another work order or the high-stakes review, in prose or a bullet instead."
 )
+MODEL_CONFIRMATION = (
+    "At the start of **every invocation** (full, plan, execute, accept, or resume), get the human's confirmation "
+    "of the exact model ID for each of the top, mid, and bottom rungs before any agent spawn, log write, archive, "
+    "or product edit. Ask once for all three; an explicit three-rung choice in the current request counts, but "
+    "installed pins, release defaults, saved choices, and an earlier invocation do not. The same model may fill "
+    "several rungs. If the human cannot answer in an unattended or headless session, stop; never assume model choices. "
+    "The main session must already run on the confirmed top model, or stop and ask the user to start a session on it."
+)
+MODEL_ALIAS_CHECK = (
+    "An alias is routing, not proof of an exact version; after each spawn, check the actual ID in that agent's "
+    "log entry or `compute-squad-archive/usage.jsonl` before the next stage. Stop if it differs from the confirmed "
+    "ID, is unavailable, or its family has no supported alias."
+)
+EXECUTOR_COMMIT_LINE = (
+    "Write exactly `Commit: <commit SHA>, working tree clean` or `Commit: <commit SHA>, working tree N changed files`, "
+    "with no parenthetical or other text on that line; put explanations in prose above it."
+)
+PM_HIGH_STAKES_LINE = (
+    "In a PASS or FAIL entry, write `High-stakes:` only once, on its fixed line below `Agent:`; later prose must "
+    "not start with that label."
+)
 # WO-9: what Claude's grant hook enforces, stated for both hosts.
 SCOPED_GRANT_RULE = (
     "A scoped `Grant: r<N> <G>, per Decision <T>` grants execution only when N is the governing plan revision, "
@@ -1770,6 +1794,12 @@ SHARED_SPANS = [
     span_row("PM exact Tested", PM_FILES,
              text="Do not append comments to the `Tested:` line: it contains only the commit SHA and `working tree "
                   "clean` or `working tree N changed files`. Put exclusions and scope explanations below the criteria block."),
+    span_row("human model confirmation", [SKILL], text=MODEL_CONFIRMATION),
+    span_row("Claude alias verification", [SKILL], text=MODEL_ALIAS_CHECK),
+    span_row("Executor exact Commit", EXECUTOR_BODIES + ["codex/04-execute.md"] +
+             [f"codex/agents/{name}.toml" for name in ("squad-executor", "squad-executor-mechanical",
+                                                        "squad-executor-complex")], text=EXECUTOR_COMMIT_LINE),
+    span_row("PM single High-stakes", PM_FILES + ["codex/agents/squad-pm.toml"], text=PM_HIGH_STAKES_LINE),
     span_row("skip empty archive route", [SKILL, "codex/README.md"],
              text="Stage 1 and closing `squad-mech` archive spawns write no stage entry: use their final archive report "
                   "and guard, and do not route the empty active log."),
@@ -2862,6 +2892,17 @@ with tempfile.TemporaryDirectory() as tmp:
     dry = run_live("--dry-run", "all")
     if dry.returncode != 0:
         fail(f"{LIVE_RUN} --dry-run all exited {dry.returncode}: {dry.stderr.strip()}")
+    same = run_live("--dry-run", "--top-model", "claude-opus-5-5", "--mid-model", "claude-opus-5-5",
+                    "--bottom-model", "claude-opus-5-5", "s8")
+    same_calls = [shlex.split(line.strip()) for line in same.stdout.splitlines() if claude_stub + " -p " in line]
+    if (same.returncode != 0 or len(same_calls) != 1
+            or "top claude-opus-5-5; mid claude-opus-5-5; bottom claude-opus-5-5" not in same_calls[0][2]):
+        fail(f"{LIVE_RUN} must accept one human-chosen model for all three rungs")
+    no_choice_env = dict(live_env, CI="")
+    missing = subprocess.run(["bash", LIVE_RUN, "s8"], capture_output=True, text=True,
+                             env=no_choice_env, timeout=30)
+    if missing.returncode == 0 or "need --top-model, --mid-model, and --bottom-model" not in missing.stderr:
+        fail(f"{LIVE_RUN} must refuse a live run without all three human model choices")
     for name, _, turns in scenarios:
         wanted = [f"== {name} (run 1 of 1)"] + [f"turn {i}, check {turn}:" for i, turn in enumerate(turns.split(), 1)]
         if any(line not in dry.stdout for line in wanted):
@@ -2887,6 +2928,11 @@ with tempfile.TemporaryDirectory() as tmp:
         try:
             words = shlex.split(line.strip())
             prompt = words[words.index("-p") + 1]
+            if ("For this invocation I confirm these exact model IDs: top <top-model>; mid <mid-model>; "
+                    "bottom <bottom-model>." not in prompt
+                    or words[words.index("--model") + 1] != "<top-model>"):
+                fail(f"{LIVE_RUN} --dry-run all must give every turn the three confirmed models and run the main "
+                     f"session on the top choice: {line[:300]}")
             if prompt.startswith("/"):
                 slash_prompts += 1
                 if prompt.split()[0] not in plugin_commands:

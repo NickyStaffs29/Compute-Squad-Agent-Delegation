@@ -13,9 +13,9 @@
 # preflight --setup-only prints. Run the live
 # scenarios by hand before a release, three repeats per scenario. S5 needs
 # Playwright (in the fixture's node_modules or the global npm root) with its
-# Chromium; S5b hides that Chromium from the session. S8's token budget is the
-# estimate for a top-rung main session, so run it without --model or with the
-# top rung's alias. S9 runs five finders and up to ten skeptics.
+# Chromium; S5b hides that Chromium from the session. S8's token budget is a
+# historical estimate; the main session uses the confirmed top model. S9 runs
+# five finders and up to ten skeptics.
 #
 # Usage: tests/live/run.sh [options] <scenario>... | all
 #   --list                 print the scenarios, their seeds and patches, and exit
@@ -24,7 +24,10 @@
 #   --setup-only           build and seed each scenario repo, print the preflight
 #                          and claude commands, and keep the repo; run no test
 #                          and call no model
-#   --model <alias>        main-session model (default: the host's default)
+#   --top-model <id>       human-confirmed top model; also the main-session model
+#   --mid-model <id>       human-confirmed mid model (may equal another rung)
+#   --bottom-model <id>    human-confirmed bottom model (may equal another rung)
+#   --model <id>           optional main-session model; must equal --top-model
 #   --repeat <n>           run each scenario n times (default 1)
 #   --max-budget-usd <x>   pass --max-budget-usd to every claude call
 #   --out <dir>            write results here (default: a new temp dir)
@@ -245,7 +248,7 @@ usage() {
   exit "${1:-2}"
 }
 
-MODE=live MODEL= REPEAT=1 BUDGET= OUT=
+MODE=live MODEL= TOP_MODEL= MID_MODEL= BOTTOM_MODEL= REPEAT=1 BUDGET= OUT=
 selected=()
 while [ $# -gt 0 ]; do
   case $1 in
@@ -253,6 +256,9 @@ while [ $# -gt 0 ]; do
     --dry-run) MODE=dry ;;
     --setup-only) MODE=setup ;;
     --model) [ $# -ge 2 ] || usage; MODEL=$2; shift ;;
+    --top-model) [ $# -ge 2 ] || usage; TOP_MODEL=$2; shift ;;
+    --mid-model) [ $# -ge 2 ] || usage; MID_MODEL=$2; shift ;;
+    --bottom-model) [ $# -ge 2 ] || usage; BOTTOM_MODEL=$2; shift ;;
     --repeat) [ $# -ge 2 ] || usage; REPEAT=$2; shift ;;
     --max-budget-usd) [ $# -ge 2 ] || usage; BUDGET=$2; shift ;;
     --out) [ $# -ge 2 ] || usage; OUT=$2; shift ;;
@@ -287,6 +293,17 @@ if [ "$MODE" = list ]; then
 fi
 [ ${#selected[@]} -gt 0 ] || usage
 case $REPEAT in ''|*[!0-9]*|0) die "--repeat takes a whole number of at least 1" ;; esac
+if [ "$MODE" = live ]; then
+  [ -n "$TOP_MODEL" ] && [ -n "$MID_MODEL" ] && [ -n "$BOTTOM_MODEL" ] ||
+    die "live runs need --top-model, --mid-model, and --bottom-model from the human for this invocation"
+else
+  TOP_MODEL=${TOP_MODEL:-'<top-model>'}
+  MID_MODEL=${MID_MODEL:-'<mid-model>'}
+  BOTTOM_MODEL=${BOTTOM_MODEL:-'<bottom-model>'}
+fi
+[ -z "$MODEL" ] || [ "$MODEL" = "$TOP_MODEL" ] || die "--model must equal --top-model"
+MODEL=$TOP_MODEL
+MODEL_CHOICE="For this invocation I confirm these exact model IDs: top $TOP_MODEL; mid $MID_MODEL; bottom $BOTTOM_MODEL."
 
 if [ "$MODE" = live ] && [ -n "${CI:-}" ]; then
   die "the live tier spends model tokens and never runs in CI (CI is set); use --dry-run or --list"
@@ -449,7 +466,7 @@ run_scenario() {
   for i in "${!PROMPTS[@]}"; do
     turn=$((i + 1))
     check=${CHECKS[$i]}
-    prompt=${PROMPTS[$i]//<C>/$head}
+    prompt="${PROMPTS[$i]//<C>/$head} $MODEL_CHOICE"
     tools="$dir/turn$turn.tools.jsonl"
     if [ "$MODE" = live ]; then
       claude_cmd "$prompt" "$session" "$tools"
