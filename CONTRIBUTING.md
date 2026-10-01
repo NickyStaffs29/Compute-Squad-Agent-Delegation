@@ -62,7 +62,7 @@ Codex models change in two places, and only one is in this repository:
 To change the release defaults:
 
 1. On an account that will run the squad, list what resolves. Codex: `codex debug models`, reading each model's slug, visibility, upgrade and retirement fields. Claude Code: `claude -p --model <alias> --output-format json "Reply ok"`, reading the model ID under `modelUsage`.
-2. Assign rungs by capability, not by name. A family name can change rungs between generations: Sol was the top Codex rung in generation 5.6 and is the mid rung in generation 6. Never apply a catalog upgrade target as is; it can put two rungs on one model.
+2. Assign rungs by capability, not by name. A family name can change rungs between generations: Sol was the top Codex rung in generation 5.6 and is the mid rung in generation 6. Review a catalog upgrade target for each rung; sharing a model is allowed, but does not increase strength between those rungs.
 3. Edit the `[rung]` lines in `models.conf`, confirm each Codex effort is in the model's supported levels, and set `reviewed` to today.
 4. If a Codex model is new, raise the CLI floor in `README.md` and `codex/README.md` to the first release whose `codex debug models --bundled` lists it.
 5. Run `python3 codex/build-agents.py`, `bash scripts/build-plugin.sh`, then `bash scripts/verify.sh`.

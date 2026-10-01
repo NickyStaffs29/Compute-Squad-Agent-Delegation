@@ -179,7 +179,7 @@ PINNED_KEY = re.compile(r'^(model|model_reasoning_effort)\s*=\s*"([^"\\]*)"\s*$'
 RETIREMENT_WARNING_DAYS = 30
 SUPERSEDED = (
     "{model} is superseded by {target}; see Changing models in CONTRIBUTING.md. "
-    "Do not apply the upgrade target as is: it can put two rungs on one model."
+    "Review the target for each rung; sharing a model is allowed but does not increase strength between those rungs."
 )
 SUPERSEDED_CHOICE = (
     "{model} is superseded by {target}; to choose again, run codex/update.sh --review-models. "
@@ -436,7 +436,7 @@ def render_skill_block(manifest: dict) -> str:
         "Rungs (Claude alias, Codex ID): "
         + "; ".join(f"{rung} `{rungs[rung]['claude']}`, `{rungs[rung]['codex']}`" for rung in top_down)
         + ".",
-        f"Codex main session: `{model_of(manifest, 'strategy', 'codex')}` (chosen separately from the tier models).",
+        f"Codex main session: `{model_of(manifest, 'strategy', 'codex')}` (configured separately; must match the confirmed top model for a run).",
     ]
     for rung in top_down:
         on = {host: [label for label in LABELS if roles[label.role][f"{host}_rung"] == rung] for host in ("claude", "codex")}
@@ -465,9 +465,9 @@ def render_skill_block(manifest: dict) -> str:
         ) + "."
     lines.append(
         efforts
-        + " Agent files already pin their models. To spawn on a rung (escalation, finders, skeptic), pass the"
-        " rung's alias as the Agent tool's `model` in Claude Code; in Codex a named agent keeps its pinned model,"
-        " so pass the rung's ID and effort only for finders and the skeptic."
+        + " These are release or installed defaults, not confirmation for a run. In Claude Code pass the family"
+        " alias in each Agent invocation's `model` parameter, then verify its actual ID against the confirmed"
+        " choice; in Codex a named agent keeps its installed pin, which must match the confirmed ID."
     )
     return "\n".join(lines)
 
@@ -488,7 +488,7 @@ def render_readme_table(manifest: dict) -> str:
         row = roles[label.role]
         claude_rung = row["claude_rung"]
         if label.role == "strategy":
-            claude = f"your session model; {claude_rung} recommended"
+            claude = f"your session model; {claude_rung} required"
         else:
             claude = f"`{rungs[claude_rung]['claude']}` ({claude_rung})"
         codex = f"`{model_of(manifest, label.role, 'codex')}` {row['codex_effort']}"

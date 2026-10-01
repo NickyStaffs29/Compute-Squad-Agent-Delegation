@@ -64,7 +64,7 @@ an unverified, possibly session-specific restriction:
 
 - Launch that one session with `multi_agent_version = "v1"` in its profile, or
   use your Codex client's "delegate new thread" phrasing if it documents one.
-- Or run the affected stage through the manual fallback below
+- Or ask the human to reconfirm all three models for this invocation, then run the affected stage through the manual fallback below
   (`01-archive.md` or `04-execute.md`) on the mid-rung model instead of the
   bottom-rung one, for that stage only.
 
@@ -74,13 +74,13 @@ If the Codex version does not support the native plugin manifest, run the manual
 
 **Main-session efficiency.** A child completion is a routing event, not a separate reporting turn. After each log-writing stage returns, run the required compact route command once, retain its output while appending `Status` and preparing the next prompt, and do not repeat the grep or reread unchanged log sections. Do not reread Recon's body after an unblocked route. Batch independent read-only checks into one tool call where the host permits it. When a high-stakes PASS is expected, combine that compact route command with loading the required reference sections, latest Goal, and governing Plan in one tool round trip; route only on the command's output, then derive risks from the Goal before opening PASS evidence. In the next tool round trip, batch the PASS criteria, full base diff, changed source and plan-named callers or stores, status, Decisions, and the plan's exact verification commands. Fetch more only for a specific unanswered risk. Get the timestamp, append the review with a quoted heredoc, and read it back in one sequential tool round trip when the host supports that; inspect the read-back before appending Status. These steps still check every applicable criterion, exact command, and full diff. Stage 1 and closing `squad-mech` archive spawns write no stage entry: use their final archive report and guard, and do not route the empty active log. After squad-mech reports a verified close, do not reread the archive or route the empty log.
 
-Named stage roles already pin their model and effort. Do not spend a separate model-discovery turn or reread the routing table before each stage; use the generated role pin and stop if a spawn reports that its model is unavailable. For an ad hoc finder or skeptic, pass the configured model and effort in the spawn itself.
+Named stage roles already pin fallback models and effort. Confirm the three models once per invocation as required above, then do not spend a separate model-discovery turn or reread the routing table before each stage. Route by the confirmed model and check the actual ID after each spawn as described in the skill.
 
 On native Codex, `wait_agent` is an event subscription, not a polling loop. Do local routing work before waiting. In a non-interactive `codex exec` run, wait once for the stage with `timeout_ms: 600000`; if the host rejects that value, use its largest supported timeout. In an interactive session, wait at most 60 seconds so the user can steer. After a routine timeout, wait again without listing agents or rereading unchanged state; inspect the agent inventory only when the wait reports an error or there is concrete evidence of a stuck child.
 
 ## How to run it
 
-**Stage 0 — Strategy (you, before any session).** Interrogate your own goal: what does done look
+**Stage 0 — Strategy (you, before any session).** Confirm the top, mid, and bottom model IDs with the human for this invocation, including a resume. One ID may fill several rungs. The main session must use the confirmed top ID, and native agents' installed pins must match all three; otherwise update the model choices and start a fresh session. An unattended run without explicit current choices stops. Interrogate your own goal: what does done look
 like, what's out of scope, what could this break. Write down the goal (one sentence), concrete
 acceptance criteria, what's out of scope, and any assumptions (only if you're running unattended;
 otherwise "none"). You own these; no session may redefine them.
